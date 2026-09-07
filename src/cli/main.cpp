@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "core/platform.h"  // defaultHomeDir
+#include "core/util.h"      // envOr
 
 using nlohmann::json;
 
@@ -43,10 +44,6 @@ Args parseArgs(int argc, char** argv) {
     return a;
 }
 
-std::string envOr(const char* name, const std::string& fallback) {
-    const char* v = std::getenv(name);
-    return (v && *v) ? v : fallback;
-}
 
 std::string readMasterKeyFromDisk() {
     std::ifstream in(zp::defaultHomeDir() + "/config/master.key");
@@ -62,12 +59,15 @@ struct Client {
     std::string masterKey;
 
     explicit Client(const Args& a)
-        : http("http://127.0.0.1:" + envOr("ZCODE_PLATFORM_PORT", "8787")),
-          name(a.gopts.count("name") ? a.gopts.at("name") : envOr("ZCODE_AGENT_NAME", "")),
-          key(a.gopts.count("key") ? a.gopts.at("key") : envOr("ZCODE_AGENT_KEY", "")),
+        : http("http://127.0.0.1:" + zp::envOr("AGENTHIVE_PORT", "ZCODE_PLATFORM_PORT", "8787")),
+          name(a.gopts.count("name") ? a.gopts.at("name")
+                                     : zp::envOr("AGENTHIVE_AGENT_NAME", "ZCODE_AGENT_NAME")),
+          key(a.gopts.count("key") ? a.gopts.at("key")
+                                   : zp::envOr("AGENTHIVE_AGENT_KEY", "ZCODE_AGENT_KEY")),
           masterKey(a.gopts.count("master-key")
                         ? a.gopts.at("master-key")
-                        : envOr("ZCODE_PLATFORM_MASTER_KEY", readMasterKeyFromDisk())) {}
+                        : zp::envOr("AGENTHIVE_MASTER_KEY", "ZCODE_PLATFORM_MASTER_KEY",
+                                    readMasterKeyFromDisk())) {}
 
     json call(const std::string& method, const std::string& path, const json* body,
               bool needsAgent) {
@@ -75,7 +75,8 @@ struct Client {
         if (needsAgent) {
             if (name.empty() || key.empty()) {
                 json err{{"code", -1},
-                         {"message", "missing --name/--key (or ZCODE_AGENT_NAME/ZCODE_AGENT_KEY)"},
+                         {"message",
+                          "missing --name/--key (or AGENTHIVE_AGENT_NAME/AGENTHIVE_AGENT_KEY)"},
                          {"data", nullptr}};
                 return err;
             }
@@ -108,7 +109,8 @@ int usage() {
     std::cout <<
         "agent-cli: AgentHive 多 Agent 协作平台命令行客户端（适用于任意 AI Agent）\n"
         "全局选项需放在命令之前: agent-cli --name X --key K [--master-key M] [--port N] <命令> ...\n"
-        "环境: ZCODE_AGENT_NAME ZCODE_AGENT_KEY ZCODE_PLATFORM_MASTER_KEY ZCODE_PLATFORM_PORT\n"
+        "环境: AGENTHIVE_AGENT_NAME AGENTHIVE_AGENT_KEY AGENTHIVE_MASTER_KEY AGENTHIVE_PORT\n"
+        "      （旧 ZCODE_* 环境变量名仍兼容识别）\n"
         "\n"
         "命令:\n"
         "  register --name X [--role member]              注册新 Agent（需 --master-key 或环境变量）\n"

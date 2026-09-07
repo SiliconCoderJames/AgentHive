@@ -9,6 +9,7 @@
 #include <thread>
 
 #include "core/platform.h"
+#include "core/util.h"
 
 int main() {
     zp::Platform platform(zp::defaultHomeDir());
@@ -18,7 +19,10 @@ int main() {
         return 1;
     }
     int port = 8787;
-    if (const char* env = std::getenv("ZCODE_PLATFORM_PORT"); env && *env) port = std::atoi(env);
+    {
+        std::string portEnv = zp::envOr("AGENTHIVE_PORT", "ZCODE_PLATFORM_PORT");
+        if (!portEnv.empty()) port = std::atoi(portEnv.c_str());
+    }
     if (!platform.startHttpServer(port, err)) {
         std::cerr << "[platformd] cannot start server: " << err << "\n";
         return 1;

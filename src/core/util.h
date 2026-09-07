@@ -1,11 +1,20 @@
 #pragma once
-// 通用工具：SHA-256、随机标识、UTC 时间、UTF-8 处理。
+// 通用工具：SHA-256、随机标识、UTC 时间、UTF-8 处理、环境变量读取。
 #include <cstdint>
+#include <cstdlib>
 #include <ctime>
 #include <string>
 #include <vector>
 
 namespace zp {
+
+// 读取环境变量：新名优先，旧名兜底（品牌更名 AgentHive 前的 ZCODE_* 仍生效）
+inline std::string envOr(const char* newName, const char* legacyName,
+                         const std::string& fallback = {}) {
+    if (const char* env = std::getenv(newName); env && *env) return env;
+    if (const char* env = std::getenv(legacyName); env && *env) return env;
+    return fallback;
+}
 
 std::string sha256Hex(const std::string& data);
 std::string randomHex(int bytes);

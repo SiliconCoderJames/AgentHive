@@ -17,7 +17,7 @@ namespace zp {
 namespace fs = std::filesystem;
 
 std::string defaultHomeDir() {
-    if (const char* env = std::getenv("ZCODE_PLATFORM_HOME"); env && *env) return env;
+    if (auto env = envOr("AGENTHIVE_HOME", "ZCODE_PLATFORM_HOME"); !env.empty()) return env;
 #ifdef _WIN32
     if (const char* up = std::getenv("USERPROFILE"); up && *up) {
         std::string home = std::string(up) + "\\.agenthive";
@@ -86,7 +86,7 @@ bool Platform::bootstrap(std::string& err) {
 
     // 主密钥：环境变量优先，其次运行期生成的文件；绝不写入源码
     std::string masterKey;
-    if (const char* env = std::getenv("ZCODE_PLATFORM_MASTER_KEY"); env && *env) {
+    if (auto env = envOr("AGENTHIVE_MASTER_KEY", "ZCODE_PLATFORM_MASTER_KEY"); !env.empty()) {
         masterKey = env;
     } else {
         std::string keyPath = (fs::path(home_dir_) / "config" / "master.key").string();

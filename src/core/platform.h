@@ -22,7 +22,7 @@ namespace zp {
 
 class HttpServer;
 
-// 数据目录：环境变量 ZCODE_PLATFORM_HOME 优先，否则 %USERPROFILE%\.zcode-platform
+// 数据目录：环境变量 AGENTHIVE_HOME 优先（兼容 ZCODE_PLATFORM_HOME），否则 %USERPROFILE%\.agenthive
 std::string defaultHomeDir();
 
 class Platform {

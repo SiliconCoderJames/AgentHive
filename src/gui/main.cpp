@@ -7,6 +7,7 @@
 #include <cstdlib>
 
 #include "core/platform.h"
+#include "core/util.h"
 #include "mainwindow.h"
 
 // 程序化绘制蜂巢图标：深色圆角底 + 琥珀色六边形蜂巢 + 入口点
@@ -74,8 +75,10 @@ int main(int argc, char** argv) {
 
     // 内置 HTTP 服务供 Agent 接入（仅绑定 127.0.0.1）
     int port = 8787;
-    if (const char* env = std::getenv("ZCODE_PLATFORM_PORT"); env && *env)
-        port = std::atoi(env);
+    {
+        std::string portEnv = zp::envOr("AGENTHIVE_PORT", "ZCODE_PLATFORM_PORT");
+        if (!portEnv.empty()) port = std::atoi(portEnv.c_str());
+    }
     std::string serr;
     if (!platform.startHttpServer(port, serr)) {
         QMessageBox::warning(nullptr, "AgentHive 工作台",
