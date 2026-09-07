@@ -19,12 +19,25 @@ namespace fs = std::filesystem;
 std::string defaultHomeDir() {
     if (const char* env = std::getenv("ZCODE_PLATFORM_HOME"); env && *env) return env;
 #ifdef _WIN32
-    if (const char* up = std::getenv("USERPROFILE"); up && *up)
-        return std::string(up) + "\\.zcode-platform";
+    if (const char* up = std::getenv("USERPROFILE"); up && *up) {
+        std::string home = std::string(up) + "\\.agenthive";
+        // 旧品牌数据目录平滑迁移：一次性改名，保留全部数据
+        std::string legacy = std::string(up) + "\\.zcode-platform";
+        std::error_code ec;
+        if (!fs::exists(home) && fs::exists(legacy))
+            fs::rename(legacy, home, ec);
+        return home;
+    }
 #endif
-    if (const char* home = std::getenv("HOME"); home && *home)
-        return std::string(home) + "/.zcode-platform";
-    return ".zcode-platform";
+    if (const char* home = std::getenv("HOME"); home && *home) {
+        std::string homeDir = std::string(home) + "/.agenthive";
+        std::string legacy = std::string(home) + "/.zcode-platform";
+        std::error_code ec;
+        if (!fs::exists(homeDir) && fs::exists(legacy))
+            fs::rename(legacy, homeDir, ec);
+        return homeDir;
+    }
+    return ".agenthive";
 }
 
 Platform::Platform(std::string homeDir)

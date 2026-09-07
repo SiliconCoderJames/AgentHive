@@ -9,8 +9,8 @@
 
 int main(int argc, char** argv) {
     QApplication app(argc, argv);
-    app.setApplicationName("ZCode 多 Agent 协作工作台");
-    app.setOrganizationName("zcode");
+    app.setApplicationName("AgentHive 多 Agent 协作工作台");
+    app.setOrganizationName("agenthive");
 
     // 强制深色主题：QSS 统一管理（背景 #1e1e1e / 卡片 #2d2d2d / 强调 #0ea5e9）
     QFile qss(":/theme/dark.qss");
@@ -20,7 +20,7 @@ int main(int argc, char** argv) {
     zp::Platform platform(zp::defaultHomeDir());
     std::string err;
     if (!platform.bootstrap(err)) {
-        QMessageBox::critical(nullptr, "ZCode 工作台",
+        QMessageBox::critical(nullptr, "AgentHive 工作台",
                               QString::fromStdString("平台初始化失败: " + err));
         return 1;
     }
@@ -31,7 +31,7 @@ int main(int argc, char** argv) {
         port = std::atoi(env);
     std::string serr;
     if (!platform.startHttpServer(port, serr)) {
-        QMessageBox::warning(nullptr, "ZCode 工作台",
+        QMessageBox::warning(nullptr, "AgentHive 工作台",
                              QString::fromStdString("HTTP 服务启动失败，Agent 将无法接入: " + serr));
     }
 

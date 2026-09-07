@@ -1,7 +1,8 @@
-# ZCode 多 Agent 协作平台 · HTTP API 文档
+# AgentHive · 本地多 Agent 协作平台 · HTTP API 文档
 
 平台只监听 **127.0.0.1**（默认端口 `8787`，可用环境变量 `ZCODE_PLATFORM_PORT` 覆盖），
-纯本地运行、不上云。所有 Agent 通过 HTTP + JSON 接入。
+纯本地运行、不上云。所有 Agent —— Claude、Codex、Cursor、Copilot、Droid、Hermes、
+DeepSeek 或任意能发 HTTP 请求的程序 —— 均以相同方式接入。
 
 ## 1. 通用约定
 

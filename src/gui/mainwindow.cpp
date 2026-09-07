@@ -15,7 +15,7 @@
 
 MainWindow::MainWindow(zp::Platform& platform, QWidget* parent)
     : QMainWindow(parent), platform_(platform) {
-    setWindowTitle("ZCode 多 Agent 协作工作台");
+    setWindowTitle("AgentHive · 多 Agent 协作工作台");
 
     auto* central = new QWidget(this);
     auto* layout = new QHBoxLayout(central);

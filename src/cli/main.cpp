@@ -106,7 +106,7 @@ struct Client {
 
 int usage() {
     std::cout <<
-        "agent-cli: ZCode 多 Agent 协作平台命令行客户端\n"
+        "agent-cli: AgentHive 多 Agent 协作平台命令行客户端（适用于任意 AI Agent）\n"
         "全局选项需放在命令之前: agent-cli --name X --key K [--master-key M] [--port N] <命令> ...\n"
         "环境: ZCODE_AGENT_NAME ZCODE_AGENT_KEY ZCODE_PLATFORM_MASTER_KEY ZCODE_PLATFORM_PORT\n"
         "\n"

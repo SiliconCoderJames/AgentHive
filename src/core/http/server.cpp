@@ -135,7 +135,7 @@ void HttpServer::setupRoutes() {
     Platform& p = platform_;
 
     srv.Get("/api/health", [&](const httplib::Request&, httplib::Response& res) {
-        send(res, ok(json{{"service", "zcode-platform"},
+        send(res, ok(json{{"service", "agenthive"},
                           {"version", "0.1.0"},
                           {"db", "sqlite3+sqlite-vec"},
                           {"time", nowIso()}}));
