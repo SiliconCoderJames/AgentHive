@@ -13,8 +13,10 @@ public:
     explicit AgentService(Database& db) : db_(db) {}
 
     bool registerAgent(const std::string& name, const std::string& role,
-                       const std::string& apiKeyHash, std::string& err);
-    std::string keyHashOf(const std::string& name, std::string& err) const;
+                       const std::string& salt, const std::string& keyHash, std::string& err);
+    // 取凭据：salt 为空表示旧格式（hash = sha256(明钥)），否则 hash = sha256(salt + 明钥)
+    bool credentialOf(const std::string& name, std::string& salt, std::string& hash,
+                      std::string& err) const;
     void heartbeat(const std::string& name, const std::string& currentTask);
     bool listAgents(std::vector<AgentInfo>& out, std::string& err);
     bool nameExists(const std::string& name);

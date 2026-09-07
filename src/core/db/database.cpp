@@ -73,4 +73,23 @@ bool Database::execScript(const std::string& sql, std::string& err) {
     return true;
 }
 
+bool Database::tryExec(const std::string& sql) {
+    char* msg = nullptr;
+    int rc = sqlite3_exec(db_, sql.c_str(), nullptr, nullptr, &msg);
+    bool dup = rc != SQLITE_OK && msg && std::strstr(msg, "duplicate column") != nullptr;
+    sqlite3_free(msg);
+    return rc == SQLITE_OK || dup;
+}
+
+bool Database::beginImmediate(std::string& err) {
+    return execScript("BEGIN IMMEDIATE;", err);
+}
+bool Database::commit(std::string& err) { return execScript("COMMIT;", err); }
+bool Database::rollback() {
+    char* msg = nullptr;
+    sqlite3_exec(db_, "ROLLBACK;", nullptr, nullptr, &msg);
+    sqlite3_free(msg);
+    return true;
+}
+
 }  // namespace zp

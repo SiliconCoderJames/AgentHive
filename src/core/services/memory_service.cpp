@@ -30,7 +30,8 @@ bool MemoryService::list(const std::string& sectionFilter, std::vector<MemoryEnt
 }
 
 bool MemoryService::set(const std::string& author, const std::string& section, const std::string& key,
-                        const std::string& value, MemoryEntry& out, std::string& err) {
+                        const std::string& value, int baseVersion, MemoryEntry& out,
+                        std::string& err) {
     int64_t latestId = 0;
     int latestVersion = 0;
     bool found = false;
@@ -40,6 +41,13 @@ bool MemoryService::set(const std::string& author, const std::string& section, c
             [&](Stmt& st) { latestId = st.i64(0); latestVersion = static_cast<int>(st.i64(1)); found = true; },
             err))
         return false;
+
+    // 乐观并发：调用方基于旧版本写入时拒绝，避免静默覆盖他人更新
+    if (baseVersion > 0 && (!found || latestVersion != baseVersion)) {
+        err = "version conflict: expected base v" + std::to_string(baseVersion) +
+              ", latest is v" + std::to_string(found ? latestVersion : 0);
+        return false;
+    }
 
     int newVersion = found ? latestVersion + 1 : 1;
     if (found) {
@@ -69,6 +77,17 @@ bool MemoryService::set(const std::string& author, const std::string& section, c
     out.version = newVersion;
     out.created_at = nowIso();
     return true;
+}
+
+bool MemoryService::remove(const std::string& section, const std::string& key, int64_t& removed,
+                           std::string& err) {
+    removed = 0;
+    if (!db_.query("SELECT COUNT(*) FROM memory_entries WHERE section=? AND key=?",
+                   [&](Stmt& st) { st.bind(1, section); st.bind(2, key); },
+                   [&](Stmt& st) { removed = st.i64(0); }, err))
+        return false;
+    return db_.query("DELETE FROM memory_entries WHERE section=? AND key=?",
+                     [&](Stmt& st) { st.bind(1, section); st.bind(2, key); }, nullptr, err);
 }
 
 bool MemoryService::history(const std::string& section, const std::string& key,

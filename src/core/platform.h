@@ -63,6 +63,8 @@ public:
     bool knowledgeSearch(const std::string& query, SearchMode mode, int limit,
                          const std::string& tagFilter, std::vector<KnowledgeHit>& out,
                          std::string& err);
+    // 管理性硬删除（仅管理者/主密钥），连同全部版本与向量；记入审计
+    bool knowledgeRemove(const std::string& actor, const std::string& uuid, std::string& err);
 
     // ---- 技能库 ----
     bool skillRegister(const std::string& author, const std::string& name,
@@ -83,9 +85,12 @@ public:
     // ---- 用户记忆 ----
     bool memoryList(const std::string& section, std::vector<MemoryEntry>& out, std::string& err);
     bool memorySet(const std::string& author, const std::string& section, const std::string& key,
-                   const std::string& value, MemoryEntry& out, std::string& err);
+                   const std::string& value, int baseVersion, MemoryEntry& out, std::string& err);
     bool memoryHistory(const std::string& section, const std::string& key,
                        std::vector<MemoryEntry>& out, std::string& err);
+    // 管理性删除某条记忆的全部版本；记入审计
+    bool memoryRemove(const std::string& actor, const std::string& section,
+                      const std::string& key, std::string& err);
 
     // ---- 消息 ----
     bool messageSend(const std::string& kind, const std::string& sender,
@@ -110,8 +115,10 @@ public:
                       ErrorReport& out, std::string& err);
 
     // ---- Token 用量 ----
+    // 超过周预算时拒绝（返回 false，err 前缀 "weekly token budget exceeded"）
     bool usageReport(const std::string& agent, int64_t tokensIn, int64_t tokensOut,
-                     const std::string& callType, const std::string& referenceId, std::string& err);
+                     const std::string& callType, const std::string& referenceId,
+                     const std::string& idempotencyKey, bool& duplicate, std::string& err);
     bool usageSummary(UsageSummary& out, std::string& err);
     int64_t usageBudget(std::string& err);
     bool usageSetBudget(const std::string& actor, int64_t budget, std::string& err);
@@ -120,6 +127,16 @@ public:
     bool auditList(const std::string& actorFilter, const std::string& actionFilter,
                    const std::string& sinceIso, int limit, std::vector<AuditRecord>& out,
                    std::string& err);
+
+    // ---- 运维：维护 / 备份恢复 ----
+    // 审计轮转（30 天或 10 万条）+ 已解决错误归档清理；有删除时 VACUUM。
+    // 返回统计 JSON（deleted_audit/deleted_errors/vacuumed）。
+    bool maintenanceRun(const std::string& actor, std::string& statsJson, std::string& err);
+    // 备份：VACUUM INTO 到 home/backup/platform-<时间戳>.db（WAL 一致性快照）
+    bool backupCreate(std::string& outPath, std::string& err);
+    bool backupList(std::vector<std::string>& out, std::string& err);
+    // 恢复：name 为 backupList 中的文件名（拒绝路径分隔符）；恢复后重开数据库
+    bool backupRestore(const std::string& name, std::string& err);
 
     // ---- HTTP 服务（仅绑定 127.0.0.1）----
     bool startHttpServer(int port, std::string& err);

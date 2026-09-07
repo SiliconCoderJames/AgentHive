@@ -143,6 +143,16 @@ std::string weekStartIso() {
     return os.str();
 }
 
+std::string isoDaysAgo(int days) {
+    using namespace std::chrono;
+    auto t = system_clock::now() - hours{24} * days;
+    std::time_t tt = system_clock::to_time_t(t);
+    std::tm tm = utcTm(tt);
+    std::ostringstream os;
+    os << std::put_time(&tm, "%Y-%m-%dT%H:%M:%SZ");
+    return os.str();
+}
+
 bool parseIso(const std::string& iso, std::time_t& out) {
     std::tm tm{};
     std::istringstream is(iso);

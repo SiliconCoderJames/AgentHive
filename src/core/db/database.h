@@ -47,6 +47,12 @@ public:
                const std::function<void(Stmt&)>& row, std::string& err);
     // 执行脚本（建表语句；不含任何外部输入）。
     bool execScript(const std::string& sql, std::string& err);
+    // 迁移用：执行语句，"duplicate column" 类错误静默吞掉并返回 true。
+    bool tryExec(const std::string& sql);
+    // 显式事务（互斥锁之外的多语句原子性，如用量扣减）
+    bool beginImmediate(std::string& err);
+    bool commit(std::string& err);
+    bool rollback();
 
     int64_t lastInsertId() const { return last_insert_id_; }
     sqlite3* handle() { return db_; }

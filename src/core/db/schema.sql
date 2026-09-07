@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS agents (
     name         TEXT NOT NULL UNIQUE,
     role         TEXT NOT NULL DEFAULT 'member',   -- member | zcode
     api_key_hash TEXT NOT NULL,
+    salt         TEXT NOT NULL DEFAULT '',         -- 加盐哈希；空串=旧格式（sha256 明钥）
     status       TEXT NOT NULL DEFAULT 'offline',
     current_task TEXT,
     last_seen_at TEXT,
@@ -120,16 +121,21 @@ CREATE TABLE IF NOT EXISTS audit_log (
 );
 
 -- Token 用量：每次调用一条，按自然周（周一 UTC 起）聚合。
+-- idempotency_key 非空时全局唯一，保证同一任务重复上报不重复扣减。
 CREATE TABLE IF NOT EXISTS token_usage (
-    id           INTEGER PRIMARY KEY AUTOINCREMENT,
-    agent        TEXT NOT NULL,
-    week_start   TEXT NOT NULL,
-    tokens_in    INTEGER NOT NULL DEFAULT 0,
-    tokens_out   INTEGER NOT NULL DEFAULT 0,
-    call_type    TEXT,
-    reference_id TEXT,
-    created_at   TEXT NOT NULL
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    agent           TEXT NOT NULL,
+    week_start      TEXT NOT NULL,
+    tokens_in       INTEGER NOT NULL DEFAULT 0,
+    tokens_out      INTEGER NOT NULL DEFAULT 0,
+    call_type       TEXT,
+    reference_id    TEXT,
+    idempotency_key TEXT,
+    created_at      TEXT NOT NULL
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_usage_idem
+    ON token_usage(idempotency_key) WHERE idempotency_key IS NOT NULL AND idempotency_key != '';
 
 CREATE INDEX IF NOT EXISTS idx_knowledge_uuid      ON knowledge_entries(uuid, version);
 CREATE INDEX IF NOT EXISTS idx_knowledge_latest    ON knowledge_entries(is_latest, created_at);

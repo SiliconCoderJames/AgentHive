@@ -211,9 +211,18 @@ void HttpServer::setupRoutes() {
         std::string section = body.value("section", "");
         std::string key = body.value("key", "");
         std::string value = body.value("value", "");
+        int baseVersion = body.value("base_version", 0);
         MemoryEntry out;
         std::string err;
-        if (!p.memorySet(actor, section, key, value, out, err)) { send(res, fail(400, err)); return; }
+        if (!p.memorySet(actor, section, key, value, baseVersion, out, err)) {
+            // 乐观并发冲突 → 409，携带服务端最新版本
+            if (err.rfind("version conflict", 0) == 0) {
+                send(res, fail(409, err));
+                return;
+            }
+            send(res, fail(400, err));
+            return;
+        }
         send(res, ok(json{{"section", out.section}, {"key", out.key}, {"value", out.value},
                           {"author", out.author}, {"version", out.version},
                           {"created_at", out.created_at}}));
@@ -419,6 +428,11 @@ void HttpServer::setupRoutes() {
         int64_t tout = body.value("tokens_out", 0);
         std::string err;
         if (!p.skillInvoke(actor, req.matches[1], params, result, status, duration, tin, tout, err)) {
+            // 周预算耗尽 → 429（请求方应停止消耗并等待下周或预算调整）
+            if (err.rfind("weekly token budget exceeded", 0) == 0) {
+                send(res, fail(429, err));
+                return;
+            }
             send(res, fail(400, err));
             return;
         }
@@ -593,15 +607,21 @@ void HttpServer::setupRoutes() {
         int64_t tout = body.value("tokens_out", 0);
         std::string type = body.value("call_type", "");
         std::string ref = body.value("reference_id", "");
+        std::string idem = body.value("idempotency_key", "");
+        bool duplicate = false;
         std::string err;
-        if (!p.usageReport(actor, tin, tout, type, ref, err)) { send(res, fail(400, err)); return; }
+        if (!p.usageReport(actor, tin, tout, type, ref, idem, duplicate, err)) {
+            send(res, fail(400, err));
+            return;
+        }
         UsageSummary sum;
         if (!p.usageSummary(sum, err)) { send(res, fail(500, err)); return; }
         send(res, ok(json{{"week_start", sum.week_start},
                           {"budget", sum.budget},
                           {"used", sum.total_tokens},
                           {"remaining", sum.budget - sum.total_tokens},
-                          {"alert_level", sum.alert_level}}));
+                          {"alert_level", sum.alert_level},
+                          {"duplicate", duplicate}}));
     });
 
     srv.Get("/api/usage/summary", [&](const httplib::Request& req, httplib::Response& res) {
@@ -665,6 +685,54 @@ void HttpServer::setupRoutes() {
                            {"detail", json::parse(r.detail)},
                            {"created_at", r.created_at}});
         send(res, ok(arr));
+    });
+
+    // ---- 运维（主密钥）：维护 / 备份恢复 / 管理性删除 ----
+    srv.Post("/api/maintenance", [&](const httplib::Request& req, httplib::Response& res) {
+        if (!checkMaster(req, p, res)) return;
+        std::string stats, err;
+        if (!p.maintenanceRun(kManagerName, stats, err)) { send(res, fail(500, err)); return; }
+        send(res, ok(json::parse(stats)));
+    });
+
+    srv.Post("/api/system/backup", [&](const httplib::Request& req, httplib::Response& res) {
+        if (!checkMaster(req, p, res)) return;
+        std::string path, err;
+        if (!p.backupCreate(path, err)) { send(res, fail(500, err)); return; }
+        send(res, ok(json{{"path", path}}));
+    });
+
+    srv.Get("/api/system/backups", [&](const httplib::Request& req, httplib::Response& res) {
+        if (!checkMaster(req, p, res)) return;
+        std::vector<std::string> files;
+        std::string err;
+        if (!p.backupList(files, err)) { send(res, fail(500, err)); return; }
+        send(res, ok(files));
+    });
+
+    srv.Post("/api/system/restore", [&](const httplib::Request& req, httplib::Response& res) {
+        if (!checkMaster(req, p, res)) return;
+        auto body = json::parse(req.body, nullptr, false);
+        if (body.is_discarded() || !body.is_object()) { send(res, fail(400, "invalid JSON body")); return; }
+        std::string err;
+        if (!p.backupRestore(body.value("file", ""), err)) { send(res, fail(400, err)); return; }
+        send(res, ok(json{{"restored", body.value("file", "")}}));
+    });
+
+    srv.Delete(R"(/api/knowledge/([0-9a-fA-F-]{36}))", [&](const httplib::Request& req, httplib::Response& res) {
+        if (!checkMaster(req, p, res)) return;
+        std::string err;
+        if (!p.knowledgeRemove(kManagerName, req.matches[1], err)) { send(res, fail(404, err)); return; }
+        send(res, ok(json{{"removed", req.matches[1]}}));
+    });
+
+    srv.Delete("/api/memory", [&](const httplib::Request& req, httplib::Response& res) {
+        if (!checkMaster(req, p, res)) return;
+        std::string section = req.get_param_value("section");
+        std::string key = req.get_param_value("key");
+        std::string err;
+        if (!p.memoryRemove(kManagerName, section, key, err)) { send(res, fail(404, err)); return; }
+        send(res, ok(json{{"removed", section + "/" + key}}));
     });
 }
 

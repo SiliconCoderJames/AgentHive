@@ -13,9 +13,10 @@ public:
     explicit MemoryService(Database& db) : db_(db) {}
 
     bool list(const std::string& sectionFilter, std::vector<MemoryEntry>& out, std::string& err);
-    // 存在则生成新版本（旧版本 is_latest 置 0、内容不动），不存在则新建 v1。
+    // baseVersion > 0 时做乐观并发校验：与最新版本不符则报 version conflict（不写入）
     bool set(const std::string& author, const std::string& section, const std::string& key,
-             const std::string& value, MemoryEntry& out, std::string& err);
+             const std::string& value, int baseVersion, MemoryEntry& out, std::string& err);
+    bool remove(const std::string& section, const std::string& key, int64_t& removed, std::string& err);
     bool history(const std::string& section, const std::string& key,
                  std::vector<MemoryEntry>& out, std::string& err);
 

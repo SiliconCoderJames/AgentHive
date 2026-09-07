@@ -13,6 +13,7 @@ std::string uuid4();                      // 8-4-4-4-12 形式
 std::string nowIso();                     // UTC ISO8601，如 2026-09-07T05:00:00Z
 std::string weekStartIso();               // 本周一（UTC 00:00）
 bool parseIso(const std::string& iso, std::time_t& out);  // 解析本平台生成的 ISO 时间
+std::string isoDaysAgo(int days);         // days 天前的 UTC ISO8601（维护轮转用）
 std::vector<uint32_t> utf8Codepoints(const std::string& s);
 std::string toLower(const std::string& s);
 std::string join(const std::vector<std::string>& v, const std::string& sep);

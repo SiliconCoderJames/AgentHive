@@ -215,12 +215,17 @@ static void test_platform_end_to_end() {
         CHECK(p.skillInvoke("claude", "code-review", "{\"file\":\"a.cpp\"}", "通过", "success",
                             120, 3000, 2000, err));
 
-        // 记忆：两次 set 生成两个版本
+        // 记忆：两次 set 生成两个版本；base_version 冲突被拒
         step("memory");
         zp::MemoryEntry m1, m2;
-        CHECK(p.memorySet("hermes", "project", "current", "正在开发多 Agent 平台", m1, err));
+        CHECK(p.memorySet("hermes", "project", "current", "正在开发多 Agent 平台", 0, m1, err));
         CHECK_EQ(m1.version, 1);
-        CHECK(p.memorySet("claude", "project", "current", "正在开发多 Agent 平台（Qt 工作台）", m2, err));
+        // 乐观并发：基于 v1 写入应冲突（最新已是 v1？不，此时最新是 v1，基于 v9 冲突）
+        std::string conflictErr;
+        zp::MemoryEntry mc;
+        CHECK(!p.memorySet("codex", "project", "current", "并发覆盖尝试", 9, mc, conflictErr));
+        CHECK(conflictErr.rfind("version conflict", 0) == 0);
+        CHECK(p.memorySet("claude", "project", "current", "正在开发多 Agent 平台（Qt 工作台）", 0, m2, err));
         CHECK_EQ(m2.version, 2);
         std::vector<zp::MemoryEntry> hist;
         CHECK(p.memoryHistory("project", "current", hist, err));
@@ -264,18 +269,30 @@ static void test_platform_end_to_end() {
         CHECK(p.usageSummary(sum, err));
         CHECK_EQ(sum.total_tokens, static_cast<int64_t>(5000));
         CHECK_EQ(sum.alert_level, "none");
-        CHECK(p.usageReport("hermes", 500, 400, "skill", "x", err));  // 50.9%
+        bool dup = false;
+        CHECK(p.usageReport("hermes", 500, 400, "skill", "x", "", dup, err));  // 5.9%
         CHECK(p.usageSummary(sum, err));
         CHECK_EQ(sum.alert_level, "none");
-        CHECK(p.usageReport("hermes", 75000, 0, "skill", "x", err));  // 80.9%
+        // 幂等：同一 idempotency_key 重复上报不重复扣减
+        CHECK(p.usageReport("hermes", 75000, 0, "llm", "task-1", "idem-1", dup, err));
+        CHECK(!dup);
         CHECK(p.usageSummary(sum, err));
-        CHECK_EQ(sum.alert_level, "warn");
-        CHECK(p.usageReport("hermes", 15000, 0, "skill", "x", err));  // 95.9%
+        int64_t afterFirst = sum.total_tokens;
+        CHECK(p.usageReport("hermes", 75000, 0, "llm", "task-1", "idem-1", dup, err));
+        CHECK(dup);
+        CHECK(p.usageSummary(sum, err));
+        CHECK_EQ(sum.total_tokens, afterFirst);  // 未重复扣减
+        CHECK_EQ(sum.alert_level, "warn");       // 80.9%
+        CHECK(p.usageReport("hermes", 15000, 0, "llm", "", "idem-2", dup, err));  // 95.9%
         CHECK(p.usageSummary(sum, err));
         CHECK_EQ(sum.alert_level, "critical");
-        CHECK(p.usageReport("hermes", 10000, 0, "skill", "x", err));  // 105.9%
+        CHECK(p.usageReport("hermes", 10000, 0, "llm", "", "idem-3", dup, err));  // 105.9%
         CHECK(p.usageSummary(sum, err));
         CHECK_EQ(sum.alert_level, "over");
+        // 预算耗尽：技能调用被拒绝（429 语义）
+        std::string budgetErr;
+        CHECK(!p.skillInvoke("hermes", "code-review", "{}", "", "success", 1, 0, 0, budgetErr));
+        CHECK(budgetErr.rfind("weekly token budget exceeded", 0) == 0);
 
         // 审计留痕
         step("audit");
@@ -314,6 +331,53 @@ static void test_platform_end_to_end() {
         else if (bad->status != 401)
             std::printf("  bad-key status=%d body=%s\n", bad->status, bad->body.c_str());
         CHECK(bad && bad->status == 401);
+
+        // ---- 加固项：长度校验 ----
+        std::string longTitle(300, 'x');
+        std::string vErr;
+        zp::KnowledgeEntry longEntry;
+        CHECK(!p.knowledgeCreate("hermes", longTitle, "内容", {}, "", {}, "", longEntry, vErr));
+        CHECK(vErr.find("too long") != std::string::npos);
+
+        // ---- 加固项：管理性删除（仅 zcode）----
+        std::string rmErr;
+        CHECK(!p.knowledgeRemove("hermes", e1.uuid, rmErr));  // 非管理者被拒
+        CHECK(p.knowledgeRemove("zcode", e1.uuid, rmErr));
+        std::vector<zp::KnowledgeEntry> gone;
+        CHECK(p.knowledgeVersions(e1.uuid, gone, rmErr));
+        CHECK(gone.empty());                                  // 版本全部移除
+        CHECK(p.memoryRemove("zcode", "project", "current", rmErr));
+        std::vector<zp::MemoryEntry> memGone;
+        CHECK(p.memoryList("project", memGone, rmErr));
+        CHECK(memGone.empty());
+        CHECK(!p.memoryRemove("zcode", "project", "nonexistent", rmErr));
+
+        // ---- 加固项：备份与恢复 ----
+        std::vector<zp::KnowledgeEntry> before;
+        CHECK(p.knowledgeList(100, "", before, rmErr));
+        std::string backupPath;
+        CHECK(p.backupCreate(backupPath, rmErr));
+        CHECK(fs::exists(backupPath));
+        std::vector<std::string> backups;
+        CHECK(p.backupList(backups, rmErr));
+        CHECK(backups.size() >= 1);
+        // 删除全部知识条目后从备份恢复
+        for (const auto& e : before) CHECK(p.knowledgeRemove("zcode", e.uuid, rmErr));
+        std::vector<zp::KnowledgeEntry> emptied;
+        CHECK(p.knowledgeList(100, "", emptied, rmErr));
+        CHECK(emptied.empty());
+        CHECK(p.backupRestore(backups[0], rmErr));
+        std::vector<zp::KnowledgeEntry> restored;
+        CHECK(p.knowledgeList(100, "", restored, rmErr));
+        CHECK_EQ(restored.size(), before.size());
+        // 非法备份名被拒（路径穿越防护）
+        std::string travErr;
+        CHECK(!p.backupRestore("../platform.db", travErr));
+
+        // ---- 加固项：维护轮转 ----
+        std::string stats;
+        CHECK(p.maintenanceRun("zcode", stats, rmErr));
+        CHECK(stats.find("deleted_audit") != std::string::npos);
 
         p.shutdown();
     }

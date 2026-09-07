@@ -108,7 +108,7 @@ void MemoryPanel::onEdit() {
     std::string err;
     zp::MemoryEntry out;
     if (!platform_.memorySet("user", section->currentText().toStdString(), key->text().trimmed().toStdString(),
-                             value->toPlainText().toStdString(), out, err)) {
+                             value->toPlainText().toStdString(), 0, out, err)) {
         QMessageBox::warning(this, "保存失败", QString::fromStdString(err));
         return;
     }

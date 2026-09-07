@@ -16,8 +16,10 @@ class UsageService {
 public:
     explicit UsageService(Database& db) : db_(db) {}
 
+    // idempotencyKey 非空时幂等：同一键重复上报只记一次，duplicate=true 标记
     bool report(const std::string& agent, int64_t tokensIn, int64_t tokensOut,
-                const std::string& callType, const std::string& referenceId, std::string& err);
+                const std::string& callType, const std::string& referenceId,
+                const std::string& idempotencyKey, bool& duplicate, std::string& err);
     bool summary(UsageSummary& out, std::string& err);
     int64_t budget(std::string& err);
     bool setBudget(int64_t budget, std::string& err);

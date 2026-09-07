@@ -1,5 +1,6 @@
 #include "core/platform.h"
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -46,11 +47,18 @@ bool Platform::bootstrap(std::string& err) {
 
     std::error_code ec;
     fs::create_directories(fs::path(home_dir_) / "config", ec);
+    fs::create_directories(fs::path(home_dir_) / "backup", ec);
     if (ec) { err = "cannot create home dir: " + ec.message(); return false; }
 
     std::string dbPath = (fs::path(home_dir_) / "platform.db").string();
     if (!db_.open(dbPath, err)) return false;
     if (!db_.execScript(kSchemaSql, err)) return false;
+    // 存量库迁移：新增列（已存在则静默跳过）
+    db_.tryExec("ALTER TABLE agents ADD COLUMN salt TEXT NOT NULL DEFAULT '';");
+    db_.tryExec("ALTER TABLE token_usage ADD COLUMN idempotency_key TEXT;");
+    db_.tryExec("CREATE UNIQUE INDEX IF NOT EXISTS idx_usage_idem "
+                "ON token_usage(idempotency_key) "
+                "WHERE idempotency_key IS NOT NULL AND idempotency_key != '';");
     // 启用 sqlite-vec（静态链接进本进程）
     if (sqlite3_vec_init(db_.handle(), nullptr, nullptr) != SQLITE_OK) {
         err = sqlite3_errmsg(db_.handle());
@@ -83,12 +91,18 @@ bool Platform::bootstrap(std::string& err) {
     // 管理者账号由主密钥引导注册（幂等）
     if (!agents_.nameExists(kManagerName)) {
         std::string zcodeKey = randomHex(32);
-        if (!agents_.registerAgent(kManagerName, kManagerName, sha256Hex(zcodeKey), err))
+        std::string zcodeSalt = randomHex(16);
+        if (!agents_.registerAgent(kManagerName, kManagerName, zcodeSalt,
+                                   sha256Hex(zcodeSalt + zcodeKey), err))
             return false;
         if (!persistAgentKey(kManagerName, zcodeKey, err)) return false;
         audit_.log("system", "agent.register", kManagerName,
                    nlohmann::json{{"role", "zcode"}}.dump(), err);
     }
+
+    // 数据增长维护：审计轮转 + 已解决错误清理（每次启动执行）
+    std::string stats;
+    maintenanceRun("system", stats, err);
 
     bootstrapped_ = true;
     return true;
@@ -121,9 +135,11 @@ bool Platform::persistAgentKey(const std::string& name, const std::string& apiKe
 bool Platform::authenticate(const std::string& agent, const std::string& apiKey) const {
     std::lock_guard lock(mutex_);
     std::string err;
-    std::string stored = agents_.keyHashOf(agent, err);
+    std::string salt, stored;
+    if (!agents_.credentialOf(agent, salt, stored, err)) return false;
     if (stored.empty()) return false;
-    return stored == sha256Hex(apiKey);
+    // 盐为空 = 旧格式哈希；非空 = sha256(salt + 明钥)
+    return stored == sha256Hex(salt.empty() ? apiKey : salt + apiKey);
 }
 
 bool Platform::authenticateMaster(const std::string& masterKey) const {
@@ -145,7 +161,9 @@ bool Platform::registerAgent(const std::string& masterKey, const std::string& na
     std::string actualRole = name == kManagerName ? std::string(kManagerName) : role;
     if (actualRole.empty()) actualRole = kDefaultRole;
     outApiKey = randomHex(32);
-    if (!agents_.registerAgent(name, actualRole, sha256Hex(outApiKey), err)) return false;
+    std::string salt = randomHex(16);
+    if (!agents_.registerAgent(name, actualRole, salt, sha256Hex(salt + outApiKey), err))
+        return false;
     persistAgentKey(name, outApiKey, err);
     audit_.log("master", "agent.register", name,
                nlohmann::json{{"role", actualRole}}.dump(), err);
@@ -209,6 +227,12 @@ bool Platform::knowledgeCreate(const std::string& author, const std::string& tit
                                std::string& err) {
     std::lock_guard lock(mutex_);
     if (title.empty() || content.empty()) { err = "title and content are required"; return false; }
+    if (title.size() > 200 || content.size() > 100000 || category.size() > 64 || tags.size() > 20) {
+        err = "field too long (title<=200, content<=100000, category<=64, tags<=20)";
+        return false;
+    }
+    for (const auto& t : tags)
+        if (t.size() > 64) { err = "tag too long (<=64)"; return false; }
     bool provided = false;
     std::vector<float> vec = resolveEmbedding(content, &embedding, provided);
     std::string provider = provided ? embeddingProvider : embedder_->name();
@@ -256,6 +280,25 @@ bool Platform::knowledgeAddVersion(const std::string& author, const std::string&
     return true;
 }
 
+bool Platform::knowledgeRemove(const std::string& actor, const std::string& uuid,
+                               std::string& err) {
+    std::lock_guard lock(mutex_);
+    if (!isManager(actor)) { err = "only zcode can remove knowledge entries"; return false; }
+    KnowledgeEntry cur;
+    if (!knowledge_.latest(uuid, cur, err)) return false;
+    // 删除全部版本与向量行（vec0 虚拟表按 entry_id 关联）
+    if (!db_.query("DELETE FROM knowledge_vec WHERE entry_id IN "
+                   "(SELECT id FROM knowledge_entries WHERE uuid=?)",
+                   [&](Stmt& st) { st.bind(1, uuid); }, nullptr, err))
+        return false;
+    if (!db_.query("DELETE FROM knowledge_entries WHERE uuid=?",
+                   [&](Stmt& st) { st.bind(1, uuid); }, nullptr, err))
+        return false;
+    audit_.log(actor, "knowledge.remove", uuid,
+               nlohmann::json{{"title", cur.title}}.dump(), err);
+    return true;
+}
+
 bool Platform::knowledgeSearch(const std::string& query, SearchMode mode, int limit,
                                const std::string& tagFilter, std::vector<KnowledgeHit>& out,
                                std::string& err) {
@@ -280,6 +323,11 @@ bool Platform::skillRegister(const std::string& author, const std::string& name,
                              SkillInfo& out, std::string& err) {
     std::lock_guard lock(mutex_);
     if (name.empty() || description.empty()) { err = "name and description are required"; return false; }
+    if (name.size() > 64 || description.size() > 2000 || category.size() > 64 ||
+        paramSchema.size() > 10000) {
+        err = "field too long (name<=64, description<=2000, category<=64, schema<=10000)";
+        return false;
+    }
     if (!skills_.registerSkill(name, displayName, description, category, author, paramSchema, out,
                                err))
         return false;
@@ -310,11 +358,21 @@ bool Platform::skillInvoke(const std::string& caller, const std::string& skillNa
         return false;
     }
     if (status != "success" && status != "failed") { err = "status must be success|failed"; return false; }
+    // 预算拦截：本周用量已达上限时拒绝新的技能调用
+    UsageSummary sum;
+    if (!usage_.summary(sum, err)) return false;
+    if (sum.total_tokens >= sum.budget) {
+        err = "weekly token budget exceeded: used " + std::to_string(sum.total_tokens) +
+              " / " + std::to_string(sum.budget);
+        return false;
+    }
     if (!skills_.recordInvocation(skillName, caller, paramsJson, resultSummary, status, durationMs,
                                   err))
         return false;
     if (tokensIn > 0 || tokensOut > 0) {
-        if (!usage_.report(caller, tokensIn, tokensOut, "skill", skillName, err)) return false;
+        bool invDup = false;
+        if (!usage_.report(caller, tokensIn, tokensOut, "skill", skillName, "", invDup, err))
+            return false;
     }
     audit_.log(caller, "skill.invoke", skillName,
                nlohmann::json{{"status", status}, {"duration_ms", durationMs}}.dump(), err);
@@ -336,13 +394,29 @@ bool Platform::memoryList(const std::string& section, std::vector<MemoryEntry>& 
 }
 
 bool Platform::memorySet(const std::string& author, const std::string& section,
-                         const std::string& key, const std::string& value, MemoryEntry& out,
-                         std::string& err) {
+                         const std::string& key, const std::string& value, int baseVersion,
+                         MemoryEntry& out, std::string& err) {
     std::lock_guard lock(mutex_);
     if (section.empty() || key.empty()) { err = "section and key are required"; return false; }
-    if (!memory_.set(author, section, key, value, out, err)) return false;
+    if (section.size() > 32 || key.size() > 128 || value.size() > 20000) {
+        err = "field too long (section<=32, key<=128, value<=20000)";
+        return false;
+    }
+    if (!memory_.set(author, section, key, value, baseVersion, out, err)) return false;
     audit_.log(author, "memory.set", section + "/" + key,
                nlohmann::json{{"version", out.version}, {"value", value}}.dump(), err);
+    return true;
+}
+
+bool Platform::memoryRemove(const std::string& actor, const std::string& section,
+                            const std::string& key, std::string& err) {
+    std::lock_guard lock(mutex_);
+    if (!isManager(actor)) { err = "only zcode can remove memory entries"; return false; }
+    int64_t removed = 0;
+    if (!memory_.remove(section, key, removed, err)) return false;
+    if (removed == 0) { err = "memory entry not found: " + section + "/" + key; return false; }
+    audit_.log(actor, "memory.remove", section + "/" + key,
+               nlohmann::json{{"versions_removed", removed}}.dump(), err);
     return true;
 }
 
@@ -359,6 +433,10 @@ bool Platform::messageSend(const std::string& kind, const std::string& sender,
                            const std::string& body, Message& out, std::string& err) {
     std::lock_guard lock(mutex_);
     if (body.empty()) { err = "body is required"; return false; }
+    if (body.size() > 50000 || subject.size() > 200) {
+        err = "field too long (subject<=200, body<=50000)";
+        return false;
+    }
     if (!messages_.send(kind, sender, recipient, subject, body, std::string(), out, err))
         return false;
     audit_.log(sender, "message.send", out.uuid,
@@ -416,6 +494,11 @@ bool Platform::errorReport(const std::string& reporter, const std::string& sever
                            ErrorReport& out, std::string& err) {
     std::lock_guard lock(mutex_);
     if (title.empty() || detail.empty()) { err = "title and detail are required"; return false; }
+    if (title.size() > 200 || detail.size() > 50000 || stackTrace.size() > 20000 ||
+        source.size() > 128) {
+        err = "field too long (title<=200, detail<=50000, stack<=20000, source<=128)";
+        return false;
+    }
     std::string sev = severity;
     if (sev != "info" && sev != "warning" && sev != "error" && sev != "critical") sev = "error";
     if (!errors_.report(reporter, sev, source, title, detail, stackTrace, out, err)) return false;
@@ -448,13 +531,17 @@ bool Platform::errorResolve(const std::string& actor, const std::string& uuid,
 
 bool Platform::usageReport(const std::string& agent, int64_t tokensIn, int64_t tokensOut,
                            const std::string& callType, const std::string& referenceId,
-                           std::string& err) {
+                           const std::string& idempotencyKey, bool& duplicate, std::string& err) {
     std::lock_guard lock(mutex_);
-    if (!usage_.report(agent, tokensIn, tokensOut, callType, referenceId, err)) return false;
-    audit_.log(agent, "usage.report", referenceId,
-               nlohmann::json{{"tokens_in", tokensIn}, {"tokens_out", tokensOut},
-                              {"call_type", callType}}.dump(),
-               err);
+    if (!usage_.report(agent, tokensIn, tokensOut, callType, referenceId, idempotencyKey,
+                       duplicate, err))
+        return false;
+    if (!duplicate) {
+        audit_.log(agent, "usage.report", referenceId,
+                   nlohmann::json{{"tokens_in", tokensIn}, {"tokens_out", tokensOut},
+                                  {"call_type", callType}}.dump(),
+                   err);
+    }
     return true;
 }
 
@@ -484,6 +571,100 @@ bool Platform::auditList(const std::string& actorFilter, const std::string& acti
                          std::string& err) {
     std::lock_guard lock(mutex_);
     return audit_.list(actorFilter, actionFilter, sinceIso, limit, out, err);
+}
+
+// ---------------- 运维：维护 / 备份恢复 ----------------
+
+bool Platform::maintenanceRun(const std::string& actor, std::string& statsJson, std::string& err) {
+    std::lock_guard lock(mutex_);
+    int64_t deletedAudit = 0, deletedErrors = 0;
+    // 审计轮转：保留 30 天且最多 10 万条（created_at 与 nowIso 同格式，直接字符串比较）
+    db_.query("DELETE FROM audit_log WHERE created_at < ?",
+              [&](Stmt& st) { st.bind(1, isoDaysAgo(30)); },
+              nullptr, err);
+    deletedAudit = sqlite3_changes64(db_.handle());
+    db_.query("DELETE FROM audit_log WHERE id <= (SELECT COALESCE(MAX(id),0) FROM audit_log) - ?",
+              [](Stmt& st) { st.bind(1, static_cast<int64_t>(100000)); },
+              nullptr, err);
+    deletedAudit += sqlite3_changes64(db_.handle());
+    // 已解决错误归档清理：解决超过 30 天的移出主表
+    db_.query("DELETE FROM errors WHERE status='resolved' AND resolved_at IS NOT NULL AND resolved_at < ?",
+              [&](Stmt& st) { st.bind(1, isoDaysAgo(30)); },
+              nullptr, err);
+    deletedErrors = sqlite3_changes64(db_.handle());
+
+    bool vacuumed = false;
+    if (deletedAudit > 0 || deletedErrors > 0) {
+        vacuumed = db_.execScript("VACUUM;", err);
+    }
+    statsJson = nlohmann::json{{"deleted_audit", deletedAudit},
+                               {"deleted_errors", deletedErrors},
+                               {"vacuumed", vacuumed}}.dump();
+    if (deletedAudit > 0 || deletedErrors > 0) {
+        audit_.log(actor, "system.maintenance", std::string(), statsJson, err);
+    }
+    return true;
+}
+
+bool Platform::backupCreate(std::string& outPath, std::string& err) {
+    std::lock_guard lock(mutex_);
+    // VACUUM INTO 生成一致性好、含 WAL 已提交数据的独立快照文件
+    std::string name = "platform-" + nowIso() + ".db";
+    for (auto& ch : name)
+        if (ch == ':') ch = '-';
+    outPath = (fs::path(home_dir_) / "backup" / name).string();
+    std::string escaped;
+    for (char ch : outPath) {
+        escaped += ch;
+        if (ch == '\'') escaped += '\'';
+    }
+    return db_.execScript("VACUUM INTO '" + escaped + "';", err);
+}
+
+bool Platform::backupList(std::vector<std::string>& out, std::string& err) {
+    std::lock_guard lock(mutex_);
+    out.clear();
+    std::error_code ec;
+    for (const auto& entry : fs::directory_iterator(fs::path(home_dir_) / "backup", ec)) {
+        if (entry.is_regular_file() && entry.path().extension() == ".db")
+            out.push_back(entry.path().filename().string());
+    }
+    std::sort(out.rbegin(), out.rend());  // 新的在前
+    return true;
+}
+
+bool Platform::backupRestore(const std::string& name, std::string& err) {
+    std::lock_guard lock(mutex_);
+    if (name.empty() || name.find('/') != std::string::npos ||
+        name.find('\\') != std::string::npos || name.find("..") != std::string::npos) {
+        err = "invalid backup name";
+        return false;
+    }
+    fs::path src = fs::path(home_dir_) / "backup" / name;
+    if (!fs::exists(src)) { err = "backup not found: " + name; return false; }
+    {
+        std::ifstream in(src, std::ios::binary);
+        char header[16] = {0};
+        in.read(header, 15);
+        if (std::string(header) != "SQLite format 3") {
+            err = "not a valid sqlite backup file";
+            return false;
+        }
+    }
+    // 关闭连接（自动 checkpoint WAL）→ 覆盖 → 重开
+    db_.close();
+    std::error_code ec;
+    fs::copy_file(src, fs::path(home_dir_) / "platform.db",
+                  fs::copy_options::overwrite_existing, ec);
+    if (ec) { err = "copy failed: " + ec.message(); return false; }
+    if (!db_.open((fs::path(home_dir_) / "platform.db").string(), err)) return false;
+    if (sqlite3_vec_init(db_.handle(), nullptr, nullptr) != SQLITE_OK) {
+        err = sqlite3_errmsg(db_.handle());
+        return false;
+    }
+    if (!knowledge_.ensureVecTable(err)) return false;
+    audit_.log("zcode", "system.restore", name, nlohmann::json{{"file", name}}.dump(), err);
+    return true;
 }
 
 // ---------------- HTTP ----------------

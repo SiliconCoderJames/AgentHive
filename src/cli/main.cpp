@@ -266,7 +266,8 @@ int main(int argc, char** argv) {
             body = {{"tokens_in", std::stoll(a.opts["tokens-in"])},
                     {"tokens_out", std::stoll(a.opts["tokens-out"])},
                     {"call_type", a.opts.count("type") ? a.opts["type"] : ""},
-                    {"reference_id", a.opts.count("ref") ? a.opts["ref"] : ""}};
+                    {"reference_id", a.opts.count("ref") ? a.opts["ref"] : ""},
+                    {"idempotency_key", a.opts.count("idem") ? a.opts["idem"] : ""}};
         } else if (sub == "summary") {
             path = "/api/usage/summary";
         } else return usage();

@@ -10,32 +10,39 @@ constexpr int64_t kOnlineWindowSec = 120;
 }  // namespace
 
 bool AgentService::registerAgent(const std::string& name, const std::string& role,
-                                 const std::string& apiKeyHash, std::string& err) {
+                                 const std::string& salt, const std::string& keyHash,
+                                 std::string& err) {
     std::string now = nowIso();
     return db_.query(
-        "INSERT INTO agents(name, role, api_key_hash, status, current_task, last_seen_at, created_at, updated_at) "
-        "VALUES (?,?,?,?,?,?,?,?)",
+        "INSERT INTO agents(name, role, api_key_hash, salt, status, current_task, last_seen_at, created_at, updated_at) "
+        "VALUES (?,?,?,?, 'offline', '', ?, ?, ?)",
         [&](Stmt& st) {
             st.bind(1, name);
             st.bind(2, role);
-            st.bind(3, apiKeyHash);
-            st.bind(4, std::string("offline"));
-            st.bind(5, std::string());
+            st.bind(3, keyHash);
+            st.bind(4, salt);
+            st.bind(5, now);
             st.bind(6, now);
             st.bind(7, now);
-            st.bind(8, now);
         },
         nullptr, err);
 }
 
-std::string AgentService::keyHashOf(const std::string& name, std::string& err) const {
-    std::string hash;
+bool AgentService::credentialOf(const std::string& name, std::string& salt, std::string& hash,
+                                std::string& err) const {
+    salt.clear();
+    hash.clear();
+    bool found = false;
     bool ok = db_.query(
-        "SELECT api_key_hash FROM agents WHERE name = ?",
+        "SELECT api_key_hash, salt FROM agents WHERE name = ?",
         [&](Stmt& st) { st.bind(1, name); },
-        [&](Stmt& st) { hash = st.text(0); }, err);
-    if (!ok) return {};
-    return hash;
+        [&](Stmt& st) {
+            hash = st.text(0);
+            salt = st.text(1);
+            found = true;
+        },
+        err);
+    return ok && found;
 }
 
 void AgentService::heartbeat(const std::string& name, const std::string& currentTask) {

@@ -6,21 +6,44 @@ namespace zp {
 
 bool UsageService::report(const std::string& agent, int64_t tokensIn, int64_t tokensOut,
                           const std::string& callType, const std::string& referenceId,
-                          std::string& err) {
+                          const std::string& idempotencyKey, bool& duplicate, std::string& err) {
+    duplicate = false;
     if (tokensIn < 0 || tokensOut < 0) { err = "token counts must be >= 0"; return false; }
-    return db_.query(
-        "INSERT INTO token_usage(agent, week_start, tokens_in, tokens_out, call_type, reference_id, created_at) "
-        "VALUES (?,?,?,?,?,?,?)",
-        [&](Stmt& st) {
-            st.bind(1, agent);
-            st.bind(2, weekStartIso());
-            st.bind(3, tokensIn);
-            st.bind(4, tokensOut);
-            st.bind(5, callType);
-            st.bind(6, referenceId);
-            st.bind(7, nowIso());
-        },
-        nullptr, err);
+    if (idempotencyKey.size() > 200) { err = "idempotency_key too long (max 200)"; return false; }
+
+    // BEGIN IMMEDIATE + 事务内查重：并发/重复上报不会双重扣减
+    if (!db_.beginImmediate(err)) return false;
+    if (!idempotencyKey.empty()) {
+        bool exists = false;
+        if (!db_.query("SELECT 1 FROM token_usage WHERE idempotency_key = ?",
+                       [&](Stmt& st) { st.bind(1, idempotencyKey); },
+                       [&](Stmt&) { exists = true; }, err)) {
+            db_.rollback();
+            return false;
+        }
+        if (exists) {
+            duplicate = true;
+            return db_.commit(err);
+        }
+    }
+    if (!db_.query(
+            "INSERT INTO token_usage(agent, week_start, tokens_in, tokens_out, call_type, reference_id, idempotency_key, created_at) "
+            "VALUES (?,?,?,?,?,?,?,?)",
+            [&](Stmt& st) {
+                st.bind(1, agent);
+                st.bind(2, weekStartIso());
+                st.bind(3, tokensIn);
+                st.bind(4, tokensOut);
+                st.bind(5, callType);
+                st.bind(6, referenceId);
+                st.bind(7, idempotencyKey);
+                st.bind(8, nowIso());
+            },
+            nullptr, err)) {
+        db_.rollback();
+        return false;
+    }
+    return db_.commit(err);
 }
 
 int64_t UsageService::budget(std::string& err) {
