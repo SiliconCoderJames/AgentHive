@@ -64,6 +64,11 @@ json knowledgeToJson(const KnowledgeEntry& e, double score = 0.0) {
     return j;
 }
 
+// 广播消息的 recipient 序列化为 null（语义：全体可见），点对点为字符串
+json recipientJson(const std::string& recipient) {
+    return recipient.empty() ? json(nullptr) : json(recipient);
+}
+
 }  // namespace
 
 struct HttpServer::Impl {
@@ -463,7 +468,7 @@ void HttpServer::setupRoutes() {
         send(res, ok(json{{"uuid", out.uuid},
                           {"kind", out.kind},
                           {"sender", out.sender},
-                          {"recipient", out.recipient},
+                          {"recipient", recipientJson(out.recipient)},
                           {"status", out.status},
                           {"created_at", out.created_at}}));
     });
@@ -487,7 +492,7 @@ void HttpServer::setupRoutes() {
             arr.push_back({{"uuid", m.uuid},
                            {"kind", m.kind},
                            {"sender", m.sender},
-                           {"recipient", m.recipient},
+                           {"recipient", recipientJson(m.recipient)},
                            {"subject", m.subject},
                            {"body", m.body},
                            {"status", m.status},

@@ -74,6 +74,20 @@ agent-cli usage report --name hermes --key <KEY> --tokens-in 500 --tokens-out 40
 
 完整接口文档见 [docs/api.md](docs/api.md)。
 
+## 可行性验证
+
+`scripts/feasibility_check.py`（仅标准库）以三个外部 Agent（claude/codex/hermes）的
+真实协作流程走通 13 个场景、39 项断言：注册、启动协议、认证拒绝、记忆跨 Agent
+共享与版本链、中文知识沉淀与语义检索、追加不覆盖、技能先注册后调用、异步任务
+状态机、错误上报解决闭环、Token 预算四级告警、审计留痕、广播消息。
+
+```bash
+platformd &                                          # 或直接运行工作台
+export ZCODE_PLATFORM_MASTER_KEY=$(cat ~/.zcode-platform/config/master.key)
+export ZCODE_ZCODE_KEY=$(python -c "import json;print(json.load(open(r'%USERPROFILE%/.zcode-platform/config/agents.json'))['zcode'])")
+python scripts/feasibility_check.py 8787             # 期望 39/39 通过
+```
+
 注意（Windows）：
 - `agent-cli` 的全局选项（`--name` / `--key` / `--master-key` / `--port`）须写在**命令之前**，
   命令之后的同名选项归子命令（如 `memory set --key` 是记忆键名，不是 API 密钥）；

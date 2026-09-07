@@ -393,7 +393,12 @@ bool Platform::messageSetStatus(const std::string& actor, const std::string& uui
     std::lock_guard lock(mutex_);
     Message cur;
     if (!messages_.get(uuid, cur, err)) return false;
-    // 仅收件人、发件人、用户（工作台操作者）或管理者可流转状态
+    // 任务类消息只有收件人（执行者）、用户或管理者可流转，发件人不能代为接单
+    if (cur.kind == "task" && actor != cur.recipient && actor != "user" && !isManager(actor)) {
+        err = "only the task recipient can change task status";
+        return false;
+    }
+    // 其余消息仅收件人、发件人、用户或管理者可流转
     if (actor != "user" && actor != cur.recipient && actor != cur.sender && !isManager(actor)) {
         err = "not allowed to change this message's status";
         return false;
