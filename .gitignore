@@ -1,10 +1,38 @@
+# ---- 构建输出 ----
 build/
 build-*/
 out/
 data/
+
+# ---- 第三方依赖（FetchContent 缓存，scripts/fetch-deps.ps1 可重建）----
 vendor/
-.mimosa/
-.vs/
-.vscode/
+
+# ---- CMake / Qt 生成物 ----
 CMakeUserPresets.json
 *.user
+moc_*.cpp
+qrc_*.cpp
+*.qrc.depends
+
+# ---- 编译中间产物 / 二进制 ----
+*.obj
+*.exe
+*.pdb
+*.ilk
+*.lib
+*.log
+
+# ---- 编辑器 / IDE ----
+.vs/
+.vscode/
+.idea/
+.clion/
+
+# ---- 操作系统 ----
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---- 本地工具状态（不入库）----
+.mimosa/
+.v2c/
