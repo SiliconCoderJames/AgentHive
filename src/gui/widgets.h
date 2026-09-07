@@ -2,8 +2,10 @@
 // 态势感知工作台自定义控件：环形进度、横向柱状图、Toast、Agent 卡片、
 // 告警卡片、可折叠区块卡片。全部 QPainter / 原生 widget 实现，无 QML。
 #include <QFrame>
+#include <QGraphicsOpacityEffect>
 #include <QLabel>
 #include <QPainter>
+#include <QPropertyAnimation>
 #include <QTimer>
 #include <QToolButton>
 #include <QVBoxLayout>
@@ -12,6 +14,16 @@
 #include "theme.h"
 
 namespace ui {
+
+// 卡片悬停高亮：进入边框变强调蓝（AgentCard / 通用 QFrame 卡片）
+inline void hoverGlow(QFrame* frame, const char* objectName) {
+    frame->setAttribute(Qt::WA_Hover);
+    QString base = QString("QFrame#%1 { background:#2d2d2d; border:1px solid #3f3f46;"
+                           " border-radius:8px; }").arg(objectName);
+    QString hover = QString("QFrame#%1:hover { background:#313131; border:1px solid %2;"
+                            " border-radius:8px; }").arg(objectName, ACCENT.name());
+    frame->setStyleSheet(base + hover);
+}
 
 // ---- 环形进度：中间显示 已用/总额/百分比，临近预算橙→红 ----
 class RingProgress : public QWidget {
@@ -98,12 +110,17 @@ protected:
         for (const auto& e : entries_) maxV = qMax(maxV, e.second);
         int rowH = height() / entries_.size();
         int labelW = qMin(110, width() / 4);
-        int valueW = 70;
+        int valueW = 110;
         int barX = labelW + 8;
         int barW = width() - barX - valueW - 8;
         QFont f = p.font();
         f.setPixelSize(11);
         p.setFont(f);
+        auto fmt = [](qint64 v) {
+            QString s = QString::number(v);
+            for (int i = s.size() - 3; i > 0; i -= 3) s.insert(i, ',');
+            return s;
+        };
         for (int i = 0; i < entries_.size(); ++i) {
             int y = i * rowH;
             p.setPen(QPen(TEXT));
@@ -113,17 +130,24 @@ protected:
             p.setPen(Qt::NoPen);
             p.setBrush(QColor("#3f3f46"));
             p.drawRoundedRect(QRect(barX, y + rowH / 2 - 5, barW, 10), 5, 5);
-            // 柱体
-            int w = int(double(barW) * double(entries_[i].second) / double(maxV));
-            p.setBrush(ACCENT);
+            // 柱体：最大值高亮蓝，其余随占比变暗
+            double ratio = double(entries_[i].second) / double(maxV);
+            int w = int(double(barW) * ratio);
+            QColor bar = ACCENT;
+            if (entries_[i].second != maxV) {
+                bar = ACCENT.darker(100 + int((1.0 - ratio) * 90));
+                bar.setAlpha(210);
+            }
+            p.setBrush(bar);
             p.drawRoundedRect(QRect(barX, y + rowH / 2 - 5, qMax(w, 4), 10), 5, 5);
-            // 数值（等宽）
+            // 数值 + 占比（等宽）
             QFont mf = p.font();
             mf.setFamily(mono());
             p.setFont(mf);
             p.setPen(QPen(MUTED));
             p.drawText(QRect(width() - valueW, y, valueW, rowH), Qt::AlignVCenter,
-                       QString::number(entries_[i].second));
+                       QString("%1 · %2%").arg(fmt(entries_[i].second))
+                           .arg(ratio * 100, 0, 'f', 0));
             p.setFont(f);
         }
     }
@@ -155,14 +179,23 @@ private:
         QWidget* top = parentWidget();
         while (top && !top->isWindow()) top = top->parentWidget();
         if (!top) { deleteLater(); return; }
-        // 提升为顶层独立气泡，置于右下角
+        // 提升为顶层独立气泡，置于右下角，淡出消失
         setWindowFlags(Qt::FramelessWindowHint | Qt::Tool);
         setAttribute(Qt::WA_TransparentForMouseEvents);
         QPoint pos = top->pos() + QPoint(top->width() - width() - 24,
                                          top->height() - height() - 46);
         move(pos);
         QWidget::show();  // 显式调用基类，避免被静态 show(QString,bool) 遮蔽
-        QTimer::singleShot(1800, this, &QObject::deleteLater);
+        auto* fx = new QGraphicsOpacityEffect(this);
+        fx->setOpacity(1.0);
+        setGraphicsEffect(fx);
+        auto* anim = new QPropertyAnimation(fx, "opacity", this);
+        anim->setDuration(500);
+        anim->setStartValue(1.0);
+        anim->setEndValue(0.0);
+        anim->setEasingCurve(QEasingCurve::InQuad);
+        QTimer::singleShot(1500, this, [anim] { anim->start(QAbstractAnimation::DeleteWhenStopped); });
+        QTimer::singleShot(2050, this, &QObject::deleteLater);
     }
 };
 
@@ -171,30 +204,35 @@ class AgentCard : public QFrame {
 public:
     explicit AgentCard(QWidget* parent = nullptr) : QFrame(parent) {
         setObjectName("agentCard");
-        setStyleSheet("QFrame#agentCard { background:#2d2d2d; border:1px solid #3f3f46;"
-                      " border-radius:8px; }");
+        hoverGlow(this, "agentCard");
         auto* lay = new QVBoxLayout(this);
         lay->setContentsMargins(14, 12, 14, 12);
         lay->setSpacing(6);
         auto* head = new QHBoxLayout();
         name_ = new QLabel(this);
-        name_->setStyleSheet("font-size:13px; font-weight:700;");
+        name_->setStyleSheet("font-size:13px; font-weight:700; background:transparent;");
         dot_ = new QLabel(this);
         dot_->setFixedWidth(14);
         dot_->setAlignment(Qt::AlignCenter);
+        status_ = new QLabel(this);
+        status_->setStyleSheet(
+            "font-size:10px; padding:1px 8px; border-radius:8px;"
+            "color:#a7f3d0; background:#064e3b;");
         role_ = new QLabel(this);
-        role_->setStyleSheet("color:#9ca3af; font-size:11px;");
+        role_->setStyleSheet("color:#9ca3af; font-size:11px; background:transparent;");
         head->addWidget(dot_);
         head->addWidget(name_);
+        head->addWidget(status_);
         head->addStretch(1);
         head->addWidget(role_);
         lay->addLayout(head);
         task_ = new QLabel(this);
-        task_->setStyleSheet("color:#e5e5e5; font-size:11px;");
+        task_->setStyleSheet("color:#e5e5e5; font-size:11px; background:transparent;");
         task_->setWordWrap(true);
         lay->addWidget(task_);
         seen_ = new QLabel(this);
-        seen_->setStyleSheet("color:#9ca3af; font-size:10px; font-family:Consolas,monospace;");
+        seen_->setStyleSheet(
+            "color:#9ca3af; font-size:10px; font-family:Consolas,monospace; background:transparent;");
         lay->addWidget(seen_);
     }
     void setAgent(const QString& name, const QString& status, const QString& role,
@@ -203,6 +241,12 @@ public:
         bool online = status == "online";
         dot_->setText(online ? "<span style='color:#22c55e;'>●</span>"
                              : "<span style='color:#71717a;'>●</span>");
+        status_->setText(online ? "在线" : "离线");
+        status_->setStyleSheet(online
+            ? "font-size:10px; padding:1px 8px; border-radius:8px;"
+              "color:#a7f3d0; background:#064e3b;"
+            : "font-size:10px; padding:1px 8px; border-radius:8px;"
+              "color:#a1a1aa; background:#27272a;");
         role_->setText(role);
         task_->setText(task.isEmpty() ? "（无当前任务）" : task);
         seen_->setText(lastSeen.isEmpty() ? "从未活跃" : "活跃于 " + lastSeen);
@@ -211,6 +255,7 @@ public:
 private:
     QLabel* name_ = nullptr;
     QLabel* dot_ = nullptr;
+    QLabel* status_ = nullptr;
     QLabel* role_ = nullptr;
     QLabel* task_ = nullptr;
     QLabel* seen_ = nullptr;

@@ -22,13 +22,39 @@ MainWindow::MainWindow(zp::Platform& platform, QWidget* parent)
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
 
-    nav_ = new QListWidget(central);
-    nav_->setFixedWidth(150);
+    // ---- 侧边栏：品牌区 + 图标导航 + 版本脚注 ----
+    auto* side = new QWidget(central);
+    side->setFixedWidth(172);
+    side->setStyleSheet("QWidget { background:#18181b; }");
+    auto* sideLay = new QVBoxLayout(side);
+    sideLay->setContentsMargins(0, 0, 0, 10);
+    sideLay->setSpacing(0);
+
+    auto* brand = new QWidget(side);
+    auto* brandLay = new QVBoxLayout(brand);
+    brandLay->setContentsMargins(16, 16, 12, 14);
+    brandLay->setSpacing(2);
+    auto* logo = new QLabel("🐝 AgentHive", brand);
+    logo->setStyleSheet("font-size:16px; font-weight:800; color:#e5e5e5; background:transparent;");
+    auto* tagline = new QLabel("多 Agent 协作工作台", brand);
+    tagline->setStyleSheet("font-size:10px; color:#9ca3af; background:transparent;");
+    brandLay->addWidget(logo);
+    brandLay->addWidget(tagline);
+    sideLay->addWidget(brand);
+
+    nav_ = new QListWidget(side);
     nav_->setStyleSheet(
-        "QListWidget { background:#18181b; border:none; padding:8px 6px; font-size:13px; }"
-        "QListWidget::item { padding:12px 14px; margin:2px 4px; border-radius:6px; color:#9ca3af; }"
+        "QListWidget { background:#18181b; border:none; padding:0 6px; font-size:13px; }"
+        "QListWidget::item { padding:11px 12px; margin:2px 4px; border-radius:6px; color:#9ca3af; }"
+        "QListWidget::item:hover { background:#262626; color:#e5e5e5; }"
         "QListWidget::item:selected { background:#0ea5e9; color:#ffffff; font-weight:600; }");
-    layout->addWidget(nav_);
+    sideLay->addWidget(nav_, 1);
+
+    auto* ver = new QLabel("v1.0 · local-first", side);
+    ver->setAlignment(Qt::AlignCenter);
+    ver->setStyleSheet("font-size:10px; color:#52525b; background:transparent;");
+    sideLay->addWidget(ver);
+    layout->addWidget(side);
 
     stack_ = new QStackedWidget(central);
     layout->addWidget(stack_, 1);
@@ -57,9 +83,9 @@ MainWindow::MainWindow(zp::Platform& platform, QWidget* parent)
 }
 
 void MainWindow::buildNav() {
-    const QStringList items{"总览",      "知识库", "技能库",
-                            "用户记忆",  "Agent 交流", "错误报告",
-                            "操作日志"};
+    const QStringList items{"📊  总览",      "📚  知识库", "🧩  技能库",
+                            "🧠  用户记忆",  "💬  Agent 交流", "🚨  错误报告",
+                            "🕘  操作日志"};
     nav_->addItems(items);
 }
 

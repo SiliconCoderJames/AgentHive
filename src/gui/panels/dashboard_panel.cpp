@@ -53,7 +53,9 @@ DashboardPanel::DashboardPanel(zp::Platform& platform, QWidget* parent)
     auto* tl = new QVBoxLayout(tlCard);
     tl->setContentsMargins(12, 20, 12, 12);
     timeline_ = new QListWidget(tlCard);
-    timeline_->setStyleSheet("QListWidget { font-family: Consolas,monospace; font-size: 11px; }");
+    timeline_->setAlternatingRowColors(true);
+    timeline_->setStyleSheet("QListWidget { font-family: Consolas,monospace; font-size: 11px; }"
+                             "QListWidget::item { padding: 3px 2px; }");
     tl->addWidget(timeline_);
     bottomRow->addWidget(tlCard, 3);
 
@@ -144,9 +146,24 @@ void DashboardPanel::refresh() {
     std::vector<zp::AuditRecord> records;
     if (platform_.auditList("", "", "", 15, records, err)) {
         timeline_->clear();
+        // 按动作类型着色：知识库蓝 / 技能橙 / 记忆紫 / 消息绿 / 错误红 / 注册金
+        auto icon = [](const std::string& a, const std::string& t) {
+            std::string s = a + " " + t;
+            if (s.find("error") != std::string::npos) return "🚨";
+            if (s.find("skill") != std::string::npos) return "🧩";
+            if (s.find("memory") != std::string::npos) return "🧠";
+            if (s.find("knowledge") != std::string::npos) return "📚";
+            if (s.find("note") != std::string::npos || s.find("question") != std::string::npos ||
+                s.find("task") != std::string::npos)
+                return "💬";
+            if (s.find("register") != std::string::npos || s.find("agent") != std::string::npos)
+                return "🐝";
+            return "▸";
+        };
         for (const auto& r : records) {
-            auto* item = new QListWidgetItem(QString("%1  ▸ %2  %3 %4")
+            auto* item = new QListWidgetItem(QString("%1  %2 %3  %4 %5")
                                                  .arg(QString::fromStdString(r.created_at))
+                                                 .arg(icon(r.action, r.target))
                                                  .arg(QString::fromStdString(r.actor))
                                                  .arg(QString::fromStdString(r.action))
                                                  .arg(QString::fromStdString(r.target)));

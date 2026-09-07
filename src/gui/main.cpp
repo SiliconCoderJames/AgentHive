@@ -13,9 +13,14 @@ int main(int argc, char** argv) {
     app.setOrganizationName("agenthive");
 
     // 强制深色主题：QSS 统一管理（背景 #1e1e1e / 卡片 #2d2d2d / 强调 #0ea5e9）
-    QFile qss(":/theme/dark.qss");
-    if (qss.open(QIODevice::ReadOnly | QIODevice::Text))
-        app.setStyleSheet(QString::fromUtf8(qss.readAll()));
+    // 注意 qt_add_resources(PREFIX "/theme") 会把子目录 qss/ 拼进资源路径
+    QFile qss(":/theme/qss/dark.qss");
+    if (qss.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        const QByteArray body = qss.readAll();
+        app.setStyleSheet(QString::fromUtf8(body));
+    } else {
+        qWarning("dark.qss open FAILED: %s", qss.errorString().toUtf8().constData());
+    }
 
     zp::Platform platform(zp::defaultHomeDir());
     std::string err;
@@ -37,6 +42,7 @@ int main(int argc, char** argv) {
 
     MainWindow w(platform);
     w.resize(1280, 800);
+    w.setMinimumSize(1080, 680);
     w.show();
     return app.exec();
 }
