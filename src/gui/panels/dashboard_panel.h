@@ -27,4 +27,5 @@ private:
     std::vector<ui::AgentCard*> agentCards_;
     std::vector<QWidget*> alertCards_;
     QString budgetAlertLevel_;
+    QString lastTimeline_;  // 事件流去重：内容未变化时跳过重建，避免闪烁
 };

@@ -41,10 +41,7 @@ ErrorsPanel::ErrorsPanel(zp::Platform& platform, QWidget* parent)
     table_ = new QTableWidget(0, 5, splitter);
     table_->setHorizontalHeaderLabels({"严重度", "标题", "上报者", "状态", "时间"});
     table_->horizontalHeader()->setStretchLastSection(true);
-    table_->verticalHeader()->setVisible(false);
-    table_->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    table_->setSelectionBehavior(QAbstractItemView::SelectRows);
-    table_->setSelectionMode(QAbstractItemView::SingleSelection);
+    polishTable(table_);
     attachTableContextMenu(table_);
     splitter->addWidget(table_);
 

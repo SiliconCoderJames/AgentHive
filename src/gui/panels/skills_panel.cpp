@@ -45,10 +45,7 @@ SkillsPanel::SkillsPanel(zp::Platform& platform, QWidget* parent)
     table_ = new QTableWidget(0, 7, splitter);
     table_->setHorizontalHeaderLabels({"名称", "显示名", "分类", "提供者", "版本", "状态", "使用热度"});
     table_->horizontalHeader()->setStretchLastSection(true);
-    table_->verticalHeader()->setVisible(false);
-    table_->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    table_->setSelectionBehavior(QAbstractItemView::SelectRows);
-    table_->setSelectionMode(QAbstractItemView::SingleSelection);
+    polishTable(table_);
     attachTableContextMenu(table_);
     splitter->addWidget(table_);
     detail_ = new QTextBrowser(splitter);
@@ -95,7 +92,12 @@ void SkillsPanel::refresh() {
     std::map<std::string, int> heat;
     for (const auto& i : allInv) ++heat[i.skill_name];
 
+    // 刷新前记住选中技能，重建后恢复选中，避免 3s 自动刷新打断浏览
+    QString prevSelected;
+    if (auto* cur = table_->item(table_->currentRow(), 0)) prevSelected = cur->text();
+
     table_->setRowCount(static_cast<int>(skills_.size()));
+    int restoreRow = -1;
     for (size_t i = 0; i < skills_.size(); ++i) {
         const auto& s = skills_[i];
         int h = heat.count(s.name) ? heat[s.name] : 0;
@@ -105,8 +107,13 @@ void SkillsPanel::refresh() {
                {QString::fromStdString(s.name), QString::fromStdString(s.display_name),
                 QString::fromStdString(s.category), QString::fromStdString(s.owner_agent),
                 QString::number(s.version), QString::fromStdString(s.status), heatStr});
+        if (!prevSelected.isEmpty() && prevSelected == QString::fromStdString(s.name))
+            restoreRow = static_cast<int>(i);
     }
-    if (!skills_.empty()) {
+    if (restoreRow >= 0) {
+        table_->selectRow(restoreRow);
+        onSelectSkill(restoreRow);
+    } else if (!skills_.empty()) {
         table_->selectRow(0);
         onSelectSkill(0);
     } else {

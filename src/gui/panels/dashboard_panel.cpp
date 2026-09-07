@@ -4,6 +4,8 @@
 
 #include <QGroupBox>
 
+#include "../gui_util.h"
+
 DashboardPanel::DashboardPanel(zp::Platform& platform, QWidget* parent)
     : PanelBase(platform, parent) {
     auto* root = new QVBoxLayout(this);
@@ -80,7 +82,7 @@ void DashboardPanel::refresh() {
     zp::UsageSummary sum;
     if (platform_.usageSummary(sum, err)) {
         ring_->setValues(sum.total_tokens, sum.budget, QString("剩余 %1")
-                                                          .arg(QString::number(sum.budget - sum.total_tokens)));
+                                                          .arg(formatNum(sum.budget - sum.total_tokens)));
         QVector<QPair<QString, qint64>> bars;
         for (const auto& [name, tokens] : sum.per_agent)
             bars.append({QString::fromStdString(name), tokens});
@@ -145,7 +147,6 @@ void DashboardPanel::refresh() {
     // 事件流时间线（最近 15 条审计）
     std::vector<zp::AuditRecord> records;
     if (platform_.auditList("", "", "", 15, records, err)) {
-        timeline_->clear();
         // 按动作类型着色：知识库蓝 / 技能橙 / 记忆紫 / 消息绿 / 错误红 / 注册金
         auto icon = [](const std::string& a, const std::string& t) {
             std::string s = a + " " + t;
@@ -160,14 +161,25 @@ void DashboardPanel::refresh() {
                 return "🐝";
             return "▸";
         };
-        for (const auto& r : records) {
-            auto* item = new QListWidgetItem(QString("%1  %2 %3  %4 %5")
-                                                 .arg(QString::fromStdString(r.created_at))
-                                                 .arg(icon(r.action, r.target))
-                                                 .arg(QString::fromStdString(r.actor))
-                                                 .arg(QString::fromStdString(r.action))
-                                                 .arg(QString::fromStdString(r.target)));
-            timeline_->addItem(item);
+        QString joined;
+        for (const auto& r : records)
+            joined += QString("%1|%2|%3|%4\n")
+                          .arg(QString::fromStdString(r.created_at))
+                          .arg(QString::fromStdString(r.actor))
+                          .arg(QString::fromStdString(r.action))
+                          .arg(QString::fromStdString(r.target));
+        if (joined != lastTimeline_) {  // 内容未变时不重建，避免 3s 刷新闪烁
+            lastTimeline_ = joined;
+            timeline_->clear();
+            for (const auto& r : records) {
+                auto* item = new QListWidgetItem(QString("%1  %2 %3  %4 %5")
+                                                     .arg(QString::fromStdString(r.created_at))
+                                                     .arg(icon(r.action, r.target))
+                                                     .arg(QString::fromStdString(r.actor))
+                                                     .arg(QString::fromStdString(r.action))
+                                                     .arg(QString::fromStdString(r.target)));
+                timeline_->addItem(item);
+            }
         }
     }
 }

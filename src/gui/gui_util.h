@@ -1,8 +1,10 @@
 #pragma once
 // GUI 小工具函数：表格填充、右键菜单（复制/详情/导出 CSV）、数字格式化。
+#include <QAbstractItemView>
 #include <QApplication>
 #include <QClipboard>
 #include <QFileDialog>
+#include <QHeaderView>
 #include <QMenu>
 #include <QMessageBox>
 #include <QTableWidget>
@@ -24,6 +26,17 @@ inline QString formatNum(qint64 n) {
     QString s = QString::number(n);
     for (int i = s.size() - 3; i > 0; i -= 3) s.insert(i, ',');
     return s;
+}
+
+// 表格统一抛光：隔行底色、隐藏垂直表头、整行选择、只读、舒适行高
+inline void polishTable(QTableWidget* table) {
+    table->setAlternatingRowColors(true);
+    table->verticalHeader()->setVisible(false);
+    table->verticalHeader()->setDefaultSectionSize(26);
+    table->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    table->setSelectionBehavior(QAbstractItemView::SelectRows);
+    table->setSelectionMode(QAbstractItemView::SingleSelection);
+    table->setWordWrap(false);
 }
 
 // 表格右键菜单：复制单元格/整行、导出 CSV。idColumn >= 0 时提供"复制 ID"。

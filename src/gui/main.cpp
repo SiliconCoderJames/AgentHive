@@ -1,16 +1,51 @@
 #include <QApplication>
 #include <QFile>
 #include <QMessageBox>
+#include <QPainter>
+#include <QPixmap>
 
 #include <cstdlib>
 
 #include "core/platform.h"
 #include "mainwindow.h"
 
+// 程序化绘制蜂巢图标：深色圆角底 + 琥珀色六边形蜂巢 + 入口点
+static QPixmap hiveIcon(int side) {
+    QPixmap pm(side, side);
+    pm.fill(Qt::transparent);
+    QPainter p(&pm);
+    p.setRenderHint(QPainter::Antialiasing);
+    qreal m = side * 0.08, w = side - 2 * m;
+    QRectF box(m, m, w, w);
+    p.setBrush(QColor("#1e1e1e"));
+    p.setPen(Qt::NoPen);
+    p.drawRoundedRect(box, side * 0.2, side * 0.2);
+    auto hex = [](QPainter& pp, const QPointF& c, qreal r) {
+        QPolygonF h;
+        for (int i = 0; i < 6; ++i) {
+            qreal a = M_PI / 180.0 * (60 * i - 30);
+            h << c + QPointF(r * std::cos(a), r * std::sin(a));
+        }
+        pp.drawPolygon(h);
+    };
+    QPen pen(QColor("#f59e0b"), side * 0.055, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+    p.setPen(pen);
+    p.setBrush(Qt::NoBrush);
+    qreal r = w * 0.21;
+    hex(p, QPointF(side / 2.0, side / 2.0 - r * 1.02), r);
+    hex(p, QPointF(side / 2.0 - r * 0.9, side / 2.0 + r * 0.55), r);
+    hex(p, QPointF(side / 2.0 + r * 0.9, side / 2.0 + r * 0.55), r);
+    p.setBrush(QColor("#0ea5e9"));
+    p.setPen(Qt::NoPen);
+    p.drawEllipse(QPointF(side / 2.0, side / 2.0 - r * 1.02), r * 0.32, r * 0.32);
+    return pm;
+}
+
 int main(int argc, char** argv) {
     QApplication app(argc, argv);
     app.setApplicationName("AgentHive 多 Agent 协作工作台");
     app.setOrganizationName("agenthive");
+    app.setWindowIcon(QIcon(hiveIcon(64)));
 
     // 强制深色主题：QSS 统一管理（背景 #1e1e1e / 卡片 #2d2d2d / 强调 #0ea5e9）
     // 注意 qt_add_resources(PREFIX "/theme") 会把子目录 qss/ 拼进资源路径

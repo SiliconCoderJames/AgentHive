@@ -50,10 +50,7 @@ KnowledgePanel::KnowledgePanel(zp::Platform& platform, QWidget* parent)
     table_ = new QTableWidget(0, 5, splitter);
     table_->setHorizontalHeaderLabels({"标题", "作者", "标签", "版本", "时间"});
     table_->horizontalHeader()->setStretchLastSection(true);
-    table_->verticalHeader()->setVisible(false);
-    table_->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    table_->setSelectionBehavior(QAbstractItemView::SelectRows);
-    table_->setSelectionMode(QAbstractItemView::SingleSelection);
+    polishTable(table_);
     splitter->addWidget(table_);
 
     auto* right = new QWidget(splitter);
