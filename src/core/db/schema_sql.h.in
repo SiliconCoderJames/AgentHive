@@ -1,0 +1,4 @@
+#pragma once
+// 由 CMake 从 db/schema.sql 生成，随二进制发布，运行时不依赖源码目录。
+static const char* kSchemaSql =
+R"SCHEMA(@SCHEMA_SQL_CONTENT@)SCHEMA";

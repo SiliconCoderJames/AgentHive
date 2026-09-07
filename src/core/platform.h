@@ -1,0 +1,156 @@
+#pragma once
+// Platform：平台门面。Qt 工作台（进程内直调）与 HTTP API 层共用同一实例，
+// 内部以互斥锁串行化，保证 SQLite 与各服务线程安全。
+#include <memory>
+#include <mutex>
+#include <string>
+#include <vector>
+
+#include "core/db/database.h"
+#include "core/embed/embedder.h"
+#include "core/services/agent_service.h"
+#include "core/services/audit_service.h"
+#include "core/services/error_service.h"
+#include "core/services/knowledge_service.h"
+#include "core/services/memory_service.h"
+#include "core/services/message_service.h"
+#include "core/services/skill_service.h"
+#include "core/services/usage_service.h"
+#include "core/types.h"
+
+namespace zp {
+
+class HttpServer;
+
+// 数据目录：环境变量 ZCODE_PLATFORM_HOME 优先，否则 %USERPROFILE%\.zcode-platform
+std::string defaultHomeDir();
+
+class Platform {
+public:
+    explicit Platform(std::string homeDir);
+    ~Platform();
+    Platform(const Platform&) = delete;
+    Platform& operator=(const Platform&) = delete;
+
+    const std::string& homeDir() const { return home_dir_; }
+    bool bootstrap(std::string& err);
+    void shutdown();
+
+    // ---- 认证（仅比对哈希，密钥明文只存于运行期生成的配置文件）----
+    bool authenticate(const std::string& agent, const std::string& apiKey) const;
+    bool authenticateMaster(const std::string& masterKey) const;
+    bool registerAgent(const std::string& masterKey, const std::string& name, const std::string& role,
+                       std::string& outApiKey, std::string& err);
+    bool isManager(const std::string& name) const;
+
+    // ---- Agent ----
+    void heartbeat(const std::string& name, const std::string& currentTask);
+    bool listAgents(std::vector<AgentInfo>& out, std::string& err);
+
+    // ---- 知识库 ----
+    bool knowledgeCreate(const std::string& author, const std::string& title,
+                         const std::string& content, const std::vector<std::string>& tags,
+                         const std::string& category, const std::vector<float>& embedding,
+                         const std::string& embeddingProvider, KnowledgeEntry& out, std::string& err);
+    bool knowledgeList(int limit, const std::string& tagFilter, std::vector<KnowledgeEntry>& out,
+                       std::string& err);
+    bool knowledgeLatest(const std::string& uuid, KnowledgeEntry& out, std::string& err);
+    bool knowledgeVersions(const std::string& uuid, std::vector<KnowledgeEntry>& out, std::string& err);
+    bool knowledgeAddVersion(const std::string& author, const std::string& uuid,
+                             const std::string& newTitle, const std::string& newContent,
+                             const std::vector<float>& embedding, const std::string& embeddingProvider,
+                             KnowledgeEntry& out, std::string& err);
+    bool knowledgeSearch(const std::string& query, SearchMode mode, int limit,
+                         const std::string& tagFilter, std::vector<KnowledgeHit>& out,
+                         std::string& err);
+
+    // ---- 技能库 ----
+    bool skillRegister(const std::string& author, const std::string& name,
+                       const std::string& displayName, const std::string& description,
+                       const std::string& category, const std::string& paramSchema, SkillInfo& out,
+                       std::string& err);
+    bool skillList(const std::string& categoryFilter, const std::string& ownerFilter,
+                   std::vector<SkillInfo>& out, std::string& err);
+    bool skillGet(const std::string& name, SkillInfo& out, std::string& err);
+    // 先注册后调用；记录调用 + Token + 审计。
+    bool skillInvoke(const std::string& caller, const std::string& skillName,
+                     const std::string& paramsJson, const std::string& resultSummary,
+                     const std::string& status, int64_t durationMs, int64_t tokensIn,
+                     int64_t tokensOut, std::string& err);
+    bool skillInvocations(const std::string& skillName, int limit,
+                          std::vector<SkillInvocation>& out, std::string& err);
+
+    // ---- 用户记忆 ----
+    bool memoryList(const std::string& section, std::vector<MemoryEntry>& out, std::string& err);
+    bool memorySet(const std::string& author, const std::string& section, const std::string& key,
+                   const std::string& value, MemoryEntry& out, std::string& err);
+    bool memoryHistory(const std::string& section, const std::string& key,
+                       std::vector<MemoryEntry>& out, std::string& err);
+
+    // ---- 消息 ----
+    bool messageSend(const std::string& kind, const std::string& sender,
+                     const std::string& recipient, const std::string& subject,
+                     const std::string& body, Message& out, std::string& err);
+    bool messageList(const std::string& recipientFilter, const std::string& kindFilter,
+                     const std::string& statusFilter, const std::string& sinceIso, int limit,
+                     std::vector<Message>& out, std::string& err);
+    bool messageGet(const std::string& uuid, Message& out, std::string& err);
+    bool messageReply(const std::string& sender, const std::string& parentUuid,
+                      const std::string& body, Message& out, std::string& err);
+    bool messageSetStatus(const std::string& actor, const std::string& uuid,
+                          const std::string& newStatus, Message& out, std::string& err);
+
+    // ---- 错误日志 ----
+    bool errorReport(const std::string& reporter, const std::string& severity,
+                     const std::string& source, const std::string& title, const std::string& detail,
+                     const std::string& stackTrace, ErrorReport& out, std::string& err);
+    bool errorList(const std::string& statusFilter, const std::string& severityFilter, int limit,
+                   std::vector<ErrorReport>& out, std::string& err);
+    bool errorResolve(const std::string& actor, const std::string& uuid, const std::string& notes,
+                      ErrorReport& out, std::string& err);
+
+    // ---- Token 用量 ----
+    bool usageReport(const std::string& agent, int64_t tokensIn, int64_t tokensOut,
+                     const std::string& callType, const std::string& referenceId, std::string& err);
+    bool usageSummary(UsageSummary& out, std::string& err);
+    int64_t usageBudget(std::string& err);
+    bool usageSetBudget(const std::string& actor, int64_t budget, std::string& err);
+
+    // ---- 操作日志 ----
+    bool auditList(const std::string& actorFilter, const std::string& actionFilter,
+                   const std::string& sinceIso, int limit, std::vector<AuditRecord>& out,
+                   std::string& err);
+
+    // ---- HTTP 服务（仅绑定 127.0.0.1）----
+    bool startHttpServer(int port, std::string& err);
+    void stopHttpServer();
+    int httpPort() const;
+    bool httpRunning() const;
+
+    // ---- 向量工具 ----
+    std::vector<float> embedText(const std::string& text);
+    int embeddingDim() const;
+
+private:
+    bool persistAgentKey(const std::string& name, const std::string& apiKey, std::string& err);
+    std::vector<float> resolveEmbedding(const std::string& content,
+                                        const std::vector<float>* provided, bool& isProvided);
+
+    std::string home_dir_;
+    Database db_;
+    std::unique_ptr<Embedder> embedder_;
+    AgentService agents_;
+    KnowledgeService knowledge_;
+    SkillService skills_;
+    MemoryService memory_;
+    MessageService messages_;
+    ErrorService errors_;
+    UsageService usage_;
+    AuditService audit_;
+    std::unique_ptr<HttpServer> http_;
+    std::string master_key_hash_;
+    bool bootstrapped_ = false;
+    mutable std::recursive_mutex mutex_;
+};
+
+}  // namespace zp

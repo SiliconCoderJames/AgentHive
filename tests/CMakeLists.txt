@@ -1,0 +1,3 @@
+add_executable(platform_tests test_main.cpp)
+target_link_libraries(platform_tests PRIVATE zplatform_core)
+add_test(NAME platform_tests COMMAND platform_tests)

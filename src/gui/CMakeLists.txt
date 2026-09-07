@@ -1,0 +1,16 @@
+add_executable(zworkbench WIN32
+    main.cpp
+    mainwindow.cpp
+    panels/dashboard_panel.cpp
+    panels/knowledge_panel.cpp
+    panels/skills_panel.cpp
+    panels/memory_panel.cpp
+    panels/messages_panel.cpp
+    panels/errors_panel.cpp
+    panels/logs_panel.cpp
+)
+target_link_libraries(zworkbench PRIVATE zplatform_core Qt6::Widgets)
+set_target_properties(zworkbench PROPERTIES
+    AUTOMOC ON
+    WIN32_EXECUTABLE TRUE
+)

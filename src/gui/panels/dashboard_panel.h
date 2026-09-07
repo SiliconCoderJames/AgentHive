@@ -1,0 +1,22 @@
+#pragma once
+// 总览面板：Agent 状态、本周 Token 用量（预算进度 + 告警）、待处理错误。
+#include <QListWidget>
+#include <QProgressBar>
+#include <QTableWidget>
+#include <QLabel>
+
+#include "panel_base.h"
+
+class DashboardPanel : public PanelBase {
+    Q_OBJECT
+public:
+    explicit DashboardPanel(zp::Platform& platform, QWidget* parent = nullptr);
+    void refresh() override;
+
+private:
+    QProgressBar* budgetBar_ = nullptr;
+    QLabel* budgetLabel_ = nullptr;
+    QTableWidget* agentsTable_ = nullptr;
+    QTableWidget* usageTable_ = nullptr;
+    QListWidget* alertsList_ = nullptr;
+};

@@ -1,0 +1,144 @@
+-- ZCode 多 Agent 协作平台 Schema
+-- 协作规则落地：
+--   * 内容只追加、不覆盖：knowledge/memory 用版本号 + is_latest 标记，旧版本永不删除。
+--   * 所有写操作在 audit_log 留痕（身份 + 时间 + 内容摘要）。
+-- 知识向量表 knowledge_vec 为 vec0 虚拟表，维度由运行时配置决定，在代码中创建。
+
+PRAGMA journal_mode = WAL;
+PRAGMA foreign_keys = ON;
+
+CREATE TABLE IF NOT EXISTS settings (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS agents (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    name         TEXT NOT NULL UNIQUE,
+    role         TEXT NOT NULL DEFAULT 'member',   -- member | zcode
+    api_key_hash TEXT NOT NULL,
+    status       TEXT NOT NULL DEFAULT 'offline',
+    current_task TEXT,
+    last_seen_at TEXT,
+    created_at   TEXT NOT NULL,
+    updated_at   TEXT NOT NULL
+);
+
+-- 共享知识库：同一 uuid 的多个版本构成历史；只增不改。
+CREATE TABLE IF NOT EXISTS knowledge_entries (
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    uuid               TEXT NOT NULL,
+    title              TEXT NOT NULL,
+    content            TEXT NOT NULL,
+    tags_json          TEXT NOT NULL DEFAULT '[]',
+    category           TEXT,
+    author             TEXT NOT NULL,
+    version            INTEGER NOT NULL DEFAULT 1,
+    parent_version_id  INTEGER,
+    is_latest          INTEGER NOT NULL DEFAULT 1,
+    embedding_provider TEXT,
+    created_at         TEXT NOT NULL
+);
+
+-- 技能库：新技能必须先注册（skills 表存在）才能被调用。
+CREATE TABLE IF NOT EXISTS skills (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    name         TEXT NOT NULL UNIQUE,
+    display_name TEXT,
+    description  TEXT NOT NULL,
+    category     TEXT,
+    owner_agent  TEXT NOT NULL,
+    param_schema TEXT NOT NULL DEFAULT '{}',
+    version      INTEGER NOT NULL DEFAULT 1,
+    status       TEXT NOT NULL DEFAULT 'active',
+    created_at   TEXT NOT NULL,
+    updated_at   TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS skill_invocations (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    skill_name     TEXT NOT NULL,
+    caller_agent   TEXT NOT NULL,
+    params         TEXT NOT NULL DEFAULT '{}',
+    result_summary TEXT,
+    status         TEXT NOT NULL,               -- success | failed
+    duration_ms    INTEGER NOT NULL DEFAULT 0,
+    created_at     TEXT NOT NULL
+);
+
+-- 用户记忆：section+key 定位一条画像；修改即生成新版本。
+CREATE TABLE IF NOT EXISTS memory_entries (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    section    TEXT NOT NULL,
+    key        TEXT NOT NULL,
+    value      TEXT NOT NULL,
+    author     TEXT NOT NULL,
+    version    INTEGER NOT NULL DEFAULT 1,
+    is_latest  INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL
+);
+
+-- Agent 异步交流：留言 / 提问 / 指派任务；不要求同时在线。
+CREATE TABLE IF NOT EXISTS messages (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    uuid          TEXT NOT NULL UNIQUE,
+    kind          TEXT NOT NULL,                -- note | question | task
+    sender        TEXT NOT NULL,
+    recipient     TEXT,                         -- NULL = 广播给所有 Agent
+    subject       TEXT,
+    body          TEXT NOT NULL,
+    status        TEXT NOT NULL DEFAULT 'unread',
+    parent_uuid   TEXT,
+    created_at    TEXT NOT NULL
+);
+
+-- 错误日志：报错必须记录，不得静默忽略。
+CREATE TABLE IF NOT EXISTS errors (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    uuid             TEXT NOT NULL UNIQUE,
+    reporter         TEXT NOT NULL,
+    severity         TEXT NOT NULL DEFAULT 'error',
+    source           TEXT,
+    title            TEXT NOT NULL,
+    detail           TEXT NOT NULL,
+    stack_trace      TEXT,
+    status           TEXT NOT NULL DEFAULT 'open',
+    resolution_notes TEXT,
+    resolved_by      TEXT,
+    created_at       TEXT NOT NULL,
+    resolved_at      TEXT
+);
+
+-- 操作日志：身份 + 时间 + 动作 + 对象 + 内容摘要，完整可追溯。
+CREATE TABLE IF NOT EXISTS audit_log (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    actor      TEXT NOT NULL,
+    action     TEXT NOT NULL,
+    target     TEXT,
+    detail     TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL
+);
+
+-- Token 用量：每次调用一条，按自然周（周一 UTC 起）聚合。
+CREATE TABLE IF NOT EXISTS token_usage (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    agent        TEXT NOT NULL,
+    week_start   TEXT NOT NULL,
+    tokens_in    INTEGER NOT NULL DEFAULT 0,
+    tokens_out   INTEGER NOT NULL DEFAULT 0,
+    call_type    TEXT,
+    reference_id TEXT,
+    created_at   TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_knowledge_uuid      ON knowledge_entries(uuid, version);
+CREATE INDEX IF NOT EXISTS idx_knowledge_latest    ON knowledge_entries(is_latest, created_at);
+CREATE INDEX IF NOT EXISTS idx_knowledge_category  ON knowledge_entries(category);
+CREATE INDEX IF NOT EXISTS idx_memory_latest       ON memory_entries(section, key, is_latest);
+CREATE INDEX IF NOT EXISTS idx_messages_recipient  ON messages(recipient, status);
+CREATE INDEX IF NOT EXISTS idx_messages_kind       ON messages(kind, created_at);
+CREATE INDEX IF NOT EXISTS idx_errors_status       ON errors(status, severity);
+CREATE INDEX IF NOT EXISTS idx_audit_actor         ON audit_log(actor, created_at);
+CREATE INDEX IF NOT EXISTS idx_audit_time          ON audit_log(created_at);
+CREATE INDEX IF NOT EXISTS idx_usage_week          ON token_usage(week_start, agent);
+CREATE INDEX IF NOT EXISTS idx_invocations_skill   ON skill_invocations(skill_name, created_at);
