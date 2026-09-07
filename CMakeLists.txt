@@ -18,15 +18,17 @@ include(FetchContent)
 
 # ---- third-party dependencies ---------------------------------------------
 # 网络韧性：scripts/fetch-deps.ps1 可把 GitHub 依赖预取到 vendor/（带重试）。
-# vendor 目录存在时优先使用本地缓存，构建不再受网络波动影响。
-if(EXISTS ${CMAKE_SOURCE_DIR}/vendor/sqlite-vec)
-    set(FETCHCONTENT_SOURCE_DIR_SQLITE_VEC ${CMAKE_SOURCE_DIR}/vendor/sqlite-vec CACHE PATH "local vendor" FORCE)
+# vendor 目录存在且用户未显式指定时才启用本地缓存：
+#   - 不用 FORCE，避免覆盖 -DFETCHCONTENT_SOURCE_DIR_<NAME>=... 的显式取值
+#   - 仅在缓存变量为空时设置，vendor/ 删除后不会残留悬空路径
+if(EXISTS ${CMAKE_SOURCE_DIR}/vendor/sqlite-vec AND NOT FETCHCONTENT_SOURCE_DIR_SQLITE_VEC)
+    set(FETCHCONTENT_SOURCE_DIR_SQLITE_VEC ${CMAKE_SOURCE_DIR}/vendor/sqlite-vec CACHE PATH "local vendor")
 endif()
-if(EXISTS ${CMAKE_SOURCE_DIR}/vendor/cpp-httplib)
-    set(FETCHCONTENT_SOURCE_DIR_HTTPLIB ${CMAKE_SOURCE_DIR}/vendor/cpp-httplib CACHE PATH "local vendor" FORCE)
+if(EXISTS ${CMAKE_SOURCE_DIR}/vendor/cpp-httplib AND NOT FETCHCONTENT_SOURCE_DIR_HTTPLIB)
+    set(FETCHCONTENT_SOURCE_DIR_HTTPLIB ${CMAKE_SOURCE_DIR}/vendor/cpp-httplib CACHE PATH "local vendor")
 endif()
-if(EXISTS ${CMAKE_SOURCE_DIR}/vendor/json)
-    set(FETCHCONTENT_SOURCE_DIR_NLOHMANN_JSON ${CMAKE_SOURCE_DIR}/vendor/json CACHE PATH "local vendor" FORCE)
+if(EXISTS ${CMAKE_SOURCE_DIR}/vendor/json AND NOT FETCHCONTENT_SOURCE_DIR_NLOHMANN_JSON)
+    set(FETCHCONTENT_SOURCE_DIR_NLOHMANN_JSON ${CMAKE_SOURCE_DIR}/vendor/json CACHE PATH "local vendor")
 endif()
 
 # SQLite official amalgamation (pinned)
@@ -101,6 +103,9 @@ target_include_directories(httplib_hdr INTERFACE ${httplib_SOURCE_DIR})
 if(WIN32)
     target_link_libraries(httplib_hdr INTERFACE ws2_32)
 endif()
+# cpp-httplib 在非 Windows 平台依赖 pthreads
+find_package(Threads REQUIRED)
+target_link_libraries(httplib_hdr INTERFACE Threads::Threads)
 
 add_subdirectory(src/core)
 

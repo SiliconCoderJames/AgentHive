@@ -3,6 +3,7 @@ build-*/
 out/
 data/
 vendor/
+.mimosa/
 .vs/
 .vscode/
 CMakeUserPresets.json

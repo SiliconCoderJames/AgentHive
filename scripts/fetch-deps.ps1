@@ -12,23 +12,28 @@ $deps = @(
 )
 
 foreach ($dep in $deps) {
-    $dest = Join-Path $vendor $dep.Name
+    $depName = $dep.Name
+    $dest = Join-Path $vendor $depName
     if (Test-Path (Join-Path $dest ".git")) {
-        Write-Host "[skip] $($dep.Name) already vendored"
+        Write-Host "[skip] $depName already vendored"
         continue
     }
-    if (Test-Path $dest) { Remove-Item -Recurse -Force $dest }
+    if (Test-Path $dest) {
+        Remove-Item -Recurse -Force $dest -ErrorAction SilentlyContinue
+    }
     $ok = $false
     for ($i = 1; $i -le 5; $i++) {
         Write-Host "[clone $i/5] $($dep.Url) -> $dest"
         git clone --quiet --depth 1 --branch $dep.Tag $dep.Url $dest
         if ($LASTEXITCODE -eq 0) { $ok = $true; break }
         Write-Host "[retry] clone failed (exit $LASTEXITCODE), waiting..."
-        if (Test-Path $dest) { Remove-Item -Recurse -Force $dest }
+        if (Test-Path $dest) {
+            Remove-Item -Recurse -Force $dest -ErrorAction SilentlyContinue
+        }
         Start-Sleep -Seconds (10 * $i)
     }
     if (-not $ok) {
-        Write-Error "failed to vendor $($dep.Name) after 5 attempts"
+        Write-Error "failed to vendor $depName after 5 attempts"
         exit 1
     }
 }
