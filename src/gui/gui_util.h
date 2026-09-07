@@ -11,12 +11,14 @@
 
 #include <initializer_list>
 
-// 填充表格一行（按列顺序），并去重设置 item。
+// 填充表格一行（按列顺序），并去重设置 item；全文同时挂到 tooltip，
+// 列宽不足被截断时悬停即可看到完整内容。
 inline void setRow(QTableWidget* table, int row, std::initializer_list<QString> cells) {
     int col = 0;
     for (const auto& text : cells) {
         auto* item = new QTableWidgetItem(text);
         item->setFlags(item->flags() & ~Qt::ItemIsEditable);
+        if (!text.isEmpty()) item->setToolTip(text);
         table->setItem(row, col++, item);
     }
 }

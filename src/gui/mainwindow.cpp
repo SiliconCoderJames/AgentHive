@@ -1,6 +1,7 @@
 #include "mainwindow.h"
 
 #include <QHBoxLayout>
+#include <QShortcut>
 #include <QStatusBar>
 
 #include "gui_util.h"
@@ -82,6 +83,14 @@ MainWindow::MainWindow(zp::Platform& platform, QWidget* parent)
     timer_ = new QTimer(this);
     connect(timer_, &QTimer::timeout, this, &MainWindow::onRefresh);
     timer_->start(3000);  // 3 秒自动刷新当前面板与状态栏
+
+    // 快捷键：Ctrl+1..7 切面板，F5 手动刷新
+    for (int i = 0; i < 7; ++i) {
+        auto* sc = new QShortcut(QKeySequence(QString("Ctrl+%1").arg(i + 1)), this);
+        connect(sc, &QShortcut::activated, this, [this, i] { nav_->setCurrentRow(i); });
+    }
+    auto* refreshSc = new QShortcut(QKeySequence("F5"), this);
+    connect(refreshSc, &QShortcut::activated, this, &MainWindow::onRefresh);
 }
 
 void MainWindow::buildNav() {
@@ -89,6 +98,7 @@ void MainWindow::buildNav() {
                             "🧠  用户记忆",  "💬  Agent 交流", "🚨  错误报告",
                             "🕘  操作日志"};
     nav_->addItems(items);
+    nav_->item(5)->setForeground(QBrush(ui::DANGER));  // 错误报告项恒红，异常时更醒目
 }
 
 void MainWindow::buildStatusBar() {
@@ -135,5 +145,13 @@ void MainWindow::updateStatusBar() {
                 .arg(formatNum(sum.budget))
                 .arg(pct, 0, 'f', 1)
                 .arg(formatNum(sum.budget - sum.total_tokens)));
+    }
+    // 导航徽标：未解决错误数附加在「错误报告」项上
+    std::vector<zp::ErrorReport> openErrors;
+    if (platform_.errorList("open", "", 99, openErrors, err)) {
+        openErrors_ = static_cast<int>(openErrors.size());
+        nav_->item(5)->setText(openErrors_ > 0
+                                   ? QString("🚨  错误报告  (%1)").arg(openErrors_)
+                                   : "🚨  错误报告");
     }
 }

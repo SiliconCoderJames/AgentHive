@@ -32,4 +32,5 @@ private:
     QLabel* spin_ = nullptr;
     int spinPhase_ = 0;
     QTimer* timer_ = nullptr;
+    int openErrors_ = 0;  // 未解决错误数，用于导航徽标
 };
