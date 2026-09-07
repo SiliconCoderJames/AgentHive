@@ -28,6 +28,7 @@ MemoryPanel::MemoryPanel(zp::Platform& platform, QWidget* parent)
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(16, 16, 16, 16);
     layout->setSpacing(12);
+    buildHeader(layout, "用户记忆", "项目档案 · 决策日志 · 偏好记录 · 设备环境 · 工作习惯，所有 Agent 共享");
 
     auto* toolbar = new QHBoxLayout;
     headerLabel_ = new QLabel(this);

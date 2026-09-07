@@ -16,6 +16,9 @@
 ErrorsPanel::ErrorsPanel(zp::Platform& platform, QWidget* parent)
     : PanelBase(platform, parent) {
     auto* layout = new QVBoxLayout(this);
+    layout->setContentsMargins(16, 16, 16, 16);
+    layout->setSpacing(12);
+    buildHeader(layout, "错误报告", "报错必须记录、可认领解决；解决说明只追加不覆盖");
 
     auto* toolbar = new QHBoxLayout;
     statusCombo_ = new QComboBox(this);

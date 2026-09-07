@@ -20,6 +20,9 @@
 SkillsPanel::SkillsPanel(zp::Platform& platform, QWidget* parent)
     : PanelBase(platform, parent) {
     auto* layout = new QVBoxLayout(this);
+    layout->setContentsMargins(16, 16, 16, 16);
+    layout->setSpacing(12);
+    buildHeader(layout, "技能库", "先注册后调用，每次调用留痕；使用热度反映真实依赖");
 
     auto* toolbar = new QHBoxLayout;
     categoryCombo_ = new QComboBox(this);

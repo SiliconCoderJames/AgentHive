@@ -45,9 +45,11 @@ MainWindow::MainWindow(zp::Platform& platform, QWidget* parent)
     nav_ = new QListWidget(side);
     nav_->setStyleSheet(
         "QListWidget { background:#18181b; border:none; padding:0 6px; font-size:13px; }"
-        "QListWidget::item { padding:11px 12px; margin:2px 4px; border-radius:6px; color:#9ca3af; }"
+        "QListWidget::item { padding:11px 12px; margin:2px 4px; border-radius:6px;"
+        " color:#9ca3af; border-left:3px solid transparent; }"
         "QListWidget::item:hover { background:#262626; color:#e5e5e5; }"
-        "QListWidget::item:selected { background:#0ea5e9; color:#ffffff; font-weight:600; }");
+        "QListWidget::item:selected { background:#0ea5e9; color:#ffffff;"
+        " font-weight:600; border-left:3px solid #f59e0b; }");
     sideLay->addWidget(nav_, 1);
 
     auto* ver = new QLabel("v1.0 · local-first", side);

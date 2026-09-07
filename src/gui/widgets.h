@@ -5,10 +5,12 @@
 #include <QGraphicsOpacityEffect>
 #include <QLabel>
 #include <QPainter>
+#include <QPointer>
 #include <QPropertyAnimation>
 #include <QTimer>
 #include <QToolButton>
 #include <QVBoxLayout>
+#include <QVariantAnimation>
 #include <QWidget>
 
 #include "theme.h"
@@ -25,7 +27,7 @@ inline void hoverGlow(QFrame* frame, const char* objectName) {
     frame->setStyleSheet(base + hover);
 }
 
-// ---- 环形进度：中间显示 已用/总额/百分比，临近预算橙→红 ----
+// ---- 环形进度：中间显示 已用/总额/百分比，临近预算橙→红，进度弧平滑动画 ----
 class RingProgress : public QWidget {
 public:
     RingProgress(QWidget* parent = nullptr) : QWidget(parent) {
@@ -35,6 +37,20 @@ public:
         used_ = used;
         total_ = total > 0 ? total : 1;
         caption_ = caption;
+        // 进度弧从当前角度平滑扫掠到目标，避免 3s 刷新时生硬跳变
+        double target = qMin(1.0, double(used_) / double(total_));
+        if (anim_) anim_->stop();  // QPointer：动画自删后自动置空，安全
+        auto* anim = new QVariantAnimation(this);
+        anim_ = anim;
+        anim->setDuration(450);
+        anim->setStartValue(animRatio_);
+        anim->setEndValue(target);
+        anim->setEasingCurve(QEasingCurve::OutCubic);
+        connect(anim, &QVariantAnimation::valueChanged, this, [this](const QVariant& v) {
+            animRatio_ = v.toDouble();
+            update();
+        });
+        anim->start(QAbstractAnimation::DeleteWhenStopped);
         update();
     }
 
@@ -45,14 +61,14 @@ protected:
         int side = qMin(width(), height());
         QRectF rect((width() - side) / 2 + 10, (height() - side) / 2 + 10,
                     side - 20, side - 20);
-        double ratio = qMin(1.0, double(used_) / double(total_));
+        double ratio = animRatio_;
         // 背景环
         QPen pen(QColor("#3f3f46"), 12, Qt::SolidLine, Qt::RoundCap);
         p.setPen(pen);
         p.drawArc(rect, 45 * 16, -270 * 16);
         // 进度环（占比驱动颜色：蓝→橙→红渐变过渡）
         QColor c = usageColor(ratio);
-        if (ratio > 0.0) {
+        if (ratio > 0.001) {
             QPen prog(c, 12, Qt::SolidLine, Qt::RoundCap);
             p.setPen(prog);
             p.drawArc(rect, 45 * 16, int(-270 * 16 * ratio));
@@ -84,6 +100,8 @@ protected:
 private:
     qint64 used_ = 0, total_ = 1;
     QString caption_;
+    double animRatio_ = 0.0;      // 动画当前扫掠比例（与目标值的差由 QVariantAnimation 收敛）
+    QPointer<QVariantAnimation> anim_;  // DeleteWhenStopped 会自删，用 QPointer 防悬空
 };
 
 // ---- 横向柱状图：各 Agent 用量对比 ----

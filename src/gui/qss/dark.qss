@@ -119,6 +119,9 @@ QHeaderView::section {
     font-size: 11px;
 }
 QTableWidget::item, QTreeWidget::item { padding: 5px; }
+QTableWidget::item:hover, QTreeWidget::item:hover, QListWidget::item:hover {
+    background-color: #333338;
+}
 QTableWidget::item:selected, QTreeWidget::item:selected, QListWidget::item:selected {
     background-color: #0ea5e9;
     color: #ffffff;

@@ -21,6 +21,9 @@
 KnowledgePanel::KnowledgePanel(zp::Platform& platform, QWidget* parent)
     : PanelBase(platform, parent) {
     auto* layout = new QVBoxLayout(this);
+    layout->setContentsMargins(16, 16, 16, 16);
+    layout->setSpacing(12);
+    buildHeader(layout, "知识库", "经验 / 方案 / 踩坑统一沉淀，关键词与语义双模式检索，版本只追加不覆盖");
 
     // 工具栏
     auto* toolbar = new QHBoxLayout;

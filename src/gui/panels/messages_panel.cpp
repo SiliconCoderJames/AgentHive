@@ -31,6 +31,7 @@ MessagesPanel::MessagesPanel(zp::Platform& platform, QWidget* parent)
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(16, 16, 16, 16);
     layout->setSpacing(12);
+    buildHeader(layout, "Agent 交流", "留言 / 提问 / 指派任务，异步流转，不要求同时在线");
 
     auto* toolbar = new QHBoxLayout;
     kindCombo_ = new QComboBox(this);
