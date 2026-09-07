@@ -120,14 +120,14 @@ void MainWindow::onRefresh() {
 void MainWindow::updateStatusBar() {
     std::string err;
     zp::UsageSummary sum;
+    // 服务在线指示灯：HTTP 服务随进程常驻，绿点常亮即后端可用
+    statusServer_->setText(QString("<span style='color:#22c55e;'>●</span> HTTP: "
+                                   "http://127.0.0.1:%1 · 数据: %2")
+                               .arg(platform_.httpPort())
+                               .arg(QString::fromStdString(platform_.homeDir())));
     if (platform_.usageSummary(sum, err)) {
-        int port = platform_.httpPort();
-        statusServer_->setText(
-            QString("HTTP: http://127.0.0.1:%1 · 数据: %2")
-                .arg(port)
-                .arg(QString::fromStdString(platform_.homeDir())));
         double pct = sum.budget > 0 ? 100.0 * sum.total_tokens / sum.budget : 0.0;
-        QString color = sum.alert_level == "none" ? "#2e7d32" : (sum.alert_level == "warn" ? "#e65100" : "#c62828");
+        QString color = sum.alert_level == "none" ? "#22c55e" : (sum.alert_level == "warn" ? "#f59e0b" : "#ef4444");
         statusUsage_->setText(
             QString("<span style='color:%1'>本周 Token: %2 / %3 (%4%) · 剩余 %5</span>")
                 .arg(color)

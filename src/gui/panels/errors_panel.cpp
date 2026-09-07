@@ -99,6 +99,17 @@ void ErrorsPanel::refresh() {
                {QString::fromStdString(e.severity), QString::fromStdString(e.title),
                 QString::fromStdString(e.reporter), QString::fromStdString(e.status),
                 QString::fromStdString(e.created_at)});
+        // 严重度着色：critical 红 / error 橙 / warning 黄 / info 灰
+        QString sev = QString::fromStdString(e.severity);
+        QColor c = sev == "critical" ? ui::DANGER
+                                     : (sev == "error" ? ui::WARN
+                                                       : (sev == "warning" ? ui::NOTE : ui::MUTED));
+        if (auto* item = table_->item(static_cast<int>(i), 0)) {
+            item->setForeground(c);
+            QFont f = item->font();
+            f.setBold(sev == "critical" || sev == "error");
+            item->setFont(f);
+        }
     }
     emptyLabel_->setVisible(errors_.empty());
     splitter_->setVisible(!errors_.empty());

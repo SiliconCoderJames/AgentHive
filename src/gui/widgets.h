@@ -266,15 +266,22 @@ public:
         seen_->setStyleSheet(
             "color:#9ca3af; font-size:10px; font-family:Consolas,monospace; background:transparent;");
         lay->addWidget(seen_);
+        // 在线呼吸灯：点亮的绿点每 900ms 明暗交替，离线则恒灰
+        pulse_ = new QTimer(this);
+        pulse_->setInterval(900);
+        connect(pulse_, &QTimer::timeout, this, [this] {
+            pulseOn_ = !pulseOn_;
+            updateDot();
+        });
+        pulse_->start();
     }
     void setAgent(const QString& name, const QString& status, const QString& role,
                   const QString& task, const QString& lastSeen) {
         name_->setText(name);
-        bool online = status == "online";
-        dot_->setText(online ? "<span style='color:#22c55e;'>●</span>"
-                             : "<span style='color:#71717a;'>●</span>");
-        status_->setText(online ? "在线" : "离线");
-        status_->setStyleSheet(online
+        online_ = status == "online";
+        updateDot();
+        status_->setText(online_ ? "在线" : "离线");
+        status_->setStyleSheet(online_
             ? "font-size:10px; padding:1px 8px; border-radius:8px;"
               "color:#a7f3d0; background:#064e3b;"
             : "font-size:10px; padding:1px 8px; border-radius:8px;"
@@ -291,6 +298,14 @@ private:
     QLabel* role_ = nullptr;
     QLabel* task_ = nullptr;
     QLabel* seen_ = nullptr;
+    QTimer* pulse_ = nullptr;
+    bool online_ = false;
+    bool pulseOn_ = true;
+    void updateDot() {
+        dot_->setText(online_ ? QString("<span style='color:%1;'>●</span>")
+                                    .arg(pulseOn_ ? "#22c55e" : "#15803d")
+                              : "<span style='color:#71717a;'>●</span>");
+    }
 };
 
 // ---- 告警卡片：红=阻断 / 橙=警告 / 黄=注意 ----

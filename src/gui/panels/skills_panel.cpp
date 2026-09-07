@@ -124,7 +124,8 @@ void SkillsPanel::refresh() {
     } else {
         // 空状态提示
         detail_->setHtml(
-            "<div style='color:#9ca3af; text-align:center; margin-top:48px;'>"
+            "<div style='color:#9ca3af; text-align:center; margin-top:36px;'>"
+            "<div style='font-size:34px;'>🧩</div>"
             "暂无注册技能<br><br>点击右上角「＋ 注册技能」，或让 Agent 通过 "
             "<span style='font-family:Consolas;'>POST /api/skills</span> 注册（先注册后调用）</div>");
     }
