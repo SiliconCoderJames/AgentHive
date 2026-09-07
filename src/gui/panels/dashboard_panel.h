@@ -26,4 +26,5 @@ private:
     QLabel* emptyAlerts_ = nullptr;
     std::vector<ui::AgentCard*> agentCards_;
     std::vector<QWidget*> alertCards_;
+    QString budgetAlertLevel_;
 };

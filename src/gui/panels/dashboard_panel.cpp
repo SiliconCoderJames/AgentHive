@@ -84,15 +84,7 @@ void DashboardPanel::refresh() {
             bars.append({QString::fromStdString(name), tokens});
         usageChart_->setEntries(bars);
 
-        // 告警：预算级别
-        alertsLay_->removeWidget(emptyAlerts_);
-        emptyAlerts_->setVisible(sum.alert_level == "none");
-        if (sum.alert_level == "warn")
-            alertsLay_->addWidget(new ui::AlertCard("warn", "⚠ Token 用量已达预算 80%，请控制消耗", this));
-        else if (sum.alert_level == "critical")
-            alertsLay_->addWidget(new ui::AlertCard("critical", "⛔ Token 用量已达预算 95%！", this));
-        else if (sum.alert_level == "over")
-            alertsLay_->addWidget(new ui::AlertCard("critical", "🚫 Token 用量已超出本周预算！", this));
+        budgetAlertLevel_ = QString::fromStdString(sum.alert_level);
     }
 
     // Agent 状态卡片网格（3 列；卡片池复用避免闪烁）
@@ -117,29 +109,36 @@ void DashboardPanel::refresh() {
         }
     }
 
-    // 告警：未解决错误（分级卡片）
-    std::vector<zp::ErrorReport> openErrors;
-    if (platform_.errorList("open", "", 10, openErrors, err)) {
-        for (auto* w : alertCards_) {
-            alertsLay_->removeWidget(w);
-            w->deleteLater();
-        }
-        alertCards_.clear();
-        bool hasOpen = !openErrors.empty();
-        emptyAlerts_->setVisible(sum.alert_level == "none" && !hasOpen);
-        for (const auto& e : openErrors) {
-            auto* card = new ui::AlertCard(
-                e.severity == "critical" ? "critical"
-                                         : (e.severity == "warning" ? "warn" : "note"),
-                QString("[%1] %2 — %3")
-                    .arg(QString::fromStdString(e.severity))
-                    .arg(QString::fromStdString(e.title))
-                    .arg(QString::fromStdString(e.reporter)),
-                this);
-            alertCards_.push_back(card);
-            alertsLay_->addWidget(card);
-        }
+    // 告警统一重建：预算卡 + 未解决错误分级卡片；无告警时显示空状态
+    for (auto* w : alertCards_) {
+        alertsLay_->removeWidget(w);
+        w->deleteLater();
     }
+    alertCards_.clear();
+    if (budgetAlertLevel_ == "warn")
+        alertCards_.push_back(new ui::AlertCard("warn", "⚠ Token 用量已达预算 80%，请控制消耗", this));
+    else if (budgetAlertLevel_ == "critical")
+        alertCards_.push_back(new ui::AlertCard("critical", "⛔ Token 用量已达预算 95%！", this));
+    else if (budgetAlertLevel_ == "over")
+        alertCards_.push_back(new ui::AlertCard("critical", "🚫 Token 用量已超出本周预算！", this));
+    std::vector<zp::ErrorReport> openErrors;
+    platform_.errorList("open", "", 10, openErrors, err);
+    for (const auto& e : openErrors) {
+        alertCards_.push_back(new ui::AlertCard(
+            e.severity == "critical" ? "critical" : (e.severity == "warning" ? "warn" : "note"),
+            QString("[%1] %2 — %3")
+                .arg(QString::fromStdString(e.severity))
+                .arg(QString::fromStdString(e.title))
+                .arg(QString::fromStdString(e.reporter)),
+            this));
+    }
+    int at = alertsLay_->indexOf(emptyAlerts_);
+    for (auto* card : alertCards_) {
+        int insertAt = at < 0 ? alertsLay_->count() : at;
+        alertsLay_->insertWidget(insertAt, card);
+        ++at;
+    }
+    emptyAlerts_->setVisible(alertCards_.empty());
 
     // 事件流时间线（最近 15 条审计）
     std::vector<zp::AuditRecord> records;

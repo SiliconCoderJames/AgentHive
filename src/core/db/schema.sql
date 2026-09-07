@@ -122,6 +122,7 @@ CREATE TABLE IF NOT EXISTS audit_log (
 
 -- Token 用量：每次调用一条，按自然周（周一 UTC 起）聚合。
 -- idempotency_key 非空时全局唯一，保证同一任务重复上报不重复扣减。
+-- 注意：idx_usage_idem 部分唯一索引由启动迁移创建（存量旧库先 ALTER 加列）。
 CREATE TABLE IF NOT EXISTS token_usage (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     agent           TEXT NOT NULL,
@@ -133,9 +134,6 @@ CREATE TABLE IF NOT EXISTS token_usage (
     idempotency_key TEXT,
     created_at      TEXT NOT NULL
 );
-
-CREATE UNIQUE INDEX IF NOT EXISTS idx_usage_idem
-    ON token_usage(idempotency_key) WHERE idempotency_key IS NOT NULL AND idempotency_key != '';
 
 CREATE INDEX IF NOT EXISTS idx_knowledge_uuid      ON knowledge_entries(uuid, version);
 CREATE INDEX IF NOT EXISTS idx_knowledge_latest    ON knowledge_entries(is_latest, created_at);

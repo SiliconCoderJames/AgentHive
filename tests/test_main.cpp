@@ -385,6 +385,55 @@ static void test_platform_end_to_end() {
     fs::remove_all(tmp, ec);
 }
 
+// 存量旧库升级：旧 schema（agents 无 salt、token_usage 无 idempotency_key）
+// 直接跑新版本 bootstrap 必须成功，旧格式密钥仍可认证。
+static void test_legacy_migration() {
+    fs::path tmp = fs::temp_directory_path() / ("zcode_legacy_" + zp::randomHex(6));
+    fs::create_directories(tmp);
+    {
+        zp::Database raw;
+        std::string err;
+        CHECK(raw.open((tmp / "platform.db").string(), err));
+        const char* oldSchema =
+            "CREATE TABLE agents(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE,"
+            " role TEXT NOT NULL DEFAULT 'member', api_key_hash TEXT NOT NULL, status TEXT,"
+            " current_task TEXT, last_seen_at TEXT, created_at TEXT, updated_at TEXT);"
+            "CREATE TABLE token_usage(id INTEGER PRIMARY KEY AUTOINCREMENT, agent TEXT NOT NULL,"
+            " week_start TEXT NOT NULL, tokens_in INTEGER NOT NULL DEFAULT 0,"
+            " tokens_out INTEGER NOT NULL DEFAULT 0, call_type TEXT, reference_id TEXT,"
+            " created_at TEXT NOT NULL);";
+        CHECK(raw.execScript(oldSchema, err));
+        std::string legacyHash = zp::sha256Hex("legacykey");
+        CHECK(raw.execScript("INSERT INTO agents(name, role, api_key_hash, status, created_at,"
+                             " updated_at) VALUES ('legacy','member','" +
+                                 legacyHash + "','offline','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z');",
+                             err));
+        raw.close();
+
+        zp::Platform p(tmp.string());
+        bool bootOk = p.bootstrap(err);
+        if (!bootOk) std::printf("  legacy bootstrap err: %s\n", err.c_str());
+        CHECK(bootOk);  // 旧库升级：修复前此处报 no such column: idempotency_key
+        CHECK(p.authenticate("legacy", "legacykey"));       // 旧格式（无盐）兼容
+        CHECK(!p.authenticate("legacy", "wrong"));
+        bool dup = false;
+        bool r1 = p.usageReport("legacy", 100, 50, "llm", "", "mig-1", dup, err);
+        if (!r1) std::printf("  legacy report err: %s\n", err.c_str());
+        CHECK(r1);
+        CHECK(p.usageReport("legacy", 100, 50, "llm", "", "mig-1", dup, err));
+        CHECK(dup);
+        std::string key;
+        std::string mk = readFile((tmp / "config" / "master.key").string());
+        bool reg = p.registerAgent(mk, "newagent", "member", key, err);
+        if (!reg) std::printf("  legacy register err: %s\n", err.c_str());
+        CHECK(reg);
+        CHECK(p.authenticate("newagent", key));             // 新 Agent 走加盐格式
+        p.shutdown();
+    }
+    std::error_code ec;
+    fs::remove_all(tmp, ec);
+}
+
 int main() {
     auto run = [](const char* name, void (*fn)()) {
         std::printf("== %s\n", name);
@@ -396,6 +445,7 @@ int main() {
     run("embedder", test_embedder);
     run("url_guard", test_url_guard);
     run("platform_e2e", test_platform_end_to_end);
+    run("legacy_migration", test_legacy_migration);
 
     std::printf("checks: %d, failures: %d\n", g_checks, g_failures);
     return g_failures == 0 ? 0 : 1;
