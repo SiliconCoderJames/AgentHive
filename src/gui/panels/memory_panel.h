@@ -1,10 +1,10 @@
 #pragma once
-// 用户记忆面板：分区块浏览、查看 / 编辑画像（编辑生成新版本）、历史版本。
-#include <QComboBox>
+// 用户记忆面板：五大区块折叠卡片（项目档案/决策日志/偏好记录/设备环境/工作习惯），
+// 顶部显示最后更新时间与条目总数；编辑生成新版本，历史可查。
+#include <QLabel>
 #include <QPushButton>
-#include <QTableWidget>
-#include <QTextBrowser>
-
+#include <QScrollArea>
+#include <QVBoxLayout>
 #include <vector>
 
 #include "panel_base.h"
@@ -20,9 +20,9 @@ private slots:
     void onShowHistory();
 
 private:
-    QComboBox* sectionCombo_ = nullptr;
-    QTableWidget* table_ = nullptr;
-    QTextBrowser* valueView_ = nullptr;
+    QLabel* headerLabel_ = nullptr;
+    QVBoxLayout* sectionsLay_ = nullptr;
+    QPushButton* editBtn_ = nullptr;
+    QPushButton* historyBtn_ = nullptr;
     std::vector<zp::MemoryEntry> entries_;
-    int selectedRow() const { return table_->currentRow(); }
 };

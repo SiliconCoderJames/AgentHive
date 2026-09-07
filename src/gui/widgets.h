@@ -3,6 +3,8 @@
 // 告警卡片、可折叠区块卡片。全部 QPainter / 原生 widget 实现，无 QML。
 #include <QFrame>
 #include <QLabel>
+#include <QPainter>
+#include <QTimer>
 #include <QToolButton>
 #include <QVBoxLayout>
 #include <QWidget>
@@ -154,11 +156,12 @@ private:
         while (top && !top->isWindow()) top = top->parentWidget();
         if (!top) { deleteLater(); return; }
         // 提升为顶层独立气泡，置于右下角
-        setWindowFlags(Qt::FramelessWindowHint | Qt::Tool | Qt::WA_TransparentForMouseEvents);
+        setWindowFlags(Qt::FramelessWindowHint | Qt::Tool);
+        setAttribute(Qt::WA_TransparentForMouseEvents);
         QPoint pos = top->pos() + QPoint(top->width() - width() - 24,
                                          top->height() - height() - 46);
         move(pos);
-        show();
+        QWidget::show();  // 显式调用基类，避免被静态 show(QString,bool) 遮蔽
         QTimer::singleShot(1800, this, &QObject::deleteLater);
     }
 };

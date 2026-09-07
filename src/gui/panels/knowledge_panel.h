@@ -29,6 +29,7 @@ private:
     QLineEdit* searchEdit_ = nullptr;
     QCheckBox* semanticCheck_ = nullptr;
     QLineEdit* tagEdit_ = nullptr;
+    QLabel* statsLabel_ = nullptr;
     QTableWidget* table_ = nullptr;
     QTextBrowser* detail_ = nullptr;
     QLabel* metaLabel_ = nullptr;

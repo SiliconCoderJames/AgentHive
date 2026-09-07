@@ -1,5 +1,7 @@
 #pragma once
 // GUI 小工具函数：表格填充、右键菜单（复制/详情/导出 CSV）、数字格式化。
+#include <QApplication>
+#include <QClipboard>
 #include <QFileDialog>
 #include <QMenu>
 #include <QMessageBox>
@@ -67,8 +69,7 @@ inline void attachTableContextMenu(QTableWidget* table, int idColumn = -1) {
                                  return "\"" + v + "\"";
                              };
                              QTextStream out(&f);
-                             out.setCodec("utf-8");
-                             out << "\xEF\xBB\xBF";  // Excel 兼容 BOM
+                             out << "\xEF\xBB\xBF";  // Excel 兼容 BOM（Qt6 默认 UTF-8）
                              for (int c = 0; c < table->columnCount(); ++c)
                                  out << esc(table->horizontalHeaderItem(c)
                                                 ? table->horizontalHeaderItem(c)->text()

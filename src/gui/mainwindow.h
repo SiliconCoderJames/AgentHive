@@ -29,5 +29,7 @@ private:
     std::vector<PanelBase*> panels_;
     QLabel* statusServer_ = nullptr;
     QLabel* statusUsage_ = nullptr;
+    QLabel* spin_ = nullptr;
+    int spinPhase_ = 0;
     QTimer* timer_ = nullptr;
 };

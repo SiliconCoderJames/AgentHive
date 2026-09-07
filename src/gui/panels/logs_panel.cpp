@@ -1,56 +1,94 @@
 #include "logs_panel.h"
 
+#include <QBrush>
 #include <QHeaderView>
 #include <QHBoxLayout>
 #include <QPushButton>
 #include <QVBoxLayout>
 
 #include "../gui_util.h"
+#include "../widgets.h"
 
 LogsPanel::LogsPanel(zp::Platform& platform, QWidget* parent)
     : PanelBase(platform, parent) {
     auto* layout = new QVBoxLayout(this);
+    layout->setContentsMargins(16, 16, 16, 16);
+    layout->setSpacing(12);
 
     auto* toolbar = new QHBoxLayout;
-    actorEdit_ = new QLineEdit(this);
-    actorEdit_->setPlaceholderText("按身份筛选（Agent 名 / user）");
-    actionEdit_ = new QLineEdit(this);
-    actionEdit_->setPlaceholderText("按动作筛选（如 knowledge.create）");
-    limitSpin_ = new QSpinBox(this);
-    limitSpin_->setRange(10, 2000);
-    limitSpin_->setValue(500);
+    agentCombo_ = new QComboBox(this);
+    agentCombo_->addItem("全部身份");
+    sinceEdit_ = new QDateEdit(this);
+    sinceEdit_->setDisplayFormat("yyyy-MM-dd");
+    sinceEdit_->setCalendarPopup(true);
     auto* refreshBtn = new QPushButton("筛选", this);
-    toolbar->addWidget(actorEdit_, 1);
-    toolbar->addWidget(actionEdit_, 1);
-    toolbar->addWidget(new QLabel("条数:", this));
-    toolbar->addWidget(limitSpin_);
+    refreshBtn->setObjectName("primary");
+    countLabel_ = new QLabel(this);
+    countLabel_->setStyleSheet("color:#9ca3af; font-size:11px;");
+    toolbar->addWidget(new QLabel("身份:", this));
+    toolbar->addWidget(agentCombo_);
+    toolbar->addWidget(new QLabel("起始日期:", this));
+    toolbar->addWidget(sinceEdit_);
     toolbar->addWidget(refreshBtn);
+    toolbar->addStretch(1);
+    toolbar->addWidget(countLabel_);
     layout->addLayout(toolbar);
     connect(refreshBtn, &QPushButton::clicked, this, [this] { refresh(); });
-    connect(actorEdit_, &QLineEdit::returnPressed, this, [this] { refresh(); });
-    connect(actionEdit_, &QLineEdit::returnPressed, this, [this] { refresh(); });
+    connect(agentCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
+            [this](int) { refresh(); });
 
-    table_ = new QTableWidget(0, 5, this);
-    table_->setHorizontalHeaderLabels({"时间", "身份", "动作", "对象", "详情"});
-    table_->horizontalHeader()->setStretchLastSection(true);
-    table_->verticalHeader()->setVisible(false);
-    table_->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    table_->setSelectionBehavior(QAbstractItemView::SelectRows);
-    layout->addWidget(table_, 1);
+    // 时间线：顶层 = 日期，子项 = 该日操作
+    tree_ = new QTreeWidget(this);
+    tree_->setHeaderLabels({"时间", "身份", "动作", "对象", "详情"});
+    tree_->header()->setStretchLastSection(true);
+    tree_->setAlternatingRowColors(true);
+    layout->addWidget(tree_, 1);
 }
 
 void LogsPanel::refresh() {
+    // 身份下拉（含全部身份 + user + 各 Agent）
+    std::vector<zp::AgentInfo> agents;
     std::string err;
-    platform_.auditList(actorEdit_->text().trimmed().toStdString(),
-                        actionEdit_->text().trimmed().toStdString(), "",
-                        limitSpin_->value(), records_, err);
+    platform_.listAgents(agents, err);
+    QString cur = agentCombo_->currentText();
+    agentCombo_->blockSignals(true);
+    agentCombo_->clear();
+    agentCombo_->addItem("全部身份");
+    agentCombo_->addItem("user");
+    for (const auto& a : agents) agentCombo_->addItem(QString::fromStdString(a.name));
+    agentCombo_->setCurrentText(cur);
+    agentCombo_->blockSignals(false);
 
-    table_->setRowCount(static_cast<int>(records_.size()));
-    for (size_t i = 0; i < records_.size(); ++i) {
-        const auto& r = records_[i];
-        setRow(table_, static_cast<int>(i),
-               {QString::fromStdString(r.created_at), QString::fromStdString(r.actor),
-                QString::fromStdString(r.action), QString::fromStdString(r.target),
-                QString::fromStdString(r.detail)});
+    std::string actor;
+    if (agentCombo_->currentIndex() > 0) actor = agentCombo_->currentText().toStdString();
+    std::string since = sinceEdit_->date().toString("yyyy-MM-dd").toStdString() + "T00:00:00Z";
+    platform_.auditList(actor, "", since, 2000, records_, err);
+
+    // 时间线分组
+    tree_->clear();
+    QTreeWidgetItem* dayItem = nullptr;
+    QString curDay;
+    for (const auto& r : records_) {
+        QString ts = QString::fromStdString(r.created_at);
+        QString day = ts.left(10);
+        if (day != curDay) {
+            curDay = day;
+            dayItem = new QTreeWidgetItem(tree_, {day, "", "", "", ""});
+            tree_->setFirstColumnSpanned(tree_->indexOfTopLevelItem(dayItem),
+                                         QModelIndex(), true);
+            QFont f = dayItem->font(0);
+            f.setBold(true);
+            dayItem->setFont(0, f);
+            dayItem->setForeground(0, QBrush(ui::ACCENT));
+        }
+        auto* row = new QTreeWidgetItem(dayItem);
+        row->setText(0, ts.mid(11, 8));
+        row->setText(1, QString::fromStdString(r.actor));
+        row->setText(2, QString::fromStdString(r.action));
+        row->setText(3, QString::fromStdString(r.target));
+        row->setText(4, QString::fromStdString(r.detail));
+        for (int c = 0; c < 5; ++c) row->setFlags(row->flags() & ~Qt::ItemIsEditable);
     }
+    tree_->expandToDepth(0);
+    countLabel_->setText(QString("共 %1 条").arg(formatNum(static_cast<qint64>(records_.size()))));
 }

@@ -11,6 +11,7 @@
 #include "panels/memory_panel.h"
 #include "panels/messages_panel.h"
 #include "panels/skills_panel.h"
+#include "theme.h"
 
 MainWindow::MainWindow(zp::Platform& platform, QWidget* parent)
     : QMainWindow(parent), platform_(platform) {
@@ -19,9 +20,14 @@ MainWindow::MainWindow(zp::Platform& platform, QWidget* parent)
     auto* central = new QWidget(this);
     auto* layout = new QHBoxLayout(central);
     layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(0);
 
     nav_ = new QListWidget(central);
     nav_->setFixedWidth(150);
+    nav_->setStyleSheet(
+        "QListWidget { background:#18181b; border:none; padding:8px 6px; font-size:13px; }"
+        "QListWidget::item { padding:12px 14px; margin:2px 4px; border-radius:6px; color:#9ca3af; }"
+        "QListWidget::item:selected { background:#0ea5e9; color:#ffffff; font-weight:600; }");
     layout->addWidget(nav_);
 
     stack_ = new QStackedWidget(central);
@@ -60,6 +66,9 @@ void MainWindow::buildNav() {
 void MainWindow::buildStatusBar() {
     statusServer_ = new QLabel(this);
     statusUsage_ = new QLabel(this);
+    spin_ = new QLabel(this);
+    spin_->setStyleSheet(QString("color:%1; font-size:14px;").arg(ui::ACCENT.name()));
+    statusBar()->addWidget(spin_);
     statusBar()->addWidget(statusServer_);
     statusBar()->addPermanentWidget(statusUsage_);
 }
@@ -72,6 +81,9 @@ void MainWindow::onNavChanged(int row) {
 }
 
 void MainWindow::onRefresh() {
+    // 刷新微动画：状态栏旋转指示符
+    static const QString kFrames = "◐◓◑◒";
+    spin_->setText(kFrames[spinPhase_++ % 4]);
     int idx = stack_->currentIndex();
     if (idx >= 0 && idx < static_cast<int>(panels_.size())) panels_[static_cast<size_t>(idx)]->refresh();
     updateStatusBar();

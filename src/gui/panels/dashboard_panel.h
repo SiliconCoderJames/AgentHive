@@ -1,10 +1,14 @@
 #pragma once
-// 总览面板：Agent 状态、本周 Token 用量（预算进度 + 告警）、待处理错误。
-#include <QListWidget>
-#include <QProgressBar>
-#include <QTableWidget>
+// 总览面板：环形 Token 预算图 + 各 Agent 用量柱状图 + Agent 状态卡片网格
+// + 底部事件流时间线 + 分级告警卡片。
+#include <QGridLayout>
 #include <QLabel>
+#include <QListWidget>
+#include <QScrollArea>
+#include <QVBoxLayout>
+#include <vector>
 
+#include "../widgets.h"
 #include "panel_base.h"
 
 class DashboardPanel : public PanelBase {
@@ -14,9 +18,12 @@ public:
     void refresh() override;
 
 private:
-    QProgressBar* budgetBar_ = nullptr;
-    QLabel* budgetLabel_ = nullptr;
-    QTableWidget* agentsTable_ = nullptr;
-    QTableWidget* usageTable_ = nullptr;
-    QListWidget* alertsList_ = nullptr;
+    ui::RingProgress* ring_ = nullptr;
+    ui::HBarChart* usageChart_ = nullptr;
+    QGridLayout* agentGrid_ = nullptr;
+    QListWidget* timeline_ = nullptr;
+    QVBoxLayout* alertsLay_ = nullptr;
+    QLabel* emptyAlerts_ = nullptr;
+    std::vector<ui::AgentCard*> agentCards_;
+    std::vector<QWidget*> alertCards_;
 };

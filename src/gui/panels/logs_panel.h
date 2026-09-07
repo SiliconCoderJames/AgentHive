@@ -1,10 +1,9 @@
 #pragma once
-// 操作日志面板：按身份 / 动作筛选，完整可追溯。
-#include <QLineEdit>
-#include <QTableWidget>
+// 操作日志：时间线视图（按日期分组），支持按日期与 Agent 筛选。
+#include <QComboBox>
+#include <QDateEdit>
 #include <QLabel>
-#include <QSpinBox>
-
+#include <QTreeWidget>
 #include <vector>
 
 #include "panel_base.h"
@@ -16,9 +15,9 @@ public:
     void refresh() override;
 
 private:
-    QLineEdit* actorEdit_ = nullptr;
-    QLineEdit* actionEdit_ = nullptr;
-    QSpinBox* limitSpin_ = nullptr;
-    QTableWidget* table_ = nullptr;
+    QComboBox* agentCombo_ = nullptr;
+    QDateEdit* sinceEdit_ = nullptr;
+    QLabel* countLabel_ = nullptr;
+    QTreeWidget* tree_ = nullptr;
     std::vector<zp::AuditRecord> records_;
 };

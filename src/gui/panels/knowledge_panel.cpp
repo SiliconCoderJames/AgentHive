@@ -1,5 +1,9 @@
 #include "knowledge_panel.h"
 
+#include <algorithm>
+#include <map>
+
+#include <QClipboard>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QFormLayout>
@@ -11,6 +15,8 @@
 #include <QVBoxLayout>
 
 #include "../gui_util.h"
+#include "../widgets.h"
+#include "core/util.h"
 
 KnowledgePanel::KnowledgePanel(zp::Platform& platform, QWidget* parent)
     : PanelBase(platform, parent) {
@@ -34,6 +40,11 @@ KnowledgePanel::KnowledgePanel(zp::Platform& platform, QWidget* parent)
     connect(searchBtn, &QPushButton::clicked, this, &KnowledgePanel::onSearch);
     connect(searchEdit_, &QLineEdit::returnPressed, this, &KnowledgePanel::onSearch);
     connect(newBtn, &QPushButton::clicked, this, &KnowledgePanel::onNewEntry);
+
+    // 统计摘要栏：总条目数 / 今日新增 / 热门标签
+    statsLabel_ = new QLabel(this);
+    statsLabel_->setObjectName("muted");
+    layout->addWidget(statsLabel_);
 
     auto* splitter = new QSplitter(Qt::Horizontal, this);
     table_ = new QTableWidget(0, 5, splitter);
@@ -66,6 +77,7 @@ KnowledgePanel::KnowledgePanel(zp::Platform& platform, QWidget* parent)
     connect(versionCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
             &KnowledgePanel::onVersionChanged);
     connect(addVersionBtn_, &QPushButton::clicked, this, &KnowledgePanel::onAddVersion);
+    attachTableContextMenu(table_);
 }
 
 void KnowledgePanel::refresh() {
@@ -97,6 +109,26 @@ void KnowledgePanel::onSearch() {
                {QString::fromStdString(e.title), QString::fromStdString(e.author), tags.trimmed(),
                 QString::number(e.version), QString::fromStdString(e.created_at)});
     }
+
+    // 统计摘要：总数 / 今日新增 / 热门标签
+    QString today = QString::fromStdString(zp::nowIso()).left(10);
+    int todayCount = 0;
+    std::map<QString, int> tagFreq;
+    for (const auto& h : hits_) {
+        if (QString::fromStdString(h.entry.created_at).startsWith(today)) ++todayCount;
+        for (const auto& t : h.entry.tags) ++tagFreq[QString::fromStdString(t)];
+    }
+    QVector<QPair<QString, int>> top(tagFreq.begin(), tagFreq.end());
+    std::sort(top.begin(), top.end(),
+              [](const auto& a, const auto& b) { return a.second > b.second; });
+    QString tagStr;
+    for (int i = 0; i < qMin(5, static_cast<int>(top.size())); ++i)
+        tagStr += QString("%1(%2) ").arg(top[i].first).arg(top[i].second);
+    statsLabel_->setText(QString("总条目 %1 · 今日新增 %2 · 热门标签: %3")
+                             .arg(formatNum(static_cast<qint64>(hits_.size())))
+                             .arg(todayCount)
+                             .arg(tagStr.isEmpty() ? "—" : tagStr));
+
     versionCombo_->clear();
     if (!hits_.empty()) {
         table_->selectRow(0);
@@ -175,9 +207,10 @@ void KnowledgePanel::onNewEntry() {
     if (!platform_.knowledgeCreate("user", title->text().trimmed().toStdString(),
                                    content->toPlainText().toStdString(), tagList,
                                    category->text().trimmed().toStdString(), {}, "", out, err)) {
-        QMessageBox::warning(this, "创建失败", QString::fromStdString(err));
+        ui::Toast::show(this, QString("创建失败: %1").arg(QString::fromStdString(err)), false);
         return;
     }
+    ui::Toast::show(this, "知识条目已创建 ✓");
     onSearch();
 }
 
@@ -200,8 +233,9 @@ void KnowledgePanel::onAddVersion() {
     zp::KnowledgeEntry out;
     if (!platform_.knowledgeAddVersion("user", currentUuid_, title->text().trimmed().toStdString(),
                                        content->toPlainText().toStdString(), {}, "", out, err)) {
-        QMessageBox::warning(this, "追加失败", QString::fromStdString(err));
+        ui::Toast::show(this, QString("追加失败: %1").arg(QString::fromStdString(err)), false);
         return;
     }
+    ui::Toast::show(this, QString("已追加 v%1（旧版本保留）✓").arg(out.version));
     onSearch();
 }

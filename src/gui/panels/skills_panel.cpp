@@ -1,5 +1,6 @@
 #include "skills_panel.h"
 
+#include <map>
 #include <set>
 
 #include <QDialog>
@@ -41,13 +42,14 @@ SkillsPanel::SkillsPanel(zp::Platform& platform, QWidget* parent)
     connect(registerBtn, &QPushButton::clicked, this, &SkillsPanel::onRegister);
 
     auto* splitter = new QSplitter(Qt::Horizontal, this);
-    table_ = new QTableWidget(0, 6, splitter);
-    table_->setHorizontalHeaderLabels({"名称", "显示名", "分类", "提供者", "版本", "状态"});
+    table_ = new QTableWidget(0, 7, splitter);
+    table_->setHorizontalHeaderLabels({"名称", "显示名", "分类", "提供者", "版本", "状态", "使用热度"});
     table_->horizontalHeader()->setStretchLastSection(true);
     table_->verticalHeader()->setVisible(false);
     table_->setEditTriggers(QAbstractItemView::NoEditTriggers);
     table_->setSelectionBehavior(QAbstractItemView::SelectRows);
     table_->setSelectionMode(QAbstractItemView::SingleSelection);
+    attachTableContextMenu(table_);
     splitter->addWidget(table_);
     detail_ = new QTextBrowser(splitter);
     splitter->addWidget(detail_);
@@ -87,13 +89,22 @@ void SkillsPanel::refresh() {
     std::string owner = ownerCombo_->currentText() == "全部" ? "" : ownerCombo_->currentText().toStdString();
     platform_.skillList(cat, owner, skills_, err);
 
+    // 使用热度：统计每个技能的调用次数
+    std::vector<zp::SkillInvocation> allInv;
+    platform_.skillInvocations("", 10000, allInv, err);
+    std::map<std::string, int> heat;
+    for (const auto& i : allInv) ++heat[i.skill_name];
+
     table_->setRowCount(static_cast<int>(skills_.size()));
     for (size_t i = 0; i < skills_.size(); ++i) {
         const auto& s = skills_[i];
+        int h = heat.count(s.name) ? heat[s.name] : 0;
+        QString heatStr = h == 0 ? "—"
+                                 : (h >= 10 ? QString("🔥 %1").arg(h) : QString::number(h));
         setRow(table_, static_cast<int>(i),
                {QString::fromStdString(s.name), QString::fromStdString(s.display_name),
                 QString::fromStdString(s.category), QString::fromStdString(s.owner_agent),
-                QString::number(s.version), QString::fromStdString(s.status)});
+                QString::number(s.version), QString::fromStdString(s.status), heatStr});
     }
     if (!skills_.empty()) {
         table_->selectRow(0);

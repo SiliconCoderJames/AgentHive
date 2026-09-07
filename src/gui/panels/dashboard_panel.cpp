@@ -3,115 +3,155 @@
 #include <algorithm>
 
 #include <QGroupBox>
-#include <QHeaderView>
-#include <QVBoxLayout>
-
-#include "../gui_util.h"
 
 DashboardPanel::DashboardPanel(zp::Platform& platform, QWidget* parent)
     : PanelBase(platform, parent) {
-    auto* layout = new QVBoxLayout(this);
+    auto* root = new QVBoxLayout(this);
+    root->setContentsMargins(16, 16, 16, 16);
+    root->setSpacing(14);
 
-    // ---- Token 预算 ----
-    auto* budgetBox = new QGroupBox("本周 Token 用量（预算 1000 万）", this);
-    auto* bl = new QVBoxLayout(budgetBox);
-    budgetBar_ = new QProgressBar(budgetBox);
-    budgetBar_->setMinimum(0);
-    budgetBar_->setTextVisible(true);
-    budgetLabel_ = new QLabel(budgetBox);
-    bl->addWidget(budgetBar_);
-    bl->addWidget(budgetLabel_);
-    layout->addWidget(budgetBox);
+    // ---- 第一行：Token 环形图 + 各 Agent 用量柱状图 ----
+    auto* topRow = new QHBoxLayout();
+    topRow->setSpacing(14);
 
-    // ---- Agent 状态 ----
-    auto* agentsBox = new QGroupBox("Agent 状态", this);
-    auto* al = new QVBoxLayout(agentsBox);
-    agentsTable_ = new QTableWidget(0, 5, agentsBox);
-    agentsTable_->setHorizontalHeaderLabels({"名称", "角色", "状态", "当前任务", "最后活跃"});
-    agentsTable_->horizontalHeader()->setStretchLastSection(true);
-    agentsTable_->verticalHeader()->setVisible(false);
-    agentsTable_->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    al->addWidget(agentsTable_);
-    layout->addWidget(agentsBox, 1);
+    auto* budgetCard = new QGroupBox("本周 Token 预算", this);
+    budgetCard->setObjectName("card");
+    auto* bl = new QVBoxLayout(budgetCard);
+    bl->setContentsMargins(12, 20, 12, 12);
+    ring_ = new ui::RingProgress(budgetCard);
+    bl->addWidget(ring_, 1);
+    topRow->addWidget(budgetCard, 2);
 
-    // ---- 各 Agent 用量 ----
-    auto* usageBox = new QGroupBox("各 Agent 本周用量", this);
-    auto* ul = new QVBoxLayout(usageBox);
-    usageTable_ = new QTableWidget(0, 2, usageBox);
-    usageTable_->setHorizontalHeaderLabels({"Agent", "Token 数"});
-    usageTable_->horizontalHeader()->setStretchLastSection(true);
-    usageTable_->verticalHeader()->setVisible(false);
-    usageTable_->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    ul->addWidget(usageTable_);
-    layout->addWidget(usageBox, 1);
+    auto* usageCard = new QGroupBox("各 Agent 本周用量", this);
+    usageCard->setObjectName("card");
+    auto* ul = new QVBoxLayout(usageCard);
+    ul->setContentsMargins(12, 20, 12, 12);
+    usageChart_ = new ui::HBarChart(usageCard);
+    ul->addWidget(usageChart_, 1);
+    topRow->addWidget(usageCard, 3);
+    root->addLayout(topRow, 2);
 
-    // ---- 告警 ----
-    auto* alertsBox = new QGroupBox("告警与待处理错误", this);
-    auto* wl = new QVBoxLayout(alertsBox);
-    alertsList_ = new QListWidget(alertsBox);
-    wl->addWidget(alertsList_);
-    layout->addWidget(alertsBox, 1);
+    // ---- 第二行：Agent 状态卡片网格 ----
+    auto* agentsCard = new QGroupBox("Agent 状态", this);
+    agentsCard->setObjectName("card");
+    auto* al = new QVBoxLayout(agentsCard);
+    al->setContentsMargins(12, 20, 12, 12);
+    auto* gridHolder = new QWidget(agentsCard);
+    agentGrid_ = new QGridLayout(gridHolder);
+    agentGrid_->setContentsMargins(0, 0, 0, 0);
+    agentGrid_->setSpacing(10);
+    al->addWidget(gridHolder);
+    al->addStretch(1);
+    root->addWidget(agentsCard, 3);
+
+    // ---- 第三行：事件流时间线 + 告警卡片 ----
+    auto* bottomRow = new QHBoxLayout();
+    bottomRow->setSpacing(14);
+
+    auto* tlCard = new QGroupBox("事件流", this);
+    tlCard->setObjectName("card");
+    auto* tl = new QVBoxLayout(tlCard);
+    tl->setContentsMargins(12, 20, 12, 12);
+    timeline_ = new QListWidget(tlCard);
+    timeline_->setStyleSheet("QListWidget { font-family: Consolas,monospace; font-size: 11px; }");
+    tl->addWidget(timeline_);
+    bottomRow->addWidget(tlCard, 3);
+
+    auto* alertCard = new QGroupBox("告警", this);
+    alertCard->setObjectName("card");
+    auto* wl = new QVBoxLayout(alertCard);
+    wl->setContentsMargins(12, 20, 12, 12);
+    wl->setSpacing(8);
+    emptyAlerts_ = new QLabel("暂无错误，一切正常 ✓", alertCard);
+    emptyAlerts_->setStyleSheet("color:#22c55e; font-size:13px;");
+    emptyAlerts_->setAlignment(Qt::AlignCenter);
+    wl->addWidget(emptyAlerts_);
+    alertsLay_ = wl;
+    bottomRow->addWidget(alertCard, 2);
+    root->addLayout(bottomRow, 2);
 }
 
 void DashboardPanel::refresh() {
     std::string err;
 
-    // 预算进度
+    // 预算环形图 + 用量柱状图
     zp::UsageSummary sum;
     if (platform_.usageSummary(sum, err)) {
-        budgetBar_->setMaximum(static_cast<int>(sum.budget > 0 ? sum.budget : 1));
-        budgetBar_->setValue(static_cast<int>(std::min<int64_t>(sum.total_tokens, sum.budget)));
-        QString style = sum.alert_level == "none"
-                            ? "QProgressBar::chunk { background: #2e7d32; }"
-                            : (sum.alert_level == "warn"
-                                   ? "QProgressBar::chunk { background: #ef6c00; }"
-                                   : "QProgressBar::chunk { background: #c62828; }");
-        budgetBar_->setStyleSheet(style);
-        double pct = sum.budget > 0 ? 100.0 * sum.total_tokens / sum.budget : 0.0;
-        budgetLabel_->setText(QString("已用 %1 / %2（%3%）· 剩余 %4 · 状态: %5")
-                                  .arg(formatNum(sum.total_tokens))
-                                  .arg(formatNum(sum.budget))
-                                  .arg(pct, 0, 'f', 2)
-                                  .arg(formatNum(sum.budget - sum.total_tokens))
-                                  .arg(QString::fromStdString(sum.alert_level)));
+        ring_->setValues(sum.total_tokens, sum.budget, QString("剩余 %1")
+                                                          .arg(QString::number(sum.budget - sum.total_tokens)));
+        QVector<QPair<QString, qint64>> bars;
+        for (const auto& [name, tokens] : sum.per_agent)
+            bars.append({QString::fromStdString(name), tokens});
+        usageChart_->setEntries(bars);
+
+        // 告警：预算级别
+        alertsLay_->removeWidget(emptyAlerts_);
+        emptyAlerts_->setVisible(sum.alert_level == "none");
+        if (sum.alert_level == "warn")
+            alertsLay_->addWidget(new ui::AlertCard("warn", "⚠ Token 用量已达预算 80%，请控制消耗", this));
+        else if (sum.alert_level == "critical")
+            alertsLay_->addWidget(new ui::AlertCard("critical", "⛔ Token 用量已达预算 95%！", this));
+        else if (sum.alert_level == "over")
+            alertsLay_->addWidget(new ui::AlertCard("critical", "🚫 Token 用量已超出本周预算！", this));
     }
 
-    // Agent 状态表
+    // Agent 状态卡片网格（3 列；卡片池复用避免闪烁）
     std::vector<zp::AgentInfo> agents;
     if (platform_.listAgents(agents, err)) {
-        agentsTable_->setRowCount(static_cast<int>(agents.size()));
-        for (size_t i = 0; i < agents.size(); ++i) {
-            const auto& a = agents[i];
-            setRow(agentsTable_, static_cast<int>(i),
-                   {QString::fromStdString(a.name), QString::fromStdString(a.role),
-                    QString::fromStdString(a.status), QString::fromStdString(a.current_task),
-                    QString::fromStdString(a.last_seen_at)});
+        size_t need = agents.size();
+        while (agentCards_.size() < need)
+            agentCards_.push_back(new ui::AgentCard(this));
+        for (size_t i = 0; i < agentCards_.size(); ++i) {
+            auto* card = agentCards_[i];
+            if (i < need) {
+                agentGrid_->addWidget(card, static_cast<int>(i / 3), static_cast<int>(i % 3));
+                card->setVisible(true);
+                const auto& a = agents[i];
+                card->setAgent(QString::fromStdString(a.name), QString::fromStdString(a.status),
+                               QString::fromStdString(a.role), QString::fromStdString(a.current_task),
+                               QString::fromStdString(a.last_seen_at));
+            } else {
+                agentGrid_->removeWidget(card);
+                card->hide();
+            }
         }
     }
 
-    // 各 Agent 用量
-    usageTable_->setRowCount(static_cast<int>(sum.per_agent.size()));
-    for (size_t i = 0; i < sum.per_agent.size(); ++i) {
-        setRow(usageTable_, static_cast<int>(i),
-               {QString::fromStdString(sum.per_agent[i].first),
-                formatNum(sum.per_agent[i].second)});
-    }
-
-    // 告警
-    alertsList_->clear();
-    if (sum.alert_level == "warn")
-        alertsList_->addItem("⚠ Token 用量已达预算 80%，请控制消耗");
-    else if (sum.alert_level == "critical")
-        alertsList_->addItem("⛔ Token 用量已达预算 95%，即将耗尽！");
-    else if (sum.alert_level == "over")
-        alertsList_->addItem("🚫 Token 用量已超出本周预算！");
-
+    // 告警：未解决错误（分级卡片）
     std::vector<zp::ErrorReport> openErrors;
     if (platform_.errorList("open", "", 10, openErrors, err)) {
-        for (const auto& e : openErrors)
-            alertsList_->addItem(QString("[%1] %2（来自 %3）")
-                                     .arg(QString::fromStdString(e.severity))
-                                     .arg(QString::fromStdString(e.title))
-                                     .arg(QString::fromStdString(e.reporter)));
+        for (auto* w : alertCards_) {
+            alertsLay_->removeWidget(w);
+            w->deleteLater();
+        }
+        alertCards_.clear();
+        bool hasOpen = !openErrors.empty();
+        emptyAlerts_->setVisible(sum.alert_level == "none" && !hasOpen);
+        for (const auto& e : openErrors) {
+            auto* card = new ui::AlertCard(
+                e.severity == "critical" ? "critical"
+                                         : (e.severity == "warning" ? "warn" : "note"),
+                QString("[%1] %2 — %3")
+                    .arg(QString::fromStdString(e.severity))
+                    .arg(QString::fromStdString(e.title))
+                    .arg(QString::fromStdString(e.reporter)),
+                this);
+            alertCards_.push_back(card);
+            alertsLay_->addWidget(card);
+        }
+    }
+
+    // 事件流时间线（最近 15 条审计）
+    std::vector<zp::AuditRecord> records;
+    if (platform_.auditList("", "", "", 15, records, err)) {
+        timeline_->clear();
+        for (const auto& r : records) {
+            auto* item = new QListWidgetItem(QString("%1  ▸ %2  %3 %4")
+                                                 .arg(QString::fromStdString(r.created_at))
+                                                 .arg(QString::fromStdString(r.actor))
+                                                 .arg(QString::fromStdString(r.action))
+                                                 .arg(QString::fromStdString(r.target)));
+            timeline_->addItem(item);
+        }
     }
 }

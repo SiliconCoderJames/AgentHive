@@ -1,4 +1,5 @@
 #include <QApplication>
+#include <QFile>
 #include <QMessageBox>
 
 #include <cstdlib>
@@ -10,6 +11,11 @@ int main(int argc, char** argv) {
     QApplication app(argc, argv);
     app.setApplicationName("ZCode 多 Agent 协作工作台");
     app.setOrganizationName("zcode");
+
+    // 强制深色主题：QSS 统一管理（背景 #1e1e1e / 卡片 #2d2d2d / 强调 #0ea5e9）
+    QFile qss(":/theme/dark.qss");
+    if (qss.open(QIODevice::ReadOnly | QIODevice::Text))
+        app.setStyleSheet(QString::fromUtf8(qss.readAll()));
 
     zp::Platform platform(zp::defaultHomeDir());
     std::string err;

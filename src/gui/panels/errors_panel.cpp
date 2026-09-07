@@ -11,6 +11,7 @@
 #include <QVBoxLayout>
 
 #include "../gui_util.h"
+#include "../widgets.h"
 
 ErrorsPanel::ErrorsPanel(zp::Platform& platform, QWidget* parent)
     : PanelBase(platform, parent) {
@@ -36,6 +37,7 @@ ErrorsPanel::ErrorsPanel(zp::Platform& platform, QWidget* parent)
     connect(resolveBtn_, &QPushButton::clicked, this, &ErrorsPanel::onResolve);
 
     auto* splitter = new QSplitter(Qt::Horizontal, this);
+    splitter_ = splitter;
     table_ = new QTableWidget(0, 5, splitter);
     table_->setHorizontalHeaderLabels({"严重度", "标题", "上报者", "状态", "时间"});
     table_->horizontalHeader()->setStretchLastSection(true);
@@ -43,6 +45,7 @@ ErrorsPanel::ErrorsPanel(zp::Platform& platform, QWidget* parent)
     table_->setEditTriggers(QAbstractItemView::NoEditTriggers);
     table_->setSelectionBehavior(QAbstractItemView::SelectRows);
     table_->setSelectionMode(QAbstractItemView::SingleSelection);
+    attachTableContextMenu(table_);
     splitter->addWidget(table_);
 
     auto* right = new QWidget(splitter);
@@ -55,6 +58,12 @@ ErrorsPanel::ErrorsPanel(zp::Platform& platform, QWidget* parent)
     splitter->setStretchFactor(0, 2);
     splitter->setStretchFactor(1, 3);
     layout->addWidget(splitter, 1);
+
+    // 空状态引导语
+    emptyLabel_ = new QLabel("暂无错误，一切正常 ✓", this);
+    emptyLabel_->setStyleSheet("color:#22c55e; font-size:14px;");
+    emptyLabel_->setAlignment(Qt::AlignCenter);
+    layout->addWidget(emptyLabel_);
 
     connect(table_, &QTableWidget::cellClicked, this, [this](int row, int) {
         if (row < 0 || row >= static_cast<int>(errors_.size())) return;
@@ -91,6 +100,8 @@ void ErrorsPanel::refresh() {
                 QString::fromStdString(e.reporter), QString::fromStdString(e.status),
                 QString::fromStdString(e.created_at)});
     }
+    emptyLabel_->setVisible(errors_.empty());
+    splitter_->setVisible(!errors_.empty());
 }
 
 void ErrorsPanel::onResolve() {
@@ -115,8 +126,9 @@ void ErrorsPanel::onResolve() {
     zp::ErrorReport out;
     std::string err;
     if (!platform_.errorResolve("user", e.uuid, notes->toPlainText().toStdString(), out, err)) {
-        QMessageBox::warning(this, "解决失败", QString::fromStdString(err));
+        ui::Toast::show(this, QString("解决失败: %1").arg(QString::fromStdString(err)), false);
         return;
     }
+    ui::Toast::show(this, "已登记解决 ✓");
     refresh();
 }
