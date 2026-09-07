@@ -11,6 +11,7 @@
 ![Qt6](https://img.shields.io/badge/Qt-6-22c55e.svg)
 ![Local](https://img.shields.io/badge/数据-不出本机-ef4444.svg)
 ![Platform](https://img.shields.io/badge/平台-Windows%20%7C%20Linux%20%7C%20macOS-9ca3af.svg)
+[![Buy Me A Coffee](https://img.shields.io/badge/☕_Buy_Me_a_Coffee-支持开发-f59e0b)](#赞助支持buy-me-a-coffee-)
 
 **适用于所有 AI Agent** —— Claude、Codex、Cursor、Copilot、Factory Droid、Hermes、
 DeepSeek、Gemini CLI……以及你自己写的任何脚本。只要能发 HTTP 请求，就能接入蜂巢。
@@ -179,6 +180,37 @@ scripts/     fetch-deps.ps1（离线依赖预取）、deploy.ps1（部署+桌面
 
 欢迎 Issue 与 PR：修 bug、补文档、接入新嵌入模型、给工作台加面板都可以。
 提交前请确保 `ctest` 全绿，并附上复现步骤或截图。
+
+## 联系与社区
+
+| 渠道 | 入口 | 适合 |
+|---|---|---|
+| 🐛 Bug 反馈 | [GitHub Issues](https://github.com/your-github-id/AgentHive/issues) | 报错、复现步骤、环境信息 |
+| 💡 功能讨论 | [GitHub Discussions](https://github.com/your-github-id/AgentHive/discussions) | 新面板、新接口、接入方案 |
+| 📧 邮件 | `your-email@example.com` | 安全漏洞请勿公开提 Issue，优先邮件联系 |
+| 💬 交流群 | 见 Releases 页公告 | 使用答疑、接入经验分享 |
+
+> 安全问题请参考 [docs/hardening-report.md](docs/hardening-report.md) 了解现有防护面，
+> 漏洞报告请发邮件并附复现细节，会在 72 小时内响应。
+
+## 赞助支持（Buy Me a Coffee ☕）
+
+AgentHive 完全免费开源（MIT）。如果它让你的多个 Agent 协作得更省心，
+欢迎请维护者喝杯咖啡——赞助用于嵌入模型接入、CI 与多平台测试机的开销。
+
+<div align="center">
+
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-支持一下-f59e0b?style=for-the-badge&logo=buy-me-a-coffee&logoColor=white)](https://www.buymeacoffee.com/your-id)
+[![爱发电](https://img.shields.io/badge/爱发电-充电计划-0ea5e9?style=for-the-badge)](https://afdian.net/a/your-id)
+[![GitHub Sponsors](https://img.shields.io/badge/GitHub%20Sponsors-Sponsor-ea4aaa?style=for-the-badge&logo=github&logoColor=white)](https://github.com/sponsors/your-github-id)
+
+</div>
+
+**其他方式支持项目（不花钱同样欢迎）：**
+
+- 给仓库点一个 ⭐ Star，让更多 Agent 作者看到
+- 提交一个真实的踩坑经验到知识库用例、或一篇接入教程
+- 把 AgentHive 推荐到你的 Agent 社区 / 播客 / 公众号
 
 ## 许可证
 
