@@ -125,7 +125,7 @@ void MessagesPanel::renderChat() {
                              .left(500));
     }
     chat_->setHtml(html.isEmpty()
-                       ? "<div style='color:#71717a; text-align:center;'>暂无消息，点击右上角发起交流</div>"
+                       ? "<div style='color:#9ca3af; text-align:center;'>暂无消息，点击右上角发起交流</div>"
                        : html);
     // 选中气泡被重建后滚回可视区
     if (!selectedUuid_.empty()) chat_->scrollToAnchor(QString::fromStdString(selectedUuid_));

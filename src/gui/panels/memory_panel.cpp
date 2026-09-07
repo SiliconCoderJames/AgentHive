@@ -87,7 +87,7 @@ void MemoryPanel::refresh() {
         cl->setSpacing(6);
         if (group.empty()) {
             auto* empty = new QLabel("该区块暂无记忆", content);
-            empty->setStyleSheet("color:#71717a; font-size:11px;");
+            empty->setStyleSheet("color:#9ca3af; font-size:11px;");
             cl->addWidget(empty);
         } else {
             for (const auto& m : group) {

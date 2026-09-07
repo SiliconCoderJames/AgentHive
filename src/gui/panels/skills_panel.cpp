@@ -44,8 +44,9 @@ SkillsPanel::SkillsPanel(zp::Platform& platform, QWidget* parent)
     auto* splitter = new QSplitter(Qt::Horizontal, this);
     table_ = new QTableWidget(0, 7, splitter);
     table_->setHorizontalHeaderLabels({"名称", "显示名", "分类", "提供者", "版本", "状态", "使用热度"});
-    table_->horizontalHeader()->setStretchLastSection(true);
+    table_->horizontalHeader()->setSectionResizeMode(6, QHeaderView::Stretch);
     polishTable(table_);
+    table_->resizeColumnsToContents();
     attachTableContextMenu(table_);
     splitter->addWidget(table_);
     detail_ = new QTextBrowser(splitter);
@@ -110,6 +111,7 @@ void SkillsPanel::refresh() {
         if (!prevSelected.isEmpty() && prevSelected == QString::fromStdString(s.name))
             restoreRow = static_cast<int>(i);
     }
+    table_->resizeColumnsToContents();  // 按实际内容重算列宽，避免截断
     if (restoreRow >= 0) {
         table_->selectRow(restoreRow);
         onSelectSkill(restoreRow);
@@ -117,7 +119,11 @@ void SkillsPanel::refresh() {
         table_->selectRow(0);
         onSelectSkill(0);
     } else {
-        detail_->clear();
+        // 空状态提示
+        detail_->setHtml(
+            "<div style='color:#9ca3af; text-align:center; margin-top:48px;'>"
+            "暂无注册技能<br><br>点击右上角「＋ 注册技能」，或让 Agent 通过 "
+            "<span style='font-family:Consolas;'>POST /api/skills</span> 注册（先注册后调用）</div>");
     }
 }
 
