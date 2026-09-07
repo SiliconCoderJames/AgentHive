@@ -1,6 +1,7 @@
 add_executable(zworkbench WIN32
     main.cpp
     mainwindow.cpp
+    app.rc
     panels/dashboard_panel.cpp
     panels/knowledge_panel.cpp
     panels/skills_panel.cpp

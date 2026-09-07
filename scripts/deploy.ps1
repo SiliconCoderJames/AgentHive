@@ -1,4 +1,4 @@
-# Deploy the workbench to %LOCALAPPDATA%\ZCodePlatform and create a desktop
+﻿# Deploy the workbench to %LOCALAPPDATA%\ZCodePlatform and create a desktop
 # shortcut. Survives repo/build directory cleanup.
 # Usage: powershell -ExecutionPolicy Bypass -File scripts\deploy.ps1
 $ErrorActionPreference = "Stop"
@@ -15,14 +15,20 @@ New-Item -ItemType Directory -Force -Path $dest | Out-Null
 robocopy $src $dest /MIR /NFL /NDL /NJH /NJS | Out-Null
 if ($LASTEXITCODE -ge 8) { Write-Error "robocopy failed: $LASTEXITCODE"; exit 1 }
 
+# 桌面快捷方式：AgentHive 命名 + 应用图标；并清理历史品牌的旧快捷方式
 $desktop = [Environment]::GetFolderPath("Desktop")
-$lnkPath = Join-Path $desktop "ZCode Platform.lnk"
+$lnkPath = Join-Path $desktop "AgentHive.lnk"
 $ws = New-Object -ComObject WScript.Shell
 $lnk = $ws.CreateShortcut($lnkPath)
 $lnk.TargetPath = Join-Path $dest "zworkbench.exe"
 $lnk.WorkingDirectory = $dest
-$lnk.Description = "ZCode multi-agent collaboration workbench (local only, includes HTTP API)"
+$lnk.IconLocation = (Join-Path $dest "zworkbench.exe") + ",0"
+$lnk.Description = "AgentHive - local-first collaboration hub for AI agents"
 $lnk.Save()
+foreach ($old in @("ZCode Platform.lnk", "ZCode 协作平台.lnk")) {
+    $oldPath = Join-Path $desktop $old
+    if (Test-Path $oldPath) { Remove-Item $oldPath -Force }
+}
 
 Write-Host "DEPLOY_DIR=$dest"
 Write-Host "LNK=$lnkPath"
