@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <!-- AgentHive logo: dark rounded tile + amber honeycomb + blue entrance dot -->
+  <rect x="8" y="8" width="240" height="240" rx="48" fill="#1e1e1e"/>
+  <g fill="none" stroke="#f59e0b" stroke-width="10" stroke-linejoin="round" stroke-linecap="round">
+    <!-- 顶格六边形 -->
+    <polygon points="128,56 162.6,76 162.6,116 128,136 93.4,116 93.4,76"/>
+    <!-- 左下六边形（共享边拼接）-->
+    <polygon points="93.4,116 128,136 128,176 93.4,196 58.8,176 58.8,136"/>
+    <!-- 右下六边形（共享边拼接）-->
+    <polygon points="162.6,116 197.2,136 197.2,176 162.6,196 128,176 128,136"/>
+  </g>
+  <!-- 蜂巢入口：强调蓝圆点 -->
+  <circle cx="128" cy="96" r="12" fill="#0ea5e9"/>
+</svg>

@@ -45,7 +45,14 @@ int main(int argc, char** argv) {
     QApplication app(argc, argv);
     app.setApplicationName("AgentHive 多 Agent 协作工作台");
     app.setOrganizationName("agenthive");
-    app.setWindowIcon(QIcon(hiveIcon(64)));
+    {
+        // 优先使用仓库品牌图标（与 README 一致），缺失时回退到程序化绘制的蜂巢
+        QIcon brandIcon(":/brand/logo.png");
+        if (!brandIcon.isNull())
+            app.setWindowIcon(brandIcon);
+        else
+            app.setWindowIcon(QIcon(hiveIcon(64)));
+    }
 
     // 强制深色主题：QSS 统一管理（背景 #1e1e1e / 卡片 #2d2d2d / 强调 #0ea5e9）
     // 注意 qt_add_resources(PREFIX "/theme") 会把子目录 qss/ 拼进资源路径

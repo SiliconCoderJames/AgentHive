@@ -14,3 +14,6 @@ set_target_properties(zworkbench PROPERTIES AUTOMOC ON AUTORCC ON)
 qt_add_resources(zworkbench "theme"
     PREFIX "/theme"
     FILES qss/dark.qss)
+qt_add_resources(zworkbench "brand"
+    PREFIX "/brand"
+    FILES ../../docs/assets/logo.png)
