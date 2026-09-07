@@ -14,6 +14,15 @@ std::string vecToBytes(const std::vector<float>& v) {
     std::memcpy(bytes.data(), v.data(), bytes.size());
     return bytes;
 }
+// tags_json -> tags 数组（tags_json 始终是合法 JSON，异常时静默保留空列表）
+void parseTags(KnowledgeEntry& e) {
+    try {
+        auto tags = nlohmann::json::parse(e.tags_json);
+        if (tags.is_array())
+            for (const auto& t : tags) e.tags.push_back(t.get<std::string>());
+    } catch (...) {
+    }
+}
 }  // namespace
 
 bool KnowledgeService::ensureVecTable(std::string& err) {
@@ -195,7 +204,10 @@ bool KnowledgeService::fetchByIds(const std::vector<int64_t>& ids, std::vector<K
                 },
                 err))
             return false;
-        if (found) out.push_back(std::move(e));
+        if (found) {
+            parseTags(e);
+            out.push_back(std::move(e));
+        }
     }
     return true;
 }
@@ -280,6 +292,7 @@ bool KnowledgeService::searchSemantic(const std::vector<float>& queryVec, int li
                 err))
             return false;
         if (found) {
+            parseTags(e);
             if (!tagFilter.empty()) {
                 bool tagHit = e.tags_json.find("\"" + tagFilter + "\"") != std::string::npos;
                 if (!tagHit) continue;

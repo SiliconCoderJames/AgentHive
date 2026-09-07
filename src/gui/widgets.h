@@ -104,7 +104,7 @@ private:
     QPointer<QVariantAnimation> anim_;  // DeleteWhenStopped 会自删，用 QPointer 防悬空
 };
 
-// ---- 横向柱状图：各 Agent 用量对比 ----
+// ---- 横向柱状图：各 Agent 用量对比，柱体平滑扫掠入场 ----
 class HBarChart : public QWidget {
 public:
     explicit HBarChart(QWidget* parent = nullptr) : QWidget(parent) {
@@ -112,6 +112,18 @@ public:
     }
     void setEntries(const QVector<QPair<QString, qint64>>& entries) {
         entries_ = entries;
+        if (anim_) anim_->stop();
+        auto* anim = new QVariantAnimation(this);
+        anim_ = anim;
+        anim->setDuration(450);
+        anim->setStartValue(0.0);
+        anim->setEndValue(1.0);
+        anim->setEasingCurve(QEasingCurve::OutCubic);
+        connect(anim, &QVariantAnimation::valueChanged, this, [this](const QVariant& v) {
+            sweep_ = v.toDouble();
+            update();
+        });
+        anim->start(QAbstractAnimation::DeleteWhenStopped);
         update();
     }
 
@@ -148,8 +160,8 @@ protected:
             p.setPen(Qt::NoPen);
             p.setBrush(QColor("#3f3f46"));
             p.drawRoundedRect(QRect(barX, y + rowH / 2 - 5, barW, 10), 5, 5);
-            // 柱体：最大值高亮蓝，其余随占比变暗
-            double ratio = double(entries_[i].second) / double(maxV);
+            // 柱体：最大值高亮蓝，其余随占比变暗；宽度乘以入场扫掠进度
+            double ratio = double(entries_[i].second) / double(maxV) * sweep_;
             int w = int(double(barW) * ratio);
             QColor bar = ACCENT;
             if (entries_[i].second != maxV) {
@@ -172,6 +184,8 @@ protected:
 
 private:
     QVector<QPair<QString, qint64>> entries_;
+    double sweep_ = 1.0;
+    QPointer<QVariantAnimation> anim_;
 };
 
 // ---- Toast：右下角气泡提示（成功绿 / 失败红），1.8s 自动消失 ----

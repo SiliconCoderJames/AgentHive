@@ -24,6 +24,19 @@ QString statusChip(const QString& s) {
                                                     : (s == "accepted" ? "#0ea5e9" : "#eab308"));
     return QString("<span style='color:%1;'>● %2</span>").arg(color).arg(s.toHtmlEscaped());
 }
+// 发送者头像圈：取首字符，颜色由名字哈希决定（固定 6 色板）
+QString avatar(const QString& sender) {
+    static const char* kPalettes[] = {
+        "#0ea5e9", "#22c55e", "#f59e0b", "#a78bfa", "#f472b6", "#34d399"};
+    quint32 h = 0;
+    for (QChar c : sender) h = h * 31 + c.unicode();
+    const QString* bg = nullptr;
+    QString initial = sender.left(1).toUpper().toHtmlEscaped();
+    return QString("<span style='display:inline-block; min-width:18px; text-align:center;"
+                   " background:%1; color:#101010; font-weight:700; border-radius:9px;"
+                   " padding:1px 0;'>%2</span>")
+        .arg(kPalettes[h % 6], initial);
+}
 }  // namespace
 
 MessagesPanel::MessagesPanel(zp::Platform& platform, QWidget* parent)
@@ -103,13 +116,15 @@ void MessagesPanel::renderChat() {
         bool selected = m.uuid == selectedUuid_;
         QString recipient =
             m.recipient.empty() ? "全员" : QString::fromStdString(m.recipient);
-        // 气泡：选中描边高亮；task/question/note 用色区分
+        // 气泡：选中描边高亮；task/question/note 用色区分；头部带头像圈
         html += QString(
                     "<a name='%1'></a>"
                     "<div style='margin:6px 4px;'>"
-                    "<span style='color:#9ca3af; font-size:10px; font-family:Consolas;'>%2 · %3 → %4</span> %5 %6"
-                    "<div style='%7'>"
-                    "<b>%8</b><br>%9"
+                    "<span style='color:#9ca3af; font-size:10px; font-family:Consolas;'>%2</span> %7 "
+                    "<span style='color:#e5e5e5; font-size:11px;'>%3</span>"
+                    " <span style='color:#9ca3af;'>→ %4</span> %5 %6"
+                    "<div style='%9'>"
+                    "<b>%8</b><br>%10"
                     "</div></div>")
                     .arg(QString::fromStdString(m.uuid))
                     .arg(QString::fromStdString(m.created_at))
@@ -117,10 +132,11 @@ void MessagesPanel::renderChat() {
                     .arg(recipient.toHtmlEscaped())
                     .arg(kindChip(QString::fromStdString(m.kind)))
                     .arg(statusChip(QString::fromStdString(m.status)))
+                    .arg(avatar(QString::fromStdString(m.sender)))
+                    .arg(QString::fromStdString(m.subject).toHtmlEscaped())
                     .arg(selected
                              ? "background:#2d2d3d; border:1px solid #0ea5e9; border-radius:8px; padding:8px 12px;"
                              : "background:#2d2d2d; border:1px solid #3f3f46; border-radius:8px; padding:8px 12px;")
-                    .arg(QString::fromStdString(m.subject).toHtmlEscaped())
                     .arg(QString::fromStdString(m.body).toHtmlEscaped()
                              .replace("\n", "<br>")
                              .left(500));

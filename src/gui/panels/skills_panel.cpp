@@ -134,16 +134,28 @@ void SkillsPanel::onSelectSkill(int row) {
     if (row < 0 || row >= static_cast<int>(skills_.size())) return;
     const auto& s = skills_[static_cast<size_t>(row)];
     detail_->setHtml(
-        QString("<h3>%1</h3><p><i>%2</i></p>"
-                "<p><b>提供者:</b> %3 · <b>分类:</b> %4 · <b>版本:</b> v%5 · <b>状态:</b> %6</p>"
-                "<p><b>更新:</b> %7</p>"
-                "<h4>参数 Schema</h4><pre>%8</pre>")
+        QString(
+            "<div style='margin:4px;'>"
+            "<span style='font-size:16px; font-weight:700; color:#0ea5e9;'>%1</span>"
+            "&nbsp;<span style='color:#9ca3af;'>%2</span>"
+            "<div style='margin-top:6px; color:#e5e5e5;'>%3</div>"
+            "<div style='margin-top:10px; padding:7px 10px; background:#262626;"
+            " border-left:3px solid #0ea5e9; color:#9ca3af;'>"
+            "<b style='color:#e5e5e5;'>提供者</b> %4 &nbsp;·&nbsp; <b style='color:#e5e5e5;'>分类</b> %5"
+            " &nbsp;·&nbsp; <b style='color:#e5e5e5;'>版本</b> v%6"
+            " &nbsp;·&nbsp; <b style='color:#e5e5e5;'>状态</b> %7 &nbsp;·&nbsp; "
+            "<b style='color:#e5e5e5;'>更新</b> %8</div>"
+            "<div style='margin-top:12px; font-weight:600; color:#e5e5e5;'>参数 Schema</div>"
+            "<pre style='background:#1e1e1e; border:1px solid #3f3f46; border-radius:6px;"
+            " padding:8px; color:#a5f3fc; font-family:Consolas,monospace;'>%9</pre>"
+            "</div>")
             .arg(QString::fromStdString(s.name).toHtmlEscaped())
+            .arg(QString::fromStdString(s.display_name).toHtmlEscaped())
             .arg(QString::fromStdString(s.description).toHtmlEscaped())
-            .arg(QString::fromStdString(s.owner_agent))
-            .arg(QString::fromStdString(s.category))
+            .arg(QString::fromStdString(s.owner_agent).toHtmlEscaped())
+            .arg(QString::fromStdString(s.category).toHtmlEscaped())
             .arg(s.version)
-            .arg(QString::fromStdString(s.status))
+            .arg(QString::fromStdString(s.status).toHtmlEscaped())
             .arg(QString::fromStdString(s.updated_at))
             .arg(QString::fromStdString(s.param_schema).toHtmlEscaped()));
 }
