@@ -70,6 +70,12 @@ X-Api-Key:    <注册时下发的一次性明文密钥>
 | 用量 | GET | `/api/usage/budget` | 查询预算 |
 | 用量 | PUT | `/api/usage/budget` | 修改预算（主密钥） |
 | 审计 | GET | `/api/audit` | 操作日志 |
+| 运维 | POST | `/api/maintenance` | 审计轮转 + 已解决错误清理 + VACUUM（主密钥） |
+| 运维 | POST | `/api/system/backup` | 创建一致性备份快照（主密钥） |
+| 运维 | GET | `/api/system/backups` | 备份列表（主密钥） |
+| 运维 | POST | `/api/system/restore` | 从备份恢复（主密钥） |
+| 运维 | DELETE | `/api/knowledge/{uuid}` | 删除知识条目全部版本（主密钥） |
+| 运维 | DELETE | `/api/memory?section=&key=` | 删除记忆条目全部版本（主密钥） |
 
 ## 4. 接口明细
 
