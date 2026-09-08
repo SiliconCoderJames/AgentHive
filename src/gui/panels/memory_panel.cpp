@@ -37,15 +37,15 @@ MemoryPanel::MemoryPanel(zp::Platform& platform, QWidget* parent)
     headerLabel_ = new QLabel(this);
     headerLabel_->setStyleSheet("font-size:13px; color:#9ca3af;");
     auto* editBtn = new QPushButton(i18n::trs("编辑 / 新增（生成新版本）", "Edit / Add (new version)"), this);
-    editBtn_->setObjectName("primary");
+    editBtn->setObjectName("primary");
     auto* historyBtn = new QPushButton(i18n::trs("查看历史版本", "History"), this);
     toolbar->addWidget(headerLabel_);
     toolbar->addStretch(1);
-    toolbar->addWidget(historyBtn_);
-    toolbar->addWidget(editBtn_);
+    toolbar->addWidget(historyBtn);
+    toolbar->addWidget(editBtn);
     layout->addLayout(toolbar);
-    connect(editBtn_, &QPushButton::clicked, this, &MemoryPanel::onEdit);
-    connect(historyBtn_, &QPushButton::clicked, this, &MemoryPanel::onShowHistory);
+    connect(editBtn, &QPushButton::clicked, this, &MemoryPanel::onEdit);
+    connect(historyBtn, &QPushButton::clicked, this, &MemoryPanel::onShowHistory);
 
     // 折叠卡片滚动区
     auto* scroll = new QScrollArea(this);

@@ -16,6 +16,7 @@
 
 MainWindow::MainWindow(zp::Platform& platform, QWidget* parent)
     : QMainWindow(parent), platform_(platform) {
+    qWarning("C1 ctor begin");
     setWindowTitle("AgentHive · 多 Agent 协作工作台");
 
     auto* central = new QWidget(this);
@@ -85,10 +86,14 @@ MainWindow::MainWindow(zp::Platform& platform, QWidget* parent)
     };
     rebuildPanels();
 
+    qWarning("C2 panels factories");
     setCentralWidget(central);
     buildNav();
+    qWarning("C3 nav built");
     buildStatusBar();
+    qWarning("C4 statusbar");
     applyLanguage();
+    qWarning("C5 lang applied");
 
     connect(nav_, &QListWidget::currentRowChanged, this, &MainWindow::onNavChanged);
     nav_->setCurrentRow(0);
@@ -138,17 +143,23 @@ void MainWindow::applyLanguage() {
 }
 
 void MainWindow::rebuildPanels() {
+    qWarning("R1 rebuild begin");
     int row = nav_ ? nav_->currentRow() : 0;
     for (auto* p : panels_) {
         stack_->removeWidget(p);
         p->deleteLater();
     }
     panels_.clear();
+    int fi = 0;
     for (auto& f : panelFactories_) {
+        qWarning("R1.%d creating", fi);
         auto* p = f(platform_, this);
+        qWarning("R1.%d created", fi);
         panels_.push_back(p);
         stack_->addWidget(p);
+        ++fi;
     }
+    qWarning("R2 panels=%d", int(panels_.size()));
     if (row >= 0 && row < static_cast<int>(panels_.size())) {
         stack_->setCurrentIndex(row);
         panels_[static_cast<size_t>(row)]->refresh();

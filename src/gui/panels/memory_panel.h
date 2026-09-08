@@ -22,7 +22,5 @@ private slots:
 private:
     QLabel* headerLabel_ = nullptr;
     QVBoxLayout* sectionsLay_ = nullptr;
-    QPushButton* editBtn_ = nullptr;
-    QPushButton* historyBtn_ = nullptr;
     std::vector<zp::MemoryEntry> entries_;
 };
