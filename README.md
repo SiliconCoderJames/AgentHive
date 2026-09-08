@@ -150,7 +150,7 @@ curl -X POST -H "X-Agent-Name: claude" -H "X-Api-Key: $KEY" -H "Content-Type: ap
 
 ## 质量与验证
 
-- 单元测试 **149 项断言**（SHA-256、嵌入器、SSRF 防护、平台端到端、旧库升级迁移）；
+- 单元测试 **150 项断言**（SHA-256、嵌入器、SSRF 防护、平台端到端、旧库升级迁移）；
 - 集成验证 **39 项断言**（[scripts/feasibility_check.py](scripts/feasibility_check.py)：
   模拟多 Agent 全生命周期，含中文语义检索、异步任务状态机、幂等上报、预算告警）；
 - AddressSanitizer 端到端 0 报告；浸泡测试 8600+ 请求 0 错误、内存收敛；
@@ -170,7 +170,7 @@ python scripts/feasibility_check.py 8787
 src/core/    平台核心（Qt 无关）：数据库、向量检索、八个服务、HTTP API
 src/gui/     Qt6 态势感知工作台（深色主题，七面板）
 src/cli/     agent-cli（Agent 侧客户端）、platformd（无界面守护进程）
-tests/       核心层单元测试（149 项断言）
+tests/       核心层单元测试（150 项断言）
 docs/        api.md（HTTP 接口文档）、hardening-report.md（安全加固报告）、assets/（品牌与截图）
 scripts/     fetch-deps.ps1（离线依赖预取）、deploy.ps1（部署+桌面快捷方式）、
              feasibility_check.py（集成验证）、soak_test.py（浸泡测试）
