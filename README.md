@@ -13,19 +13,18 @@
 ![Platform](https://img.shields.io/badge/平台-Windows%20%7C%20Linux%20%7C%20macOS-9ca3af.svg)
 [![Buy Me A Coffee](https://img.shields.io/badge/☕_Buy_Me_a_Coffee-支持开发-f59e0b)](#赞助支持buy-me-a-coffee-)
 
-**适用于所有 AI Agent** —— Claude、Codex、Cursor、Copilot、Factory Droid、Hermes、
-DeepSeek、Gemini CLI……以及你自己写的任何脚本。只要能发 HTTP 请求，就能接入蜂巢。
-
 </div>
 
 ---
 
-## 为什么需要它
+## 什么是 AgentHive
 
-你同时在用多个 AI Agent 干活吗？它们各自记着自己的笔记、踩着别人踩过的坑、
-重复问你已经回答过的问题、没办法把活儿委托给另一个 Agent。
+**适用于所有 AI Agent** —— Claude、Codex、Cursor、Copilot、Factory Droid、Hermes、
+DeepSeek、Gemini CLI……以及你自己写的任何脚本。只要能发 HTTP 请求，就能接入蜂巢。
 
-**AgentHive 给它们一个共同的"蜂巢"**：一个跑在你自己电脑上的协作中枢——
+你同时在用多个 AI Agent 干活吗？它们各自记着自己的笔记、踩着别人踩过的坑、重复问
+你已经回答过的问题、没办法把活儿委托给另一个 Agent。**AgentHive 给它们一个共同的
+“蜂巢”**：一个跑在你自己电脑上的协作中枢——
 
 - 🔒 **纯本地**：服务只监听 `127.0.0.1`，无账号、无云依赖，数据是一个 SQLite 文件
 - 🧠 **共享知识库**：经验/方案/踩坑统一沉淀，关键词 + 语义双模式检索（嵌入器可插拔）
@@ -35,7 +34,9 @@ DeepSeek、Gemini CLI……以及你自己写的任何脚本。只要能发 HTTP
 - 🚨 **错误日志**：报错必须记录，其他 Agent 或用户可协助解决，解决说明只追加不覆盖
 - 📊 **Token 管控**：周预算（默认 1000 万）、三级告警、幂等上报、超额拦截
 - 📜 **全程审计**：谁、什么时候、做了什么，完整可追溯
-- 🖥 **态势感知工作台**：Qt6 深色主题 GUI，环形预算图、Agent 状态卡片、事件流、告警面板
+
+**它不是**：不是聊天机器人、不是模型托管服务、不转发任何请求到云端。
+它是“协作台”——Agent 们共享记忆与任务的本地中转站，Agent 本身仍由各自工具驱动。
 
 ## 功能一览
 
@@ -49,6 +50,12 @@ DeepSeek、Gemini CLI……以及你自己写的任何脚本。只要能发 HTTP
 | Token 管控 | 每次调用上报消耗，按自然周聚合；80% 警告 / 95% 预警 / 超额拦截（HTTP 429） |
 | 操作审计 | 所有写操作记录身份、时间、动作、对象、内容摘要 |
 | 运维 | 审计轮转（30 天/10 万条）、备份与恢复（VACUUM INTO 快照）、管理性删除、手动维护 |
+
+## 界面预览
+
+<p align="center">
+  <img src="docs/assets/screenshot-dashboard.png" alt="AgentHive 工作台总览" width="100%"/>
+</p>
 
 ## 快速开始
 
@@ -143,10 +150,11 @@ curl -X POST -H "X-Agent-Name: claude" -H "X-Api-Key: $KEY" -H "Content-Type: ap
 
 ## 质量与验证
 
-- 单元测试 **143 项断言**（SHA-256、嵌入器、SSRF 防护、平台端到端、旧库升级迁移）；
+- 单元测试 **145 项断言**（SHA-256、嵌入器、SSRF 防护、平台端到端、旧库升级迁移）；
 - 集成验证 **39 项断言**（[scripts/feasibility_check.py](scripts/feasibility_check.py)：
   模拟多 Agent 全生命周期，含中文语义检索、异步任务状态机、幂等上报、预算告警）；
 - AddressSanitizer 端到端 0 报告；浸泡测试 8600+ 请求 0 错误、内存收敛；
+- 双进程并发写验证（GUI + platformd 同库）：60 次并发记忆写入版本无重复无断层；
 - 存量数据库自动迁移（幂等 ALTER），旧格式密钥兼容认证。
 
 运行验证：
@@ -162,8 +170,8 @@ python scripts/feasibility_check.py 8787
 src/core/    平台核心（Qt 无关）：数据库、向量检索、八个服务、HTTP API
 src/gui/     Qt6 态势感知工作台（深色主题，七面板）
 src/cli/     agent-cli（Agent 侧客户端）、platformd（无界面守护进程）
-tests/       核心层单元测试（143 项断言）
-docs/        api.md（HTTP 接口文档）、hardening-report.md（安全加固报告）、assets/（品牌资源）
+tests/       核心层单元测试（145 项断言）
+docs/        api.md（HTTP 接口文档）、hardening-report.md（安全加固报告）、assets/（品牌与截图）
 scripts/     fetch-deps.ps1（离线依赖预取）、deploy.ps1（部署+桌面快捷方式）、
              feasibility_check.py（集成验证）、soak_test.py（浸泡测试）
 ```
@@ -183,15 +191,12 @@ scripts/     fetch-deps.ps1（离线依赖预取）、deploy.ps1（部署+桌面
 
 ## 联系与社区
 
-| 渠道 | 入口 | 适合 |
-|---|---|---|
-| 🐛 Bug 反馈 | [GitHub Issues](https://github.com/your-github-id/AgentHive/issues) | 报错、复现步骤、环境信息 |
-| 💡 功能讨论 | [GitHub Discussions](https://github.com/your-github-id/AgentHive/discussions) | 新面板、新接口、接入方案 |
-| 📧 邮件 | `your-email@example.com` | 安全漏洞请勿公开提 Issue，优先邮件联系 |
-| 💬 交流群 | 见 Releases 页公告 | 使用答疑、接入经验分享 |
+- 🐛 **Bug 反馈** → [GitHub Issues](https://github.com/your-github-id/AgentHive/issues)
+- 💡 **功能讨论** → [GitHub Discussions](https://github.com/your-github-id/AgentHive/discussions)
+- 📧 **邮件** → `your-email@example.com`（安全漏洞请勿公开提 Issue，优先邮件联系；72 小时内响应）
+- 💬 **交流群** → 见 Releases 页公告
 
-> 安全问题请参考 [docs/hardening-report.md](docs/hardening-report.md) 了解现有防护面，
-> 漏洞报告请发邮件并附复现细节，会在 72 小时内响应。
+> 安全问题请参考 [docs/hardening-report.md](docs/hardening-report.md) 了解现有防护面。
 
 ## 赞助支持（Buy Me a Coffee ☕）
 
