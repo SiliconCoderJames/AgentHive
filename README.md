@@ -179,7 +179,7 @@ scripts/     fetch-deps.ps1（离线依赖预取）、deploy.ps1（部署+桌面
 ## Roadmap
 
 - [ ] 本地嵌入模型接入（ONNX Runtime，bge / m3e 系列）
-- [ ] 工作台多语言界面（i18n）
+- [x] 工作台多语言界面（中文 / English，侧边栏一键切换）
 - [ ] 知识条目附件（代码片段高亮、截图）
 - [ ] 任务依赖与看板视图
 - [ ] Linux / macOS 打包（AppImage / dmg）
