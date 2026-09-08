@@ -1,7 +1,4 @@
 # GitHub 会在仓库页顶部显示 "Sponsor this project" 按钮。
-# 把下面的占位用户名替换为你的真实账号，不用的平台整行删除即可。
 # 字段参考: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/displaying-a-sponsor-button-in-your-repository
 
-buy_me_a_coffee: your-id        # buymeacoffee.com/your-id
-ko-fi: your-id                  # ko-fi.com/your-id
-custom: ["https://afdian.net/a/your-id"]   # 爱发电（国内用户）
+buy_me_a_coffee: zwj8jc5rrgp

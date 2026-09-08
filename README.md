@@ -200,9 +200,9 @@ AgentHive 完全免费开源（MIT）。如果它让你的多个 Agent 协作得
 
 <div align="center">
 
-[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-支持一下-f59e0b?style=for-the-badge&logo=buy-me-a-coffee&logoColor=white)](https://www.buymeacoffee.com/your-id)
-[![爱发电](https://img.shields.io/badge/爱发电-充电计划-0ea5e9?style=for-the-badge)](https://afdian.net/a/your-id)
-[![GitHub Sponsors](https://img.shields.io/badge/GitHub%20Sponsors-Sponsor-ea4aaa?style=for-the-badge&logo=github&logoColor=white)](https://github.com/sponsors/your-github-id)
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-支持请喝咖啡-f59e0b?style=for-the-badge&logo=buy-me-a-coffee&logoColor=white)](https://www.buymeacoffee.com/zwj8jc5rrgp)
+
+<img src="docs/assets/bmc-qr.png" width="180" alt="Buy Me a Coffee 二维码"/>
 
 </div>
 
