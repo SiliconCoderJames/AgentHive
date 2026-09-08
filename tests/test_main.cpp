@@ -102,6 +102,10 @@ static void test_embedder() {
         return s;
     };
     CHECK(dot(a, d) > dot(a, c));
+    // 词边界：空白折叠为分隔符，"ab c" 与 "a bc" 的跨词 n-gram 不同
+    CHECK(emb.embed("ab c") != emb.embed("a bc"));
+    // 大小写折叠 + 连续空白等价于单词
+    CHECK(emb.embed("AB  C") == emb.embed("ab c"));
 }
 
 static void test_url_guard() {

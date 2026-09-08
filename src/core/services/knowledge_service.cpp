@@ -131,6 +131,9 @@ bool KnowledgeService::addVersion(const std::string& author, const std::string& 
                                   const std::vector<float>& embedding,
                                   const std::string& embeddingProvider, KnowledgeEntry& out,
                                   std::string& err) {
+    // BEGIN IMMEDIATE 包裹查-改-插：双进程并发追加同一 uuid 时不会产生两条 is_latest=1
+    if (!db_.beginImmediate(err)) return false;
+
     // 追加新版本：旧版本内容原样保留，仅翻转 is_latest 标记
     int64_t oldId = 0;
     int oldVersion = 0;
@@ -147,13 +150,21 @@ bool KnowledgeService::addVersion(const std::string& author, const std::string& 
                 oldCategory = st.isNull(4) ? std::string() : st.text(4);
                 found = true;
             },
-            err))
+            err)) {
+        db_.rollback();
         return false;
-    if (!found) { err = "knowledge not found: " + uuid; return false; }
+    }
+    if (!found) {
+        err = "knowledge not found: " + uuid;
+        db_.rollback();
+        return false;
+    }
 
     if (!db_.query("UPDATE knowledge_entries SET is_latest=0 WHERE id=?",
-                   [&](Stmt& st) { st.bind(1, oldId); }, nullptr, err))
+                   [&](Stmt& st) { st.bind(1, oldId); }, nullptr, err)) {
+        db_.rollback();
         return false;
+    }
 
     std::string title = newTitle.empty() ? oldTitle : newTitle;
     if (!db_.query(
@@ -172,10 +183,19 @@ bool KnowledgeService::addVersion(const std::string& author, const std::string& 
                 st.bind(9, embeddingProvider);
                 st.bind(10, nowIso());
             },
-            nullptr, err))
+            nullptr, err)) {
+        db_.rollback();
         return false;
+    }
     int64_t id = db_.lastInsertId();
-    if (!insertVec(id, embedding, err)) return false;
+    if (!insertVec(id, embedding, err)) {
+        db_.rollback();
+        return false;
+    }
+    if (!db_.commit(err)) {
+        db_.rollback();
+        return false;
+    }
     return latest(uuid, out, err);
 }
 

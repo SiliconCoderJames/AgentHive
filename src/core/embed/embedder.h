@@ -20,7 +20,8 @@ public:
 class NgramHashEmbedder : public Embedder {
 public:
     explicit NgramHashEmbedder(int dim = 384);
-    std::string name() const override { return "ngram-hash"; }
+    // v2：引入词间分隔符，向量与 v1 不兼容（provider 名随之升级）
+    std::string name() const override { return "ngram-hash-v2"; }
     int dim() const override { return dim_; }
     std::vector<float> embed(const std::string& text) override;
 

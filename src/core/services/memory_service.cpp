@@ -32,6 +32,10 @@ bool MemoryService::list(const std::string& sectionFilter, std::vector<MemoryEnt
 bool MemoryService::set(const std::string& author, const std::string& section, const std::string& key,
                         const std::string& value, int baseVersion, MemoryEntry& out,
                         std::string& err) {
+    // BEGIN IMMEDIATE 包裹查-改-插：GUI 与 platformd 双进程并发写同库时，
+    // 不会产生两条 is_latest=1 的同版本记录（进程内另有 Platform 大锁）
+    if (!db_.beginImmediate(err)) return false;
+
     int64_t latestId = 0;
     int latestVersion = 0;
     bool found = false;
@@ -39,13 +43,16 @@ bool MemoryService::set(const std::string& author, const std::string& section, c
             "SELECT id, version FROM memory_entries WHERE section=? AND key=? AND is_latest=1",
             [&](Stmt& st) { st.bind(1, section); st.bind(2, key); },
             [&](Stmt& st) { latestId = st.i64(0); latestVersion = static_cast<int>(st.i64(1)); found = true; },
-            err))
+            err)) {
+        db_.rollback();
         return false;
+    }
 
     // 乐观并发：调用方基于旧版本写入时拒绝，避免静默覆盖他人更新
     if (baseVersion > 0 && (!found || latestVersion != baseVersion)) {
         err = "version conflict: expected base v" + std::to_string(baseVersion) +
               ", latest is v" + std::to_string(found ? latestVersion : 0);
+        db_.rollback();
         return false;
     }
 
@@ -53,8 +60,10 @@ bool MemoryService::set(const std::string& author, const std::string& section, c
     if (found) {
         // 仅翻转版本标记，旧内容原样保留（append-only）
         if (!db_.query("UPDATE memory_entries SET is_latest=0 WHERE id=?",
-                       [&](Stmt& st) { st.bind(1, latestId); }, nullptr, err))
+                       [&](Stmt& st) { st.bind(1, latestId); }, nullptr, err)) {
+            db_.rollback();
             return false;
+        }
     }
     if (!db_.query(
             "INSERT INTO memory_entries(section, key, value, author, version, is_latest, created_at) "
@@ -67,8 +76,15 @@ bool MemoryService::set(const std::string& author, const std::string& section, c
                 st.bind(5, static_cast<int64_t>(newVersion));
                 st.bind(6, nowIso());
             },
-            nullptr, err))
+            nullptr, err)) {
+        db_.rollback();
         return false;
+    }
+
+    if (!db_.commit(err)) {
+        db_.rollback();
+        return false;
+    }
 
     out.section = section;
     out.key = key;

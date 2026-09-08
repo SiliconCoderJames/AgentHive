@@ -122,14 +122,22 @@ bool Platform::bootstrap(std::string& err) {
 }
 
 void Platform::shutdown() {
+    // 顺序很关键：先取出并锁外停止 HTTP（join 在途请求，handler 需要拿
+    // mutex_ 与可用的 db_）→ 再关闭数据库。持锁 join 会互相等待死锁。
+    std::unique_ptr<HttpServer> http;
+    {
+        std::lock_guard lock(mutex_);
+        http = std::move(http_);
+    }
+    if (http) http->stop();
     std::lock_guard lock(mutex_);
-    stopHttpServer();
     db_.close();
     bootstrapped_ = false;
 }
 
 bool Platform::persistAgentKey(const std::string& name, const std::string& apiKey,
                                std::string& err) {
+    (void)err;  // 尽力而为语义：失败不阻塞注册（密钥哈希已入库，可重新注册获取）
     // 密钥明文仅存于运行期生成的数据目录配置文件，供 Agent 侧命令行取用
     std::string path = (fs::path(home_dir_) / "config" / "agents.json").string();
     nlohmann::json j;
@@ -166,8 +174,8 @@ bool Platform::registerAgent(const std::string& masterKey, const std::string& na
                              const std::string& role, std::string& outApiKey, std::string& err) {
     std::lock_guard lock(mutex_);
     if (!authenticateMaster(masterKey)) { err = "invalid master key"; return false; }
-    if (name.empty() || name.find_first_of(" \t\r\n") != std::string::npos) {
-        err = "invalid agent name";
+    if (name.empty() || name.size() > 64 || name.find_first_of(" \t\r\n") != std::string::npos) {
+        err = "invalid agent name (1..64 chars, no whitespace)";
         return false;
     }
     if (agents_.nameExists(name)) { err = "agent already registered: " + name; return false; }
@@ -638,10 +646,12 @@ bool Platform::backupList(std::vector<std::string>& out, std::string& err) {
     std::lock_guard lock(mutex_);
     out.clear();
     std::error_code ec;
-    for (const auto& entry : fs::directory_iterator(fs::path(home_dir_) / "backup", ec)) {
-        if (entry.is_regular_file() && entry.path().extension() == ".db")
+    fs::path dir = fs::path(home_dir_) / "backup";
+    for (const auto& entry : fs::directory_iterator(dir, ec)) {
+        if (entry.is_regular_file(ec) && entry.path().extension() == ".db")
             out.push_back(entry.path().filename().string());
     }
+    if (ec) { err = "cannot list backup dir: " + ec.message(); return false; }
     std::sort(out.rbegin(), out.rend());  // 新的在前
     return true;
 }
@@ -690,7 +700,13 @@ bool Platform::startHttpServer(int port, std::string& err) {
 }
 
 void Platform::stopHttpServer() {
-    if (http_) http_->stop();
+    // 同 shutdown：取出后锁外停止，避免与在途请求互相等待
+    std::unique_ptr<HttpServer> http;
+    {
+        std::lock_guard lock(mutex_);
+        http = std::move(http_);
+    }
+    if (http) http->stop();
 }
 
 int Platform::httpPort() const {

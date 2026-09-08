@@ -272,14 +272,14 @@ def s13_broadcast(agents):
 
 def main():
     global MASTER
-    MASTER = os.environ.get("ZCODE_PLATFORM_MASTER_KEY", "")
+    MASTER = os.environ.get("AGENTHIVE_MASTER_KEY") or os.environ.get("ZCODE_PLATFORM_MASTER_KEY", "")
     if not MASTER:
-        print("需要环境变量 ZCODE_PLATFORM_MASTER_KEY")
+        print("需要环境变量 AGENTHIVE_MASTER_KEY（兼容 ZCODE_PLATFORM_MASTER_KEY）")
         return 2
 
     agents = {n: {} for n in ("claude", "codex", "hermes")}
     # zcode 管理者密钥：由运行方从数据目录 config/agents.json 提供
-    agents["zcode"] = {"key": os.environ.get("ZCODE_ZCODE_KEY", "")}
+    agents["zcode"] = {"key": os.environ.get("AGENTHIVE_ZCODE_KEY") or os.environ.get("ZCODE_ZCODE_KEY", "")}
 
     s01_health()
     s02_register(agents)

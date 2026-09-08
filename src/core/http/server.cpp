@@ -4,6 +4,7 @@
 #include <nlohmann/json.hpp>
 
 #include <chrono>
+#include <stdexcept>
 #include <thread>
 
 #include "core/platform.h"
@@ -28,6 +29,28 @@ void send(httplib::Response& res, const json& body) {
     else
         res.status = 200;
     res.set_content(body.dump(), "application/json; charset=utf-8");
+}
+
+// 查询参数 -> 正整数（默认值兜底）；非数字输入返回 400 而非抛异常
+bool parseLimit(const httplib::Request& req, httplib::Response& res, int def, int& out) {
+    if (!req.has_param("limit")) { out = def; return true; }
+    const std::string& v = req.get_param_value("limit");
+    try {
+        size_t pos = 0;
+        int n = std::stoi(v, &pos);
+        if (n <= 0 || pos != v.size()) throw std::invalid_argument("range");
+        out = n;
+        return true;
+    } catch (...) {
+        send(res, fail(400, "limit must be a positive integer"));
+        return false;
+    }
+}
+
+// 解析库内存储的 JSON 片段（schema/params/audit detail）；损坏时退化为原字符串
+json safeStoredJson(const std::string& s) {
+    auto j = json::parse(s, nullptr, false);
+    return j.is_discarded() ? json(s) : std::move(j);
 }
 
 // 从 body 提取 embedding（可选）；维度不匹配返回 false
@@ -260,7 +283,10 @@ void HttpServer::setupRoutes() {
         std::string embedder = body.value("embedder", "");
         std::vector<std::string> tags;
         if (body.contains("tags") && body["tags"].is_array())
-            for (const auto& t : body["tags"]) tags.push_back(t.get<std::string>());
+            for (const auto& t : body["tags"]) {
+                if (!t.is_string()) { send(res, fail(400, "tags must be an array of strings")); return; }
+                tags.push_back(t.get<std::string>());
+            }
         bool hasEmb = false;
         std::vector<float> emb;
         std::string err;
@@ -277,7 +303,8 @@ void HttpServer::setupRoutes() {
     srv.Get("/api/knowledge", [&](const httplib::Request& req, httplib::Response& res) {
         std::string actor;
         if (!checkAgent(req, p, actor, res)) return;
-        int limit = req.has_param("limit") ? std::stoi(req.get_param_value("limit")) : 100;
+        int limit = 100;
+        if (!parseLimit(req, res, 100, limit)) return;
         std::string tag = req.has_param("tag") ? req.get_param_value("tag") : "";
         std::vector<KnowledgeEntry> entries;
         std::string err;
@@ -372,7 +399,7 @@ void HttpServer::setupRoutes() {
                           {"description", out.description},
                           {"category", out.category},
                           {"owner_agent", out.owner_agent},
-                          {"param_schema", json::parse(out.param_schema)},
+                          {"param_schema", safeStoredJson(out.param_schema)},
                           {"version", out.version},
                           {"status", out.status}}));
     });
@@ -392,7 +419,7 @@ void HttpServer::setupRoutes() {
                            {"description", s.description},
                            {"category", s.category},
                            {"owner_agent", s.owner_agent},
-                           {"param_schema", json::parse(s.param_schema)},
+                           {"param_schema", safeStoredJson(s.param_schema)},
                            {"version", s.version},
                            {"status", s.status},
                            {"updated_at", s.updated_at}});
@@ -410,7 +437,7 @@ void HttpServer::setupRoutes() {
                           {"description", out.description},
                           {"category", out.category},
                           {"owner_agent", out.owner_agent},
-                          {"param_schema", json::parse(out.param_schema)},
+                          {"param_schema", safeStoredJson(out.param_schema)},
                           {"version", out.version},
                           {"status", out.status}}));
     });
@@ -447,7 +474,8 @@ void HttpServer::setupRoutes() {
     srv.Get(R"(/api/skills/([^/]+)/invocations)", [&](const httplib::Request& req, httplib::Response& res) {
         std::string actor;
         if (!checkAgent(req, p, actor, res)) return;
-        int limit = req.has_param("limit") ? std::stoi(req.get_param_value("limit")) : 100;
+        int limit = 100;
+        if (!parseLimit(req, res, 100, limit)) return;
         std::vector<SkillInvocation> invs;
         std::string err;
         if (!p.skillInvocations(req.matches[1], limit, invs, err)) { send(res, fail(500, err)); return; }
@@ -455,7 +483,7 @@ void HttpServer::setupRoutes() {
         for (const auto& i : invs)
             arr.push_back({{"skill_name", i.skill_name},
                            {"caller_agent", i.caller_agent},
-                           {"params", json::parse(i.params)},
+                           {"params", safeStoredJson(i.params)},
                            {"result_summary", i.result_summary},
                            {"status", i.status},
                            {"duration_ms", i.duration_ms},
@@ -494,7 +522,8 @@ void HttpServer::setupRoutes() {
         std::string kind = req.has_param("kind") ? req.get_param_value("kind") : "";
         std::string status = req.has_param("status") ? req.get_param_value("status") : "";
         std::string since = req.has_param("since") ? req.get_param_value("since") : "";
-        int limit = req.has_param("limit") ? std::stoi(req.get_param_value("limit")) : 100;
+        int limit = 100;
+        if (!parseLimit(req, res, 100, limit)) return;
         std::vector<Message> msgs;
         std::string err;
         if (!p.messageList(recipient, kind, status, since, limit, msgs, err)) {
@@ -565,7 +594,8 @@ void HttpServer::setupRoutes() {
         if (!checkAgent(req, p, actor, res)) return;
         std::string status = req.has_param("status") ? req.get_param_value("status") : "";
         std::string severity = req.has_param("severity") ? req.get_param_value("severity") : "";
-        int limit = req.has_param("limit") ? std::stoi(req.get_param_value("limit")) : 200;
+        int limit = 200;
+        if (!parseLimit(req, res, 200, limit)) return;
         std::vector<ErrorReport> errors;
         std::string err;
         if (!p.errorList(status, severity, limit, errors, err)) { send(res, fail(500, err)); return; }
@@ -653,8 +683,9 @@ void HttpServer::setupRoutes() {
     srv.Put("/api/usage/budget", [&](const httplib::Request& req, httplib::Response& res) {
         if (!checkMaster(req, p, res)) return;
         auto body = json::parse(req.body, nullptr, false);
-        if (body.is_discarded() || !body.is_object() || !body.contains("budget")) {
-            send(res, fail(400, "budget is required"));
+        if (body.is_discarded() || !body.is_object() || !body.contains("budget") ||
+            !body["budget"].is_number()) {
+            send(res, fail(400, "budget must be a number"));
             return;
         }
         std::string err;
@@ -672,7 +703,8 @@ void HttpServer::setupRoutes() {
         std::string a = req.has_param("actor") ? req.get_param_value("actor") : "";
         std::string act = req.has_param("action") ? req.get_param_value("action") : "";
         std::string since = req.has_param("since") ? req.get_param_value("since") : "";
-        int limit = req.has_param("limit") ? std::stoi(req.get_param_value("limit")) : 200;
+        int limit = 200;
+        if (!parseLimit(req, res, 200, limit)) return;
         std::vector<AuditRecord> records;
         std::string err;
         if (!p.auditList(a, act, since, limit, records, err)) { send(res, fail(500, err)); return; }
@@ -682,7 +714,7 @@ void HttpServer::setupRoutes() {
                            {"actor", r.actor},
                            {"action", r.action},
                            {"target", r.target},
-                           {"detail", json::parse(r.detail)},
+                           {"detail", safeStoredJson(r.detail)},
                            {"created_at", r.created_at}});
         send(res, ok(arr));
     });
@@ -692,7 +724,7 @@ void HttpServer::setupRoutes() {
         if (!checkMaster(req, p, res)) return;
         std::string stats, err;
         if (!p.maintenanceRun(kManagerName, stats, err)) { send(res, fail(500, err)); return; }
-        send(res, ok(json::parse(stats)));
+        send(res, ok(safeStoredJson(stats)));
     });
 
     srv.Post("/api/system/backup", [&](const httplib::Request& req, httplib::Response& res) {
