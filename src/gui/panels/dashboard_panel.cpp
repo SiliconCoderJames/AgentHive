@@ -84,7 +84,7 @@ void DashboardPanel::refresh() {
     // 预算环形图 + 用量柱状图
     zp::UsageSummary sum;
     if (platform_.usageSummary(sum, err)) {
-        ring_->setValues(sum.total_tokens, sum.budget, QString("剩余 %1")
+        ring_->setValues(sum.total_tokens, sum.budget, i18n::trs("剩余 %1", "left %1")
                                                           .arg(formatNum(sum.budget - sum.total_tokens)));
         QVector<QPair<QString, qint64>> bars;
         for (const auto& [name, tokens] : sum.per_agent)

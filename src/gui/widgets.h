@@ -14,6 +14,7 @@
 #include <QWidget>
 
 #include "theme.h"
+#include "i18n.h"
 
 namespace ui {
 
@@ -133,7 +134,7 @@ protected:
         p.setRenderHint(QPainter::Antialiasing);
         if (entries_.isEmpty()) {
             p.setPen(QPen(MUTED));
-            p.drawText(rect(), Qt::AlignCenter, "暂无用量数据");
+            p.drawText(rect(), Qt::AlignCenter, i18n::trs("暂无用量数据", "no usage data yet"));
             return;
         }
         qint64 maxV = 1;
@@ -280,15 +281,16 @@ public:
         name_->setText(name);
         online_ = status == "online";
         updateDot();
-        status_->setText(online_ ? "在线" : "离线");
+        status_->setText(online_ ? i18n::trs("在线", "online") : i18n::trs("离线", "offline"));
         status_->setStyleSheet(online_
             ? "font-size:10px; padding:1px 8px; border-radius:8px;"
               "color:#a7f3d0; background:#064e3b;"
             : "font-size:10px; padding:1px 8px; border-radius:8px;"
               "color:#a1a1aa; background:#27272a;");
         role_->setText(role);
-        task_->setText(task.isEmpty() ? "（无当前任务）" : task);
-        seen_->setText(lastSeen.isEmpty() ? "从未活跃" : "活跃于 " + lastSeen);
+        task_->setText(task.isEmpty() ? i18n::trs("（无当前任务）", "(no current task)") : task);
+        seen_->setText(lastSeen.isEmpty() ? i18n::trs("从未活跃", "never seen")
+                                      : i18n::trs("活跃于 ", "last active ") + lastSeen);
     }
 
 private:
