@@ -11,7 +11,8 @@ DashboardPanel::DashboardPanel(zp::Platform& platform, QWidget* parent)
     auto* root = new QVBoxLayout(this);
     root->setContentsMargins(16, 16, 16, 16);
     root->setSpacing(14);
-    buildHeader(root, "总览", "预算消耗 · Agent 状态 · 事件流与告警，一屏掌握蜂巢动态");
+    buildHeader(root, "总览", "Overview", "预算消耗 · Agent 状态 · 事件流与告警，一屏掌握蜂巢动态",
+                "Budget, agent status, event stream and alerts at a glance");
 
     // ---- 第一行：Token 环形图 + 各 Agent 用量柱状图 ----
     auto* topRow = new QHBoxLayout();

@@ -8,6 +8,7 @@
 
 #include "core/platform.h"
 #include "core/util.h"
+#include "i18n.h"
 #include "mainwindow.h"
 
 // 程序化绘制蜂巢图标：深色圆角底 + 琥珀色六边形蜂巢 + 入口点
@@ -46,6 +47,7 @@ int main(int argc, char** argv) {
     QApplication app(argc, argv);
     app.setApplicationName("AgentHive 多 Agent 协作工作台");
     app.setOrganizationName("agenthive");
+    i18n::load();
     {
         // 优先使用仓库品牌图标（与 README 一致），缺失时回退到程序化绘制的蜂巢
         QIcon brandIcon(":/brand/logo.png");

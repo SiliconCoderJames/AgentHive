@@ -4,9 +4,11 @@
 #include <QLabel>
 #include <QStackedWidget>
 #include <QTimer>
+#include <QToolButton>
 #include <vector>
 
 #include "core/platform.h"
+#include "i18n.h"
 #include "panels/panel_base.h"
 
 class MainWindow : public QMainWindow {
@@ -22,6 +24,7 @@ private:
     void buildNav();
     void buildStatusBar();
     void updateStatusBar();
+    void applyLanguage();
 
     zp::Platform& platform_;
     QListWidget* nav_ = nullptr;
@@ -30,6 +33,8 @@ private:
     QLabel* statusServer_ = nullptr;
     QLabel* statusUsage_ = nullptr;
     QLabel* spin_ = nullptr;
+    QToolButton* langBtn_ = nullptr;
+    QLabel* tagline_ = nullptr;
     int spinPhase_ = 0;
     QTimer* timer_ = nullptr;
     int openErrors_ = 0;  // 未解决错误数，用于导航徽标

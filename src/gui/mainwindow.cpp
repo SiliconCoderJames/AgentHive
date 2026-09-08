@@ -37,10 +37,10 @@ MainWindow::MainWindow(zp::Platform& platform, QWidget* parent)
     brandLay->setSpacing(2);
     auto* logo = new QLabel("🐝 AgentHive", brand);
     logo->setStyleSheet("font-size:16px; font-weight:800; color:#e5e5e5; background:transparent;");
-    auto* tagline = new QLabel("多 Agent 协作工作台", brand);
-    tagline->setStyleSheet("font-size:10px; color:#9ca3af; background:transparent;");
+    tagline_ = new QLabel(brand);
+    tagline_->setStyleSheet("font-size:10px; color:#9ca3af; background:transparent;");
     brandLay->addWidget(logo);
-    brandLay->addWidget(tagline);
+    brandLay->addWidget(tagline_);
     sideLay->addWidget(brand);
 
     nav_ = new QListWidget(side);
@@ -53,10 +53,22 @@ MainWindow::MainWindow(zp::Platform& platform, QWidget* parent)
         " font-weight:600; border-left:3px solid #f59e0b; }");
     sideLay->addWidget(nav_, 1);
 
-    auto* ver = new QLabel("v1.0 · local-first", side);
-    ver->setAlignment(Qt::AlignCenter);
+    // 脚注：版本号 + 语言切换（持久化到 QSettings）
+    auto* foot = new QWidget(side);
+    auto* footLay = new QHBoxLayout(foot);
+    footLay->setContentsMargins(10, 0, 10, 0);
+    auto* ver = new QLabel("v1.0 · local-first", foot);
     ver->setStyleSheet("font-size:10px; color:#52525b; background:transparent;");
-    sideLay->addWidget(ver);
+    langBtn_ = new QToolButton(foot);
+    langBtn_->setStyleSheet(
+        "QToolButton { color:#9ca3af; font-size:10px; border:1px solid #3f3f46;"
+        " border-radius:6px; padding:2px 8px; }"
+        "QToolButton:hover { color:#e5e5e5; border-color:#0ea5e9; }");
+    connect(langBtn_, &QToolButton::clicked, this, [] { i18n::toggle(); });
+    footLay->addWidget(ver);
+    footLay->addStretch(1);
+    footLay->addWidget(langBtn_);
+    sideLay->addWidget(foot);
     layout->addWidget(side);
 
     stack_ = new QStackedWidget(central);
@@ -76,9 +88,13 @@ MainWindow::MainWindow(zp::Platform& platform, QWidget* parent)
     setCentralWidget(central);
     buildNav();
     buildStatusBar();
+    applyLanguage();
 
     connect(nav_, &QListWidget::currentRowChanged, this, &MainWindow::onNavChanged);
     nav_->setCurrentRow(0);
+
+    // 语言切换：重译铬层（导航/页头/状态栏），面板各自处理自有文案
+    i18n::listeners().push_back([this] { applyLanguage(); });
 
     timer_ = new QTimer(this);
     connect(timer_, &QTimer::timeout, this, &MainWindow::onRefresh);
@@ -94,11 +110,31 @@ MainWindow::MainWindow(zp::Platform& platform, QWidget* parent)
 }
 
 void MainWindow::buildNav() {
-    const QStringList items{"📊  总览",      "📚  知识库", "🧩  技能库",
-                            "🧠  用户记忆",  "💬  Agent 交流", "🚨  错误报告",
-                            "🕘  操作日志"};
+    nav_->clear();
+    const QStringList items{
+        "📊  " + i18n::trs("总览", "Overview"),
+        "📚  " + i18n::trs("知识库", "Knowledge"),
+        "🧩  " + i18n::trs("技能库", "Skills"),
+        "🧠  " + i18n::trs("用户记忆", "Memory"),
+        "💬  " + i18n::trs("Agent 交流", "Messaging"),
+        "🚨  " + i18n::trs("错误报告", "Errors"),
+        "🕘  " + i18n::trs("操作日志", "Audit"),
+    };
     nav_->addItems(items);
     nav_->item(5)->setForeground(QBrush(ui::DANGER));  // 错误报告项恒红，异常时更醒目
+}
+
+void MainWindow::applyLanguage() {
+    setWindowTitle(i18n::trs("AgentHive · 多 Agent 协作工作台",
+                             "AgentHive · Multi-Agent Collaboration Workbench"));
+    tagline_->setText(i18n::trs("多 Agent 协作工作台", "multi-agent collaboration hub"));
+    langBtn_->setText(i18n::g_lang == i18n::Lang::Zh ? "EN" : "中文");
+    langBtn_->setToolTip(i18n::trs("切换语言", "Switch language"));
+    int row = nav_->currentRow();
+    buildNav();
+    if (row >= 0) nav_->setCurrentRow(row);
+    for (auto* p : panels_) p->retranslate();
+    updateStatusBar();
 }
 
 void MainWindow::buildStatusBar() {
@@ -132,26 +168,30 @@ void MainWindow::updateStatusBar() {
     zp::UsageSummary sum;
     // 服务在线指示灯：HTTP 服务随进程常驻，绿点常亮即后端可用
     statusServer_->setText(QString("<span style='color:#22c55e;'>●</span> HTTP: "
-                                   "http://127.0.0.1:%1 · 数据: %2")
+                                   "http://127.0.0.1:%1 · %2 %3")
                                .arg(platform_.httpPort())
+                               .arg(i18n::trs("数据", "data"))
                                .arg(QString::fromStdString(platform_.homeDir())));
     if (platform_.usageSummary(sum, err)) {
         double pct = sum.budget > 0 ? 100.0 * sum.total_tokens / sum.budget : 0.0;
         QString color = sum.alert_level == "none" ? "#22c55e" : (sum.alert_level == "warn" ? "#f59e0b" : "#ef4444");
         statusUsage_->setText(
-            QString("<span style='color:%1'>本周 Token: %2 / %3 (%4%) · 剩余 %5</span>")
+            QString("<span style='color:%1'>%2: %3 / %4 (%5%) · %6 %7</span>")
                 .arg(color)
+                .arg(i18n::trs("本周 Token", "Weekly tokens"))
                 .arg(formatNum(sum.total_tokens))
                 .arg(formatNum(sum.budget))
                 .arg(pct, 0, 'f', 1)
+                .arg(i18n::trs("剩余", "left"))
                 .arg(formatNum(sum.budget - sum.total_tokens)));
     }
     // 导航徽标：未解决错误数附加在「错误报告」项上
     std::vector<zp::ErrorReport> openErrors;
     if (platform_.errorList("open", "", 99, openErrors, err)) {
         openErrors_ = static_cast<int>(openErrors.size());
-        nav_->item(5)->setText(openErrors_ > 0
-                                   ? QString("🚨  错误报告  (%1)").arg(openErrors_)
-                                   : "🚨  错误报告");
+        nav_->item(5)->setText(
+            openErrors_ > 0
+                ? QString("🚨  %1  (%2)").arg(i18n::trs("错误报告", "Errors")).arg(openErrors_)
+                : "🚨  " + i18n::trs("错误报告", "Errors"));
     }
 }
