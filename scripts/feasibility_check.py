@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""ZCode 多 Agent 协作平台 · 可行性验证脚本
+"""AgentHive 本地多 Agent 协作平台 · 可行性验证脚本
 
 以三个外部 Agent（claude/codex/hermes）的真实协作流程走通全部核心场景，
 仅通过 HTTP API 交互（模拟真实接入方式），逐条断言协作规则落地。

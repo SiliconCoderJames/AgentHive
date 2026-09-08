@@ -1,4 +1,4 @@
--- ZCode 多 Agent 协作平台 Schema
+-- AgentHive 本地多 Agent 协作平台 Schema
 -- 协作规则落地：
 --   * 内容只追加、不覆盖：knowledge/memory 用版本号 + is_latest 标记，旧版本永不删除。
 --   * 所有写操作在 audit_log 留痕（身份 + 时间 + 内容摘要）。
@@ -143,6 +143,7 @@ CREATE INDEX IF NOT EXISTS idx_messages_recipient  ON messages(recipient, status
 CREATE INDEX IF NOT EXISTS idx_messages_kind       ON messages(kind, created_at);
 CREATE INDEX IF NOT EXISTS idx_errors_status       ON errors(status, severity);
 CREATE INDEX IF NOT EXISTS idx_audit_actor         ON audit_log(actor, created_at);
+CREATE INDEX IF NOT EXISTS idx_audit_action        ON audit_log(action, created_at);
 CREATE INDEX IF NOT EXISTS idx_audit_time          ON audit_log(created_at);
 CREATE INDEX IF NOT EXISTS idx_usage_week          ON token_usage(week_start, agent);
 CREATE INDEX IF NOT EXISTS idx_invocations_skill   ON skill_invocations(skill_name, created_at);

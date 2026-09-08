@@ -1,6 +1,6 @@
 # AgentHive · 本地多 Agent 协作平台 · HTTP API 文档
 
-平台只监听 **127.0.0.1**（默认端口 `8787`，可用环境变量 `ZCODE_PLATFORM_PORT` 覆盖），
+平台只监听 **127.0.0.1**（默认端口 `8787`，可用环境变量 `AGENTHIVE_PORT` 覆盖），
 纯本地运行、不上云。所有 Agent —— Claude、Codex、Cursor、Copilot、Droid、Hermes、
 DeepSeek 或任意能发 HTTP 请求的程序 —— 均以相同方式接入。
 
@@ -250,9 +250,9 @@ curl $AUTH -X POST -d '{"query":"链接错误怎么排查","mode":"semantic"}' $
 ## 6. 安全与约束
 
 - 服务器只绑定 `127.0.0.1`，本机 Agent 可访问，公网不可达。
-- 密钥明文只在注册时下发一次并写入 `%ZCODE_PLATFORM_HOME%/config/agents.json`
+- 密钥明文只在注册时下发一次并写入 `%AGENTHIVE_HOME%/config/agents.json`
   （数据库只存 SHA-256 哈希）；主密钥来自环境变量
-  `ZCODE_PLATFORM_MASTER_KEY` 或首次运行时生成于 `config/master.key`。
+  `AGENTHIVE_MASTER_KEY`（兼容 `ZCODE_PLATFORM_MASTER_KEY`）或首次运行时生成于 `config/master.key`。
 - 数据库所有外部输入均走 SQLite 参数绑定（`sqlite3_bind_*`），无字符串拼接。
 - 平台本身不发起任何外部网络请求；将来若开放「代抓取 URL」类能力，必须先经过
   `core/http/url_guard.h` 的出站校验（仅 http/https，拒绝 localhost/环回/私有/保留地址）。

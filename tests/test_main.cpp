@@ -336,6 +336,26 @@ static void test_platform_end_to_end() {
             std::printf("  bad-key status=%d body=%s\n", bad->status, bad->body.c_str());
         CHECK(bad && bad->status == 401);
 
+        // ---- 加固项：HTTP 输入健壮性（异常参数必须返回 4xx 而非 500/崩溃）----
+        auto badLimit = cli.Get("/api/knowledge?limit=abc",
+                                {{"X-Agent-Name", "hermes"}, {"X-Api-Key", key}});
+        CHECK(badLimit && badLimit->status == 400);
+        auto badLimit2 = cli.Get("/api/messages?limit=-5",
+                                 {{"X-Agent-Name", "hermes"}, {"X-Api-Key", key}});
+        CHECK(badLimit2 && badLimit2->status == 400);
+        {
+            nlohmann::json badTags = {{"title", "t"}, {"content", "c"}, {"tags", json::array({1, 2})}};
+            auto r = cli.Post("/api/knowledge", {{"X-Agent-Name", "hermes"}, {"X-Api-Key", key}},
+                              badTags.dump(), "application/json");
+            CHECK(r && r->status == 400);
+        }
+        {
+            nlohmann::json badBudget = {{"budget", "很多"}};
+            auto r = cli.Put("/api/usage/budget", {{"X-Master-Key", masterKey}},
+                             badBudget.dump(), "application/json");
+            CHECK(r && r->status == 400);
+        }
+
         // ---- 加固项：长度校验 ----
         std::string longTitle(300, 'x');
         std::string vErr;
