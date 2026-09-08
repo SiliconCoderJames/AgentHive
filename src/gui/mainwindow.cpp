@@ -74,16 +74,16 @@ MainWindow::MainWindow(zp::Platform& platform, QWidget* parent)
     stack_ = new QStackedWidget(central);
     layout->addWidget(stack_, 1);
 
-    panels_ = {
-        new DashboardPanel(platform_, this),
-        new KnowledgePanel(platform_, this),
-        new SkillsPanel(platform_, this),
-        new MemoryPanel(platform_, this),
-        new MessagesPanel(platform_, this),
-        new ErrorsPanel(platform_, this),
-        new LogsPanel(platform_, this),
+    panelFactories_ = {
+        [](zp::Platform& pl, QWidget* parent) { return static_cast<PanelBase*>(new DashboardPanel(pl, parent)); },
+        [](zp::Platform& pl, QWidget* parent) { return static_cast<PanelBase*>(new KnowledgePanel(pl, parent)); },
+        [](zp::Platform& pl, QWidget* parent) { return static_cast<PanelBase*>(new SkillsPanel(pl, parent)); },
+        [](zp::Platform& pl, QWidget* parent) { return static_cast<PanelBase*>(new MemoryPanel(pl, parent)); },
+        [](zp::Platform& pl, QWidget* parent) { return static_cast<PanelBase*>(new MessagesPanel(pl, parent)); },
+        [](zp::Platform& pl, QWidget* parent) { return static_cast<PanelBase*>(new ErrorsPanel(pl, parent)); },
+        [](zp::Platform& pl, QWidget* parent) { return static_cast<PanelBase*>(new LogsPanel(pl, parent)); },
     };
-    for (auto* p : panels_) stack_->addWidget(p);
+    rebuildPanels();
 
     setCentralWidget(central);
     buildNav();
@@ -133,8 +133,26 @@ void MainWindow::applyLanguage() {
     int row = nav_->currentRow();
     buildNav();
     if (row >= 0) nav_->setCurrentRow(row);
-    for (auto* p : panels_) p->retranslate();
+    rebuildPanels();  // 面板整体重建：ctor 里的 trs() 随新语言重新求值
     updateStatusBar();
+}
+
+void MainWindow::rebuildPanels() {
+    int row = nav_ ? nav_->currentRow() : 0;
+    for (auto* p : panels_) {
+        stack_->removeWidget(p);
+        p->deleteLater();
+    }
+    panels_.clear();
+    for (auto& f : panelFactories_) {
+        auto* p = f(platform_, this);
+        panels_.push_back(p);
+        stack_->addWidget(p);
+    }
+    if (row >= 0 && row < static_cast<int>(panels_.size())) {
+        stack_->setCurrentIndex(row);
+        panels_[static_cast<size_t>(row)]->refresh();
+    }
 }
 
 void MainWindow::buildStatusBar() {

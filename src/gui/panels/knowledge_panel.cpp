@@ -15,6 +15,7 @@
 #include <QVBoxLayout>
 
 #include "../gui_util.h"
+#include "../i18n.h"
 #include "../widgets.h"
 #include "core/util.h"
 
@@ -30,12 +31,12 @@ KnowledgePanel::KnowledgePanel(zp::Platform& platform, QWidget* parent)
     // 工具栏
     auto* toolbar = new QHBoxLayout;
     searchEdit_ = new QLineEdit(this);
-    searchEdit_->setPlaceholderText("搜索知识库（关键词或自然语言）…");
-    semanticCheck_ = new QCheckBox("语义搜索", this);
+    searchEdit_->setPlaceholderText(i18n::trs("搜索知识库（关键词或自然语言）…", "Search knowledge (keyword or natural language)..."));
+    semanticCheck_ = new QCheckBox(i18n::trs("语义搜索", "Semantic"), this);
     tagEdit_ = new QLineEdit(this);
-    tagEdit_->setPlaceholderText("按标签过滤");
-    auto* searchBtn = new QPushButton("搜索", this);
-    auto* newBtn = new QPushButton("＋ 新建条目", this);
+    tagEdit_->setPlaceholderText(i18n::trs("按标签过滤", "Filter by tag"));
+    auto* searchBtn = new QPushButton(i18n::trs("搜索", "Search"), this);
+    auto* newBtn = new QPushButton(i18n::trs("＋ 新建条目", "＋ New Entry"), this);
     toolbar->addWidget(searchEdit_, 1);
     toolbar->addWidget(semanticCheck_);
     toolbar->addWidget(tagEdit_);
@@ -53,7 +54,8 @@ KnowledgePanel::KnowledgePanel(zp::Platform& platform, QWidget* parent)
 
     auto* splitter = new QSplitter(Qt::Horizontal, this);
     table_ = new QTableWidget(0, 5, splitter);
-    table_->setHorizontalHeaderLabels({"标题", "作者", "标签", "版本", "时间"});
+    table_->setHorizontalHeaderLabels({i18n::trs("标题", "Title"), i18n::trs("作者", "Author"),
+                                      i18n::trs("标签", "Tags"), i18n::trs("版本", "Ver."), i18n::trs("时间", "Time")});
     table_->horizontalHeader()->setStretchLastSection(true);
     polishTable(table_);
     splitter->addWidget(table_);
@@ -66,7 +68,7 @@ KnowledgePanel::KnowledgePanel(zp::Platform& platform, QWidget* parent)
     rl->addWidget(detail_, 1);
     auto* vrow = new QHBoxLayout;
     versionCombo_ = new QComboBox(right);
-    addVersionBtn_ = new QPushButton("追加新版本", right);
+    addVersionBtn_ = new QPushButton(i18n::trs("追加新版本", "Append Version"), right);
     vrow->addWidget(versionCombo_, 1);
     vrow->addWidget(addVersionBtn_);
     rl->addLayout(vrow);
@@ -126,7 +128,7 @@ void KnowledgePanel::onSearch() {
     QString tagStr;
     for (int i = 0; i < qMin(5, static_cast<int>(top.size())); ++i)
         tagStr += QString("%1(%2) ").arg(top[i].first).arg(top[i].second);
-    statsLabel_->setText(QString("总条目 %1 · 今日新增 %2 · 热门标签: %3")
+    statsLabel_->setText(QString(i18n::trs("总条目 %1 · 今日新增 %2 · 热门标签: %3", "Entries %1 · new today %2 · top tags: %3"))
                              .arg(formatNum(static_cast<qint64>(hits_.size())))
                              .arg(todayCount)
                              .arg(tagStr.isEmpty() ? "—" : tagStr));
@@ -140,9 +142,12 @@ void KnowledgePanel::onSearch() {
         detail_->setHtml(
             "<div style='color:#9ca3af; text-align:center; margin-top:36px;'>"
             "<div style='font-size:34px;'>📚</div>"
-            "暂无知识条目<br><br>点击右上角「＋ 新建条目」沉淀第一条经验，"
-            "或让任意已接入的 Agent 通过 <span style='font-family:Consolas;'>POST /api/knowledge</span> 写入"
-            "</div>");
+            + i18n::trs("暂无知识条目<br><br>点击右上角「＋ 新建条目」沉淀第一条经验，"
+                        "或让任意已接入的 Agent 通过 <span style='font-family:Consolas;'>POST /api/knowledge</span> 写入",
+                        "No entries yet.<br><br>Click「＋ New Entry」to add the first one, "
+                        "or let any connected agent write via "
+                        "<span style='font-family:Consolas;'>POST /api/knowledge</span>")
+            + "</div>");
     }
 }
 
@@ -152,14 +157,15 @@ void KnowledgePanel::onSelectEntry(int row) {
     const auto& e = hit.entry;
     currentUuid_ = e.uuid;
     detail_->setPlainText(QString::fromStdString(e.content));
-    QString meta = QString("<b>%1</b> · 作者: %2 · 版本 v%3 · 分类: %4 · 时间: %5")
+    QString meta = QString("<b>%1</b> · %2: %3 · %4 v%5 · %6: %7 · %8: %9")
                        .arg(QString::fromStdString(e.title).toHtmlEscaped())
-                       .arg(QString::fromStdString(e.author))
+                       .arg(i18n::trs("作者", "Author"), QString::fromStdString(e.author))
+                       .arg(i18n::trs("版本", "Version"))
                        .arg(e.version)
-                       .arg(QString::fromStdString(e.category))
-                       .arg(QString::fromStdString(e.created_at));
+                       .arg(i18n::trs("分类", "Category"), QString::fromStdString(e.category))
+                       .arg(i18n::trs("时间", "Time"), QString::fromStdString(e.created_at));
     if (semanticCheck_->isChecked())
-        meta += QString(" · 距离: %1").arg(hit.score, 0, 'f', 4);
+        meta += QString(" · %1: %2").arg(i18n::trs("距离", "dist")).arg(hit.score, 0, 'f', 4);
     metaLabel_->setText(meta);
 
     // 历史版本
@@ -183,26 +189,27 @@ void KnowledgePanel::onVersionChanged(int idx) {
     const auto& v = versions_[static_cast<size_t>(idx)];
     currentUuid_ = v.uuid;
     detail_->setPlainText(QString::fromStdString(v.content));
-    metaLabel_->setText(QString("<b>%1</b> · 作者: %2 · 版本 v%3 · 时间: %4")
+    metaLabel_->setText(QString("<b>%1</b> · %2: %3 · %4 v%5 · %6: %7")
                             .arg(QString::fromStdString(v.title).toHtmlEscaped())
-                            .arg(QString::fromStdString(v.author))
+                            .arg(i18n::trs("作者", "Author"), QString::fromStdString(v.author))
+                            .arg(i18n::trs("版本", "Version"))
                             .arg(v.version)
-                            .arg(QString::fromStdString(v.created_at)));
+                            .arg(i18n::trs("时间", "Time"), QString::fromStdString(v.created_at)));
 }
 
 void KnowledgePanel::onNewEntry() {
     QDialog dlg(this);
-    dlg.setWindowTitle("新建知识条目");
+    dlg.setWindowTitle(i18n::trs("新建知识条目", "New Knowledge Entry"));
     auto* form = new QFormLayout(&dlg);
     auto* title = new QLineEdit(&dlg);
     auto* content = new QPlainTextEdit(&dlg);
     auto* tags = new QLineEdit(&dlg);
     tags->setPlaceholderText("逗号分隔，如 qt,cmake");
     auto* category = new QLineEdit(&dlg);
-    form->addRow("标题", title);
-    form->addRow("内容", content);
-    form->addRow("标签", tags);
-    form->addRow("分类", category);
+    form->addRow(i18n::trs("标题", "Title"), title);
+    form->addRow(i18n::trs("内容", "Content"), content);
+    form->addRow(i18n::trs("标签", "Tags"), tags);
+    form->addRow(i18n::trs("分类", "Category"), category);
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dlg);
     connect(buttons, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
     connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
@@ -220,18 +227,18 @@ void KnowledgePanel::onNewEntry() {
         ui::Toast::show(this, QString("创建失败: %1").arg(QString::fromStdString(err)), false);
         return;
     }
-    ui::Toast::show(this, "知识条目已创建 ✓");
+    ui::Toast::show(this, i18n::trs("知识条目已创建 ✓", "Entry created ✓"));
     onSearch();
 }
 
 void KnowledgePanel::onAddVersion() {
     if (currentUuid_.empty()) return;
     QDialog dlg(this);
-    dlg.setWindowTitle("追加新版本（旧版本保留，禁止覆盖）");
+    dlg.setWindowTitle(i18n::trs("追加新版本（旧版本保留，禁止覆盖）", "Append Version (old versions kept, overwrite forbidden)"));
     auto* form = new QFormLayout(&dlg);
     auto* title = new QLineEdit(&dlg);
     auto* content = new QPlainTextEdit(&dlg);
-    form->addRow("标题（留空沿用当前版本标题）", title);
+    form->addRow(i18n::trs("标题（留空沿用当前版本标题）", "Title (blank keeps current)"), title);
     form->addRow("新内容", content);
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dlg);
     connect(buttons, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);

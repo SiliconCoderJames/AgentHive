@@ -7,6 +7,7 @@
 #include <QVBoxLayout>
 
 #include "../gui_util.h"
+#include "../i18n.h"
 #include "../widgets.h"
 
 LogsPanel::LogsPanel(zp::Platform& platform, QWidget* parent)
@@ -20,17 +21,17 @@ LogsPanel::LogsPanel(zp::Platform& platform, QWidget* parent)
 
     auto* toolbar = new QHBoxLayout;
     agentCombo_ = new QComboBox(this);
-    agentCombo_->addItem("全部身份");
+    agentCombo_->addItem(i18n::trs("全部身份", "All identities"));
     sinceEdit_ = new QDateEdit(this);
     sinceEdit_->setDisplayFormat("yyyy-MM-dd");
     sinceEdit_->setCalendarPopup(true);
-    auto* refreshBtn = new QPushButton("筛选", this);
+    auto* refreshBtn = new QPushButton(i18n::trs("筛选", "Apply"), this);
     refreshBtn->setObjectName("primary");
     countLabel_ = new QLabel(this);
     countLabel_->setStyleSheet("color:#9ca3af; font-size:11px;");
-    toolbar->addWidget(new QLabel("身份:", this));
+    toolbar->addWidget(new QLabel(i18n::trs("身份:", "Actor:"), this));
     toolbar->addWidget(agentCombo_);
-    toolbar->addWidget(new QLabel("起始日期:", this));
+    toolbar->addWidget(new QLabel(i18n::trs("起始日期:", "Since:"), this));
     toolbar->addWidget(sinceEdit_);
     toolbar->addWidget(refreshBtn);
     toolbar->addStretch(1);
@@ -42,7 +43,7 @@ LogsPanel::LogsPanel(zp::Platform& platform, QWidget* parent)
 
     // 时间线：顶层 = 日期，子项 = 该日操作
     tree_ = new QTreeWidget(this);
-    tree_->setHeaderLabels({"时间", "身份", "动作", "对象", "详情"});
+    tree_->setHeaderLabels({i18n::trs("时间", "Time"), i18n::trs("身份", "Actor"), i18n::trs("动作", "Action"),i18n::trs("对象", "Target"), i18n::trs("详情", "Detail")});
     tree_->header()->setStretchLastSection(true);
     tree_->setAlternatingRowColors(true);
     layout->addWidget(tree_, 1);
@@ -56,7 +57,7 @@ void LogsPanel::refresh() {
     QString cur = agentCombo_->currentText();
     agentCombo_->blockSignals(true);
     agentCombo_->clear();
-    agentCombo_->addItem("全部身份");
+    agentCombo_->addItem(i18n::trs("全部身份", "All identities"));
     agentCombo_->addItem("user");
     for (const auto& a : agents) agentCombo_->addItem(QString::fromStdString(a.name));
     agentCombo_->setCurrentText(cur);
@@ -93,5 +94,5 @@ void LogsPanel::refresh() {
         for (int c = 0; c < 5; ++c) row->setFlags(row->flags() & ~Qt::ItemIsEditable);
     }
     tree_->expandToDepth(0);
-    countLabel_->setText(QString("共 %1 条").arg(formatNum(static_cast<qint64>(records_.size()))));
+    countLabel_->setText(i18n::trs("共 %1 条", "%1 records").arg(formatNum(static_cast<qint64>(records_.size()))));
 }

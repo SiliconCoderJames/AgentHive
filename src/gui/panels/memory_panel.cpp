@@ -13,6 +13,7 @@
 #include <QPlainTextEdit>
 
 #include "../gui_util.h"
+#include "../i18n.h"
 #include "../widgets.h"
 
 namespace {
@@ -35,9 +36,9 @@ MemoryPanel::MemoryPanel(zp::Platform& platform, QWidget* parent)
     auto* toolbar = new QHBoxLayout;
     headerLabel_ = new QLabel(this);
     headerLabel_->setStyleSheet("font-size:13px; color:#9ca3af;");
-    editBtn_ = new QPushButton("编辑 / 新增（生成新版本）", this);
+    auto* editBtn = new QPushButton(i18n::trs("编辑 / 新增（生成新版本）", "Edit / Add (new version)"), this);
     editBtn_->setObjectName("primary");
-    historyBtn_ = new QPushButton("查看历史版本", this);
+    auto* historyBtn = new QPushButton(i18n::trs("查看历史版本", "History"), this);
     toolbar->addWidget(headerLabel_);
     toolbar->addStretch(1);
     toolbar->addWidget(historyBtn_);
@@ -90,7 +91,7 @@ void MemoryPanel::refresh() {
         cl->setSpacing(6);
         if (group.empty()) {
             auto* empty = new QLabel("该区块暂无记忆", content);
-            empty->setStyleSheet("color:#9ca3af; font-size:11px;");
+            empty->setText(i18n::trs("该区块暂无记忆", "No memories in this section yet")); empty->setStyleSheet("color:#9ca3af; font-size:11px;");
             cl->addWidget(empty);
         } else {
             for (const auto& m : group) {
@@ -116,15 +117,15 @@ void MemoryPanel::refresh() {
 
 void MemoryPanel::onEdit() {
     QDialog dlg(this);
-    dlg.setWindowTitle("编辑用户记忆（保存后生成新版本，历史保留）");
+    dlg.setWindowTitle(i18n::trs("编辑用户记忆（保存后生成新版本，历史保留）", "Edit Memory (saved as a new version; history kept)"));
     auto* form = new QFormLayout(&dlg);
     auto* section = new QComboBox(&dlg);
     for (const auto& [title, name] : kSections) section->addItem(title, name);
     auto* key = new QLineEdit(&dlg);
     auto* value = new QPlainTextEdit(&dlg);
-    form->addRow("区块", section);
-    form->addRow("键", key);
-    form->addRow("值", value);
+    form->addRow(i18n::trs("区块", "Section"), section);
+    form->addRow(i18n::trs("键", "Key"), key);
+    form->addRow(i18n::trs("值", "Value"), value);
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dlg);
     connect(buttons, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
     connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
@@ -155,13 +156,13 @@ void MemoryPanel::onEdit() {
 
 void MemoryPanel::onShowHistory() {
     QDialog dlg(this);
-    dlg.setWindowTitle("按键查询历史版本");
+    dlg.setWindowTitle(i18n::trs("按键查询历史版本", "Query History by Key"));
     auto* form = new QFormLayout(&dlg);
     auto* section = new QComboBox(&dlg);
     for (const auto& [title, name] : kSections) section->addItem(title, name);
     auto* key = new QLineEdit(&dlg);
-    form->addRow("区块", section);
-    form->addRow("键", key);
+    form->addRow(i18n::trs("区块", "Section"), section);
+    form->addRow(i18n::trs("键", "Key"), key);
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dlg);
     connect(buttons, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
     connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
@@ -173,11 +174,12 @@ void MemoryPanel::onShowHistory() {
     if (!platform_.memoryHistory(section->currentData().toString().toStdString(),
                                  key->text().trimmed().toStdString(), history, err) ||
         history.empty()) {
-        QMessageBox::information(this, "历史版本", "该键无记忆记录");
+        QMessageBox::information(this, i18n::trs("历史版本", "History"),
+                            i18n::trs("该键无记忆记录", "No records for this key"));
         return;
     }
     QDialog view(this);
-    view.setWindowTitle(QString("历史版本 (%1 条)").arg(history.size()));
+    view.setWindowTitle(i18n::trs("历史版本 (%1 条)", "History (%1 entries)").arg(history.size()));
     auto* l = new QVBoxLayout(&view);
     auto* table = new QTableWidget(static_cast<int>(history.size()), 4, &view);
     table->setHorizontalHeaderLabels({"版本", "作者", "时间", "值"});

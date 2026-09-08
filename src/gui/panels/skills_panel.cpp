@@ -16,6 +16,7 @@
 #include <QVBoxLayout>
 
 #include "../gui_util.h"
+#include "../i18n.h"
 
 SkillsPanel::SkillsPanel(zp::Platform& platform, QWidget* parent)
     : PanelBase(platform, parent) {
@@ -29,8 +30,8 @@ SkillsPanel::SkillsPanel(zp::Platform& platform, QWidget* parent)
     auto* toolbar = new QHBoxLayout;
     categoryCombo_ = new QComboBox(this);
     ownerCombo_ = new QComboBox(this);
-    auto* refreshBtn = new QPushButton("刷新", this);
-    auto* registerBtn = new QPushButton("＋ 注册技能", this);
+    auto* refreshBtn = new QPushButton(i18n::trs("刷新", "Refresh"), this);
+    auto* registerBtn = new QPushButton(i18n::trs("＋ 注册技能", "＋ Register Skill"), this);
     toolbar->addWidget(new QLabel("分类:", this));
     toolbar->addWidget(categoryCombo_);
     toolbar->addWidget(new QLabel("提供者:", this));
@@ -48,7 +49,9 @@ SkillsPanel::SkillsPanel(zp::Platform& platform, QWidget* parent)
 
     auto* splitter = new QSplitter(Qt::Horizontal, this);
     table_ = new QTableWidget(0, 7, splitter);
-    table_->setHorizontalHeaderLabels({"名称", "显示名", "分类", "提供者", "版本", "状态", "使用热度"});
+    table_->setHorizontalHeaderLabels({i18n::trs("名称", "Name"), i18n::trs("显示名", "Display"),
+                                      i18n::trs("分类", "Category"), i18n::trs("提供者", "Owner"), i18n::trs("版本", "Ver."),
+                                      i18n::trs("状态", "Status"), i18n::trs("使用热度", "Usage Heat")});
     table_->horizontalHeader()->setSectionResizeMode(6, QHeaderView::Stretch);
     polishTable(table_);
     table_->resizeColumnsToContents();
@@ -126,10 +129,15 @@ void SkillsPanel::refresh() {
     } else {
         // 空状态提示
         detail_->setHtml(
+            i18n::trs(
             "<div style='color:#9ca3af; text-align:center; margin-top:36px;'>"
             "<div style='font-size:34px;'>🧩</div>"
             "暂无注册技能<br><br>点击右上角「＋ 注册技能」，或让 Agent 通过 "
-            "<span style='font-family:Consolas;'>POST /api/skills</span> 注册（先注册后调用）</div>");
+            "<span style='font-family:Consolas;'>POST /api/skills</span> 注册（先注册后调用）</div>",
+            "<div style='color:#9ca3af; text-align:center; margin-top:36px;'>"
+            "<div style='font-size:34px;'>🧩</div>"
+            "No skills registered.<br><br>Click「＋ Register Skill」, or let an agent register via "
+            "<span style='font-family:Consolas;'>POST /api/skills</span> (register before invoke)</div>"));
     }
 }
 
@@ -165,7 +173,7 @@ void SkillsPanel::onSelectSkill(int row) {
 
 void SkillsPanel::onRegister() {
     QDialog dlg(this);
-    dlg.setWindowTitle("注册新技能（先注册后调用）");
+    dlg.setWindowTitle(i18n::trs("注册新技能（先注册后调用）", "Register Skill (register before invoke)"));
     auto* form = new QFormLayout(&dlg);
     auto* name = new QLineEdit(&dlg);
     auto* display = new QLineEdit(&dlg);
@@ -173,11 +181,11 @@ void SkillsPanel::onRegister() {
     auto* category = new QLineEdit(&dlg);
     auto* schema = new QPlainTextEdit(&dlg);
     schema->setPlainText("{}");
-    form->addRow("技能名（唯一）", name);
-    form->addRow("显示名", display);
-    form->addRow("描述", desc);
-    form->addRow("分类", category);
-    form->addRow("参数 Schema (JSON)", schema);
+    form->addRow(i18n::trs("技能名（唯一）", "Name (unique)"), name);
+    form->addRow(i18n::trs("显示名", "Display name"), display);
+    form->addRow(i18n::trs("描述", "Description"), desc);
+    form->addRow(i18n::trs("分类", "Category"), category);
+    form->addRow(i18n::trs("参数 Schema (JSON)", "Param Schema (JSON)"), schema);
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dlg);
     connect(buttons, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
     connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);

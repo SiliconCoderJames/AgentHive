@@ -5,6 +5,7 @@
 #include <QStackedWidget>
 #include <QTimer>
 #include <QToolButton>
+#include <functional>
 #include <vector>
 
 #include "core/platform.h"
@@ -25,11 +26,13 @@ private:
     void buildStatusBar();
     void updateStatusBar();
     void applyLanguage();
+    void rebuildPanels();
 
     zp::Platform& platform_;
     QListWidget* nav_ = nullptr;
     QStackedWidget* stack_ = nullptr;
     std::vector<PanelBase*> panels_;
+    std::vector<std::function<PanelBase*(zp::Platform&, QWidget*)>> panelFactories_;
     QLabel* statusServer_ = nullptr;
     QLabel* statusUsage_ = nullptr;
     QLabel* spin_ = nullptr;

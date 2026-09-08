@@ -8,6 +8,7 @@
 #include <QScrollBar>
 
 #include "../gui_util.h"
+#include "../i18n.h"
 #include "../widgets.h"
 
 namespace {
@@ -53,11 +54,11 @@ MessagesPanel::MessagesPanel(zp::Platform& platform, QWidget* parent)
     kindCombo_->addItems({"全部", "note", "question", "task"});
     statusCombo_ = new QComboBox(this);
     statusCombo_->addItems({"全部", "unread", "read", "pending", "accepted", "done", "declined"});
-    auto* composeBtn = new QPushButton("＋ 发消息 / 指派任务", this);
+    auto* composeBtn = new QPushButton(i18n::trs("＋ 发消息 / 指派任务", "＋ Message / Assign Task"), this);
     composeBtn->setObjectName("primary");
-    toolbar->addWidget(new QLabel("类型:", this));
+    toolbar->addWidget(new QLabel(i18n::trs("类型:", "Kind:"), this));
     toolbar->addWidget(kindCombo_);
-    toolbar->addWidget(new QLabel("状态:", this));
+    toolbar->addWidget(new QLabel(i18n::trs("状态:", "Status:"), this));
     toolbar->addWidget(statusCombo_);
     toolbar->addStretch(1);
     toolbar->addWidget(composeBtn);
@@ -81,11 +82,11 @@ MessagesPanel::MessagesPanel(zp::Platform& platform, QWidget* parent)
     infoLabel_ = new QLabel(this);
     infoLabel_->setStyleSheet("color:#9ca3af; font-size:11px;");
     auto* brow = new QHBoxLayout;
-    replyBtn_ = new QPushButton("回复", this);
-    readBtn_ = new QPushButton("标记已读", this);
-    acceptBtn_ = new QPushButton("接受任务", this);
-    doneBtn_ = new QPushButton("任务完成", this);
-    declineBtn_ = new QPushButton("拒绝任务", this);
+    replyBtn_ = new QPushButton(i18n::trs("回复", "Reply"), this);
+    readBtn_ = new QPushButton(i18n::trs("标记已读", "Mark Read"), this);
+    acceptBtn_ = new QPushButton(i18n::trs("接受任务", "Accept"), this);
+    doneBtn_ = new QPushButton(i18n::trs("任务完成", "Done"), this);
+    declineBtn_ = new QPushButton(i18n::trs("拒绝任务", "Decline"), this);
     brow->addWidget(infoLabel_, 1);
     brow->addWidget(replyBtn_);
     brow->addWidget(readBtn_);
@@ -148,7 +149,8 @@ void MessagesPanel::renderChat() {
                              .left(500));
     }
     chat_->setHtml(html.isEmpty()
-                       ? "<div style='color:#9ca3af; text-align:center;'>暂无消息，点击右上角发起交流</div>"
+                       ? i18n::trs("<div style='color:#9ca3af; text-align:center;'>暂无消息，点击右上角发起交流</div>",
+                       "<div style='color:#9ca3af; text-align:center;'>No messages yet — start a conversation</div>")
                        : html);
     // 恢复滚动位置；原本就在底部（阅读最新消息）则保持贴底
     QScrollBar* bar = chat_->verticalScrollBar();
@@ -167,12 +169,14 @@ void MessagesPanel::updateActions() {
     for (const auto& m : messages_)
         if (m.uuid == selectedUuid_) cur = &m;
     if (has && cur) {
-        infoLabel_->setText(QString("已选中: %1 (%2 · %3)")
+        infoLabel_->setText(QString("%1: %2 (%3 · %4)")
+                                .arg(i18n::trs("已选中", "Selected"))
                                 .arg(QString::fromStdString(cur->subject).toHtmlEscaped())
                                 .arg(QString::fromStdString(cur->kind))
                                 .arg(QString::fromStdString(cur->status)));
     } else {
-        infoLabel_->setText("点击消息气泡以选中（可回复 / 流转状态）");
+        infoLabel_->setText(i18n::trs("点击消息气泡以选中（可回复 / 流转状态）",
+                                      "Click a message bubble to select (reply / change status)"));
     }
     replyBtn_->setEnabled(has);
     readBtn_->setEnabled(has && cur && cur->status == "unread" && cur->kind != "task");
@@ -183,12 +187,12 @@ void MessagesPanel::updateActions() {
 
 void MessagesPanel::onCompose() {
     QDialog dlg(this);
-    dlg.setWindowTitle("发消息 / 指派任务");
+    dlg.setWindowTitle(i18n::trs("发消息 / 指派任务", "Send Message / Assign Task"));
     auto* form = new QFormLayout(&dlg);
     auto* kind = new QComboBox(&dlg);
     kind->addItems({"note", "question", "task"});
     auto* recipient = new QComboBox(&dlg);
-    recipient->addItem("（广播给所有 Agent）", "");
+    recipient->addItem(i18n::trs("（广播给所有 Agent）", "(broadcast to all agents)"), "");
     std::vector<zp::AgentInfo> agents;
     std::string err;
     if (platform_.listAgents(agents, err))
@@ -196,10 +200,10 @@ void MessagesPanel::onCompose() {
             recipient->addItem(QString::fromStdString(a.name), QString::fromStdString(a.name));
     auto* subject = new QLineEdit(&dlg);
     auto* body = new QPlainTextEdit(&dlg);
-    form->addRow("类型", kind);
-    form->addRow("接收者", recipient);
-    form->addRow("主题", subject);
-    form->addRow("内容", body);
+    form->addRow(i18n::trs("类型", "Kind"), kind);
+    form->addRow(i18n::trs("接收者", "Recipient"), recipient);
+    form->addRow(i18n::trs("主题", "Subject"), subject);
+    form->addRow(i18n::trs("内容", "Body"), body);
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dlg);
     connect(buttons, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
     connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
@@ -214,7 +218,7 @@ void MessagesPanel::onCompose() {
         ui::Toast::show(this, QString("发送失败: %1").arg(QString::fromStdString(err)), false);
         return;
     }
-    ui::Toast::show(this, "消息已发送 ✓");
+    ui::Toast::show(this, i18n::trs("消息已发送 ✓", "Message sent ✓"));
     refresh();
 }
 
@@ -240,7 +244,7 @@ void MessagesPanel::onReply() {
         ui::Toast::show(this, QString("回复失败: %1").arg(QString::fromStdString(err)), false);
         return;
     }
-    ui::Toast::show(this, "回复已发送 ✓");
+    ui::Toast::show(this, i18n::trs("回复已发送 ✓", "Reply sent ✓"));
     refresh();
 }
 

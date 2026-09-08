@@ -11,6 +11,7 @@
 #include <QVBoxLayout>
 
 #include "../gui_util.h"
+#include "../i18n.h"
 #include "../widgets.h"
 
 ErrorsPanel::ErrorsPanel(zp::Platform& platform, QWidget* parent)
@@ -27,7 +28,7 @@ ErrorsPanel::ErrorsPanel(zp::Platform& platform, QWidget* parent)
     statusCombo_->addItems({"全部", "open", "investigating", "resolved"});
     severityCombo_ = new QComboBox(this);
     severityCombo_->addItems({"全部", "info", "warning", "error", "critical"});
-    resolveBtn_ = new QPushButton("登记解决", this);
+    resolveBtn_ = new QPushButton(i18n::trs("登记解决", "Mark Resolved"), this);
     toolbar->addWidget(new QLabel("状态:", this));
     toolbar->addWidget(statusCombo_);
     toolbar->addWidget(new QLabel("严重度:", this));
@@ -44,7 +45,8 @@ ErrorsPanel::ErrorsPanel(zp::Platform& platform, QWidget* parent)
     auto* splitter = new QSplitter(Qt::Horizontal, this);
     splitter_ = splitter;
     table_ = new QTableWidget(0, 5, splitter);
-    table_->setHorizontalHeaderLabels({"严重度", "标题", "上报者", "状态", "时间"});
+    table_->setHorizontalHeaderLabels({i18n::trs("严重度", "Severity"), i18n::trs("标题", "Title"),
+                                      i18n::trs("上报者", "Reporter"), i18n::trs("状态", "Status"), i18n::trs("时间", "Time")});
     table_->horizontalHeader()->setStretchLastSection(true);
     polishTable(table_);
     attachTableContextMenu(table_);
@@ -62,7 +64,7 @@ ErrorsPanel::ErrorsPanel(zp::Platform& platform, QWidget* parent)
     layout->addWidget(splitter, 1);
 
     // 空状态引导语
-    emptyLabel_ = new QLabel("暂无错误，一切正常 ✓", this);
+    emptyLabel_ = new QLabel(i18n::trs("暂无错误，一切正常 ✓", "No errors — all clear ✓"), this);
     emptyLabel_->setStyleSheet("color:#22c55e; font-size:14px;");
     emptyLabel_->setAlignment(Qt::AlignCenter);
     layout->addWidget(emptyLabel_);
@@ -120,15 +122,17 @@ void ErrorsPanel::refresh() {
 void ErrorsPanel::onResolve() {
     int row = table_->currentRow();
     if (row < 0 || row >= static_cast<int>(errors_.size())) {
-        QMessageBox::information(this, "解决", "请先选择一条错误");
+        QMessageBox::information(this, i18n::trs("解决", "Resolve"),
+                             i18n::trs("请先选择一条错误", "Select an error first"));
         return;
     }
     const auto& e = errors_[static_cast<size_t>(row)];
     QDialog dlg(this);
-    dlg.setWindowTitle(QString("登记解决: %1").arg(QString::fromStdString(e.title)));
+    dlg.setWindowTitle(i18n::trs("登记解决: %1", "Resolve: %1").arg(QString::fromStdString(e.title)));
     auto* l = new QVBoxLayout(&dlg);
     auto* notes = new QPlainTextEdit(&dlg);
-    notes->setPlaceholderText("解决说明（追加到错误记录，不覆盖原内容）");
+    notes->setPlaceholderText(i18n::trs("解决说明（追加到错误记录，不覆盖原内容）",
+        "Resolution notes (appended; original content is never overwritten)"));
     l->addWidget(notes);
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dlg);
     connect(buttons, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
