@@ -64,3 +64,30 @@
 - ASan 端到端：132 checks / 0 AddressSanitizer 报告
 - 浸泡：60s / 8626 ops / 0 错误 / 内存收敛
 - 存量数据库迁移：`ALTER TABLE` 幂等迁移（duplicate column 静默跳过），旧密钥格式兼容认证
+
+---
+
+# 第三轮 · 全局核心审查（2026-09-08）
+
+对核心层约 4000 行做 /W4 严格警告编译 + 全量人工通读 + 专项检查（线程安全 / SQL 绑定 / 鉴权一致性），
+修复与结论如下：
+
+## 发现与修复
+
+| 类别 | 问题 | 修复 |
+|---|---|---|
+| 线程安全（死锁） | `shutdown()`/`stopHttpServer()` 持 `recursive_mutex` 等待 HTTP 线程 join，在途请求 handler 又在等这把锁——退出时有在途请求即互相等待 | 锁内取出 `http_`（`unique_ptr` 所有权转移），**锁外** `stop()` 排空请求后再重入关库 |
+| 跨进程一致性 | `memory.set` 与 `knowledge.addVersion` 为“查-改-插”三步无事务：GUI 与 platformd 双进程并发写同库可产生两条 `is_latest=1` | 以 `BEGIN IMMEDIATE` 包裹全部三步，任一步失败回滚。双进程实测：60 次并发写，60 个版本无重复无断层 |
+| 输入健壮性 | HTTP 层 5 处 `std::stoi(limit)` 对非数字抛异常；`tags` 非字符串元素、`budget` 非数字类型抛异常；库内存储 JSON（schema/params/audit detail）损坏时 `json::parse` 抛异常 | `parseLimit` 统一校验（非法 → 400）；tags 逐项 `is_string`；budget `is_number`；`safeStoredJson` 退化为原字符串 |
+| 语义质量 | 嵌入器设计了词间分隔符（`kSep`）但从未使用——“AB C”与“A BC”跨词 n-gram 同哈希 | 空白折叠为分隔符码点参与哈希；provider 名升级 `ngram-hash-v2`（向量与 v1 不兼容） |
+| 输入校验 | Agent 名长度无上限 | `1..64` 字符且禁止空白 |
+| 索引 | GUI 按动作筛选审计时全表扫描 | 补 `idx_audit_action(action, created_at)`（schema 幂等执行，存量库自动生效） |
+| 警告 | /W4 下 C4996/C4100/C4189 | `_CRT_SECURE_NO_WARNINGS`（本机场景预期用法）+ 未引用参数处理；核心层 /W4 零警告 |
+
+## 验证汇总（本轮）
+
+- 单元测试：**149 checks / 0 failures**（新增 4 项 HTTP 健壮性断言：`limit=abc`/`limit=-5`/tags 非字符串/budget 非数字 → 400）
+- ASan：**149 checks / 0 报告**（含本轮全部修复）
+- 集成验证：**39/39 通过**（feasibility_check.py，兼容 `AGENTHIVE_MASTER_KEY`）
+- 双进程并发：**60/60 版本唯一、无断层**
+- 浸泡：20 分钟混合请求（结果见运行输出）

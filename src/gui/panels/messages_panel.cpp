@@ -5,6 +5,7 @@
 #include <QLineEdit>
 #include <QMessageBox>
 #include <QPlainTextEdit>
+#include <QScrollBar>
 
 #include "../gui_util.h"
 #include "../widgets.h"
@@ -111,6 +112,10 @@ void MessagesPanel::refresh() {
 }
 
 void MessagesPanel::renderChat() {
+    // 3s 刷新重建 HTML 会把滚动条归零：先记住位置，渲染后恢复
+    int scrollPos = chat_->verticalScrollBar()->value();
+    bool atBottom = chat_->verticalScrollBar()->value() >=
+                    chat_->verticalScrollBar()->maximum() - 4;
     QString html;
     for (const auto& m : messages_) {
         bool selected = m.uuid == selectedUuid_;
@@ -144,6 +149,12 @@ void MessagesPanel::renderChat() {
     chat_->setHtml(html.isEmpty()
                        ? "<div style='color:#9ca3af; text-align:center;'>暂无消息，点击右上角发起交流</div>"
                        : html);
+    // 恢复滚动位置；原本就在底部（阅读最新消息）则保持贴底
+    QScrollBar* bar = chat_->verticalScrollBar();
+    if (atBottom)
+        bar->setValue(bar->maximum());
+    else
+        bar->setValue(qMin(scrollPos, bar->maximum()));
     // 选中气泡被重建后滚回可视区
     if (!selectedUuid_.empty()) chat_->scrollToAnchor(QString::fromStdString(selectedUuid_));
     updateActions();
