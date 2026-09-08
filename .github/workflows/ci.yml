@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+jobs:
+  windows-build-test:
+    name: Build + Unit Tests + Integration (Windows, Qt6)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Qt 6.8
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          arch: win64_msvc2022_64
+          cache: true
+
+      - name: Configure
+        run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR"
+
+      - name: Build (core + cli + gui)
+        run: cmake --build build --config Release
+
+      - name: Unit tests (143 assertions)
+        run: ctest --test-dir build -C Release --output-on-failure
+
+      - name: Integration feasibility check (39 assertions)
+        shell: pwsh
+        env:
+          AGENTHIVE_MASTER_KEY: ci-test-master-key-not-a-secret
+        run: |
+          $dataHome = Join-Path $env:RUNNER_TEMP "agenthive-data"
+          New-Item -ItemType Directory -Force -Path $dataHome | Out-Null
+          $env:AGENTHIVE_HOME = $dataHome
+          $env:AGENTHIVE_PORT = "19090"
+          $p = Start-Process -FilePath "build\src\cli\Release\platformd.exe" -PassThru -NoNewWindow
+          try {
+            $ready = $false
+            foreach ($i in 1..30) {
+              try {
+                Invoke-RestMethod "http://127.0.0.1:19090/api/health" | Out-Null
+                $ready = $true; break
+              } catch { Start-Sleep -Seconds 1 }
+            }
+            if (-not $ready) { throw "platformd did not become healthy in 30s" }
+            # bootstrap 预置的 zcode 管理者密钥在数据目录 config/agents.json
+            $agents = Get-Content (Join-Path $dataHome "config\agents.json") | ConvertFrom-Json
+            $env:ZCODE_ZCODE_KEY = $agents.zcode
+            python scripts/feasibility_check.py 19090
+            if ($LASTEXITCODE -ne 0) { throw "feasibility check failed" }
+          } finally {
+            Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+          }
