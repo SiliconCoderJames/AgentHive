@@ -31,7 +31,6 @@ QString avatar(const QString& sender) {
         "#0ea5e9", "#22c55e", "#f59e0b", "#a78bfa", "#f472b6", "#34d399"};
     quint32 h = 0;
     for (QChar c : sender) h = h * 31 + c.unicode();
-    const QString* bg = nullptr;
     QString initial = sender.left(1).toUpper().toHtmlEscaped();
     return QString("<span style='display:inline-block; min-width:18px; text-align:center;"
                    " background:%1; color:#101010; font-weight:700; border-radius:9px;"
