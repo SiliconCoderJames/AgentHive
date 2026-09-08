@@ -3,9 +3,15 @@
 #include <httplib.h>
 #include <nlohmann/json.hpp>
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+#include <cctype>
 #include <cstdlib>
+#include <cwchar>
 #include <fstream>
 #include <iostream>
+#include <iterator>
 #include <map>
 #include <string>
 #include <vector>
@@ -16,6 +22,39 @@
 using nlohmann::json;
 
 namespace {
+
+// 查询参数百分号编码：中文/空格/& 等字符安全进入 URL
+std::string urlEncode(const std::string& v) {
+    static const char* kHex = "0123456789ABCDEF";
+    std::string out;
+    for (unsigned char c : v) {
+        if (std::isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') {
+            out += static_cast<char>(c);
+        } else {
+            out += '%';
+            out += kHex[c >> 4];
+            out += kHex[c & 0xF];
+        }
+    }
+    return out;
+}
+
+// 数字选项容错解析：非法输入回落默认值，不崩进程
+long long toInt(const std::string& s, long long def) {
+    try {
+        size_t pos = 0;
+        long long v = std::stoll(s, &pos);
+        if (pos != s.size()) return def;
+        return v;
+    } catch (...) {
+        return def;
+    }
+}
+
+// 宽松 JSON 解析：失败返回 discarded，由调用方给出友好错误
+json parseJsonLenient(const std::string& s) {
+    return json::parse(s, nullptr, false);
+}
 
 struct Args {
     std::vector<std::string> pos;
@@ -139,8 +178,33 @@ int usage() {
 
 }  // namespace
 
+#ifdef _WIN32
+// argv 的正确形态是 UTF-16（wmain）；转成 UTF-8 供 JSON 使用，任何字符都不丢。
+// （若用 ANSI 版 main，CRT 会先把参数转成本机代码页，GBK 外字符在入口即丢失）
+static std::string utf16ToUtf8(const wchar_t* w, int wlen) {
+    if (wlen <= 0) return {};
+    int ulen = WideCharToMultiByte(CP_UTF8, 0, w, wlen, nullptr, 0, nullptr, nullptr);
+    std::string u(static_cast<size_t>(ulen), '\0');
+    WideCharToMultiByte(CP_UTF8, 0, w, wlen, u.data(), ulen, nullptr, nullptr);
+    while (!u.empty() && u.back() == '\0') u.pop_back();
+    return u;
+}
+
+int wmain(int argc, wchar_t** argv) {
+    std::vector<std::string> argStore;
+    std::vector<const char*> argPtrs;
+    argStore.reserve(static_cast<size_t>(argc));
+    argPtrs.reserve(static_cast<size_t>(argc));
+    for (int i = 0; i < argc; ++i) {
+        argStore.push_back(utf16ToUtf8(argv[i], static_cast<int>(wcslen(argv[i]))));
+        argPtrs.push_back(argStore.back().c_str());
+    }
+    char** utf8Argv = const_cast<char**>(argPtrs.data());
+    Args a = parseArgs(argc, utf8Argv);
+#else
 int main(int argc, char** argv) {
     Args a = parseArgs(argc, argv);
+#endif
     if (a.pos.empty()) return usage();
 
     Client c(a);
@@ -165,12 +229,14 @@ int main(int argc, char** argv) {
     } else if (cmd == "memory") {
         if (sub == "get") {
             path = "/api/memory";
-            if (a.opts.count("section")) path += "?section=" + a.opts["section"];
+            if (a.opts.count("section")) path += "?section=" + urlEncode(a.opts["section"]);
         } else if (sub == "set") {
             method = "POST"; path = "/api/memory";
             body = {{"section", a.opts["section"]}, {"key", a.opts["key"]}, {"value", a.opts["value"]}};
         } else if (sub == "history") {
-            path = "/api/memory/history?section=" + a.opts["section"] + "&key=" + a.opts["key"];
+            if (!a.opts.count("section") || !a.opts.count("key")) return usage();
+            path = "/api/memory/history?section=" + urlEncode(a.opts["section"]) +
+                   "&key=" + urlEncode(a.opts["key"]);
         } else return usage();
     } else if (cmd == "knowledge") {
         if (sub == "add") {
@@ -183,7 +249,16 @@ int main(int argc, char** argv) {
             if (a.opts.count("embedding-file")) {
                 std::ifstream in(a.opts["embedding-file"]);
                 json emb;
-                if (in) { in >> emb; body["embedding"] = emb; body["embedder"] = "agent"; }
+                if (in) {
+                    std::istreambuf_iterator<char> it(in), end;
+                    emb = parseJsonLenient(std::string(it, end));
+                }
+                if (emb.is_discarded() || !emb.is_array()) {
+                    std::cerr << "embedding-file 必须是 JSON 数组\n";
+                    return 2;
+                }
+                body["embedding"] = emb;
+                body["embedder"] = "agent";
             }
         } else if (sub == "search") {
             method = "POST"; path = "/api/knowledge/search";
@@ -206,7 +281,14 @@ int main(int argc, char** argv) {
             json schema = json::object();
             if (a.opts.count("schema-file")) {
                 std::ifstream in(a.opts["schema-file"]);
-                if (in) in >> schema;
+                if (in) {
+                    std::istreambuf_iterator<char> it(in), end;
+                    schema = parseJsonLenient(std::string(it, end));
+                }
+                if (schema.is_discarded() || !schema.is_object()) {
+                    std::cerr << "schema-file 必须是 JSON 对象\n";
+                    return 2;
+                }
             }
             body = {{"name", a.opts["name"]},
                     {"display_name", a.opts.count("display-name") ? a.opts["display-name"] : ""},
@@ -216,22 +298,28 @@ int main(int argc, char** argv) {
         } else if (sub == "list") {
             path = "/api/skills";
             std::string q;
-            if (a.opts.count("category")) q += "?category=" + a.opts["category"];
+            if (a.opts.count("category")) q += "?category=" + urlEncode(a.opts["category"]);
             if (a.opts.count("owner"))
-                q += (q.empty() ? "?" : "&") + std::string("owner=") + a.opts["owner"];
+                q += (q.empty() ? "?" : "&") + std::string("owner=") + urlEncode(a.opts["owner"]);
             path += q;
         } else if (sub == "get") {
-            path = "/api/skills/" + a.opts["name"];
+            path = "/api/skills/" + urlEncode(a.opts["name"]);
         } else if (sub == "invoke") {
-            method = "POST"; path = "/api/skills/" + a.opts["name"] + "/invoke";
+            method = "POST"; path = "/api/skills/" + urlEncode(a.opts["name"]) + "/invoke";
             json params = json::object();
-            if (a.opts.count("params-json")) params = json::parse(a.opts["params-json"]);
+            if (a.opts.count("params-json")) {
+                params = parseJsonLenient(a.opts["params-json"]);
+                if (params.is_discarded() || !params.is_object()) {
+                    std::cerr << "--params-json 必须是 JSON 对象\n";
+                    return 2;
+                }
+            }
             body = {{"params", params},
                     {"status", a.opts.count("status") ? a.opts["status"] : "success"},
                     {"result_summary", a.opts.count("result") ? a.opts["result"] : ""},
-                    {"duration_ms", a.opts.count("duration-ms") ? std::stoll(a.opts["duration-ms"]) : 0},
-                    {"tokens_in", a.opts.count("tokens-in") ? std::stoll(a.opts["tokens-in"]) : 0},
-                    {"tokens_out", a.opts.count("tokens-out") ? std::stoll(a.opts["tokens-out"]) : 0}};
+                    {"duration_ms", a.opts.count("duration-ms") ? toInt(a.opts["duration-ms"], 0) : 0},
+                    {"tokens_in", a.opts.count("tokens-in") ? toInt(a.opts["tokens-in"], 0) : 0},
+                    {"tokens_out", a.opts.count("tokens-out") ? toInt(a.opts["tokens-out"], 0) : 0}};
         } else return usage();
     } else if (cmd == "message") {
         if (sub == "send") {
@@ -243,9 +331,9 @@ int main(int argc, char** argv) {
         } else if (sub == "inbox") {
             path = "/api/messages";
             std::string q;
-            if (a.opts.count("kind")) q += "?kind=" + a.opts["kind"];
+            if (a.opts.count("kind")) q += "?kind=" + urlEncode(a.opts["kind"]);
             if (a.opts.count("status"))
-                q += (q.empty() ? "?" : "&") + std::string("status=") + a.opts["status"];
+                q += (q.empty() ? "?" : "&") + std::string("status=") + urlEncode(a.opts["status"]);
             path += q;
         } else if (sub == "reply") {
             method = "POST"; path = "/api/messages/" + a.opts["uuid"] + "/reply";
@@ -265,8 +353,8 @@ int main(int argc, char** argv) {
     } else if (cmd == "usage") {
         if (sub == "report") {
             method = "POST"; path = "/api/usage/report";
-            body = {{"tokens_in", std::stoll(a.opts["tokens-in"])},
-                    {"tokens_out", std::stoll(a.opts["tokens-out"])},
+            body = {{"tokens_in", toInt(a.opts["tokens-in"], 0)},
+                    {"tokens_out", toInt(a.opts["tokens-out"], 0)},
                     {"call_type", a.opts.count("type") ? a.opts["type"] : ""},
                     {"reference_id", a.opts.count("ref") ? a.opts["ref"] : ""},
                     {"idempotency_key", a.opts.count("idem") ? a.opts["idem"] : ""}};
@@ -278,16 +366,16 @@ int main(int argc, char** argv) {
             path = "/api/usage/budget";
         } else if (sub == "set") {
             method = "PUT"; path = "/api/usage/budget"; needsAgent = false;
-            body = {{"budget", std::stoll(a.opts["value"])}};
+            body = {{"budget", toInt(a.opts["value"], 0)}};
         } else return usage();
     } else if (cmd == "audit") {
         path = "/api/audit";
         std::string q;
-        if (a.opts.count("actor")) q += "?actor=" + a.opts["actor"];
+        if (a.opts.count("actor")) q += "?actor=" + urlEncode(a.opts["actor"]);
         if (a.opts.count("action"))
-            q += (q.empty() ? "?" : "&") + std::string("action=") + a.opts["action"];
+            q += (q.empty() ? "?" : "&") + std::string("action=") + urlEncode(a.opts["action"]);
         if (a.opts.count("limit"))
-            q += (q.empty() ? "?" : "&") + std::string("limit=") + a.opts["limit"];
+            q += (q.empty() ? "?" : "&") + std::string("limit=") + urlEncode(a.opts["limit"]);
         path += q;
     } else {
         return usage();

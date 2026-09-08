@@ -129,11 +129,21 @@ void MemoryPanel::onEdit() {
     form->addRow(buttons);
     if (dlg.exec() != QDialog::Accepted) return;
 
+    // 乐观并发：以当前最新版本为 base 保存，他人先写过则拒绝而非静默覆盖
+    const std::string sectionName = section->currentData().toString().toStdString();
+    const std::string keyName = key->text().trimmed().toStdString();
+    int baseVersion = 0;
+    std::vector<zp::MemoryEntry> existing;
+    std::string probeErr;
+    if (!keyName.empty() && platform_.memoryList(sectionName, existing, probeErr)) {
+        for (const auto& m : existing)
+            if (m.key == keyName) baseVersion = m.version;
+    }
+
     std::string err;
     zp::MemoryEntry out;
-    if (!platform_.memorySet("user", section->currentData().toString().toStdString(),
-                             key->text().trimmed().toStdString(), value->toPlainText().toStdString(),
-                             0, out, err)) {
+    if (!platform_.memorySet("user", sectionName, keyName, value->toPlainText().toStdString(),
+                             baseVersion, out, err)) {
         ui::Toast::show(this, QString("保存失败: %1").arg(QString::fromStdString(err)), false);
         return;
     }
@@ -170,13 +180,20 @@ void MemoryPanel::onShowHistory() {
     auto* table = new QTableWidget(static_cast<int>(history.size()), 4, &view);
     table->setHorizontalHeaderLabels({"版本", "作者", "时间", "值"});
     table->horizontalHeader()->setStretchLastSection(true);
-    table->verticalHeader()->setVisible(false);
-    table->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    for (size_t i = 0; i < history.size(); ++i)
+    polishTable(table);
+    for (size_t i = 0; i < history.size(); ++i) {
+        // 列表按版本倒序：首行即最新版本，标注出来；值列截断显示，全文在悬停提示
+        QString v = QString::fromStdString(history[i].value);
+        QString shown = v.size() > 200 ? v.left(200) + "…" : v;
+        QString ver = QString("v%1").arg(history[i].version);
+        if (i == 0) ver += "（最新）";
         setRow(table, static_cast<int>(i),
-               {QString::number(history[i].version), QString::fromStdString(history[i].author),
-                QString::fromStdString(history[i].created_at),
-                QString::fromStdString(history[i].value)});
+               {ver, QString::fromStdString(history[i].author),
+                QString::fromStdString(history[i].created_at), shown});
+    }
+    table->resizeColumnToContents(0);
+    table->resizeColumnToContents(1);
+    table->resizeColumnToContents(2);
     l->addWidget(table);
     auto* close = new QDialogButtonBox(QDialogButtonBox::Close, &view);
     connect(close, &QDialogButtonBox::rejected, &view, &QDialog::reject);
