@@ -379,14 +379,8 @@ bool Platform::skillInvoke(const std::string& caller, const std::string& skillNa
         return false;
     }
     if (status != "success" && status != "failed") { err = "status must be success|failed"; return false; }
-    // 预算拦截：本周用量已达上限时拒绝新的技能调用
-    UsageSummary sum;
-    if (!usage_.summary(sum, err)) return false;
-    if (sum.total_tokens >= sum.budget) {
-        err = "weekly token budget exceeded: used " + std::to_string(sum.total_tokens) +
-              " / " + std::to_string(sum.budget);
-        return false;
-    }
+    // 用量仅做统计与告警（80%/95%/超额三级），不做硬性拦截——
+    // 平台定位是协作与观测，Agent 的消耗策略由调用方自行决定
     if (!skills_.recordInvocation(skillName, caller, paramsJson, resultSummary, status, durationMs,
                                   err))
         return false;

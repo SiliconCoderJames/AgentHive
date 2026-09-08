@@ -5,6 +5,7 @@
 #include <QGroupBox>
 
 #include "../gui_util.h"
+#include "../i18n.h"
 
 DashboardPanel::DashboardPanel(zp::Platform& platform, QWidget* parent)
     : PanelBase(platform, parent) {
@@ -18,62 +19,62 @@ DashboardPanel::DashboardPanel(zp::Platform& platform, QWidget* parent)
     auto* topRow = new QHBoxLayout();
     topRow->setSpacing(14);
 
-    auto* budgetCard = new QGroupBox("本周 Token 预算", this);
-    budgetCard->setObjectName("card");
-    auto* bl = new QVBoxLayout(budgetCard);
+    budgetCard_ = new QGroupBox(i18n::trs("本周 Token 预算", "Weekly Token Budget"), this);
+    budgetCard_->setObjectName("card");
+    auto* bl = new QVBoxLayout(budgetCard_);
     bl->setContentsMargins(12, 20, 12, 12);
-    ring_ = new ui::RingProgress(budgetCard);
+    ring_ = new ui::RingProgress(budgetCard_);
     bl->addWidget(ring_, 1);
-    topRow->addWidget(budgetCard, 2);
+    topRow->addWidget(budgetCard_, 2);
 
-    auto* usageCard = new QGroupBox("各 Agent 本周用量", this);
-    usageCard->setObjectName("card");
-    auto* ul = new QVBoxLayout(usageCard);
+    usageCard_ = new QGroupBox(i18n::trs("各 Agent 本周用量", "Per-Agent Usage This Week"), this);
+    usageCard_->setObjectName("card");
+    auto* ul = new QVBoxLayout(usageCard_);
     ul->setContentsMargins(12, 20, 12, 12);
-    usageChart_ = new ui::HBarChart(usageCard);
+    usageChart_ = new ui::HBarChart(usageCard_);
     ul->addWidget(usageChart_, 1);
-    topRow->addWidget(usageCard, 3);
+    topRow->addWidget(usageCard_, 3);
     root->addLayout(topRow, 2);
 
     // ---- 第二行：Agent 状态卡片网格 ----
-    auto* agentsCard = new QGroupBox("Agent 状态", this);
-    agentsCard->setObjectName("card");
-    auto* al = new QVBoxLayout(agentsCard);
+    agentsCard_ = new QGroupBox(i18n::trs("Agent 状态", "Agent Status"), this);
+    agentsCard_->setObjectName("card");
+    auto* al = new QVBoxLayout(agentsCard_);
     al->setContentsMargins(12, 20, 12, 12);
-    auto* gridHolder = new QWidget(agentsCard);
+    auto* gridHolder = new QWidget(agentsCard_);
     agentGrid_ = new QGridLayout(gridHolder);
     agentGrid_->setContentsMargins(0, 0, 0, 0);
     agentGrid_->setSpacing(10);
     al->addWidget(gridHolder);
     al->addStretch(1);
-    root->addWidget(agentsCard, 3);
+    root->addWidget(agentsCard_, 3);
 
     // ---- 第三行：事件流时间线 + 告警卡片 ----
     auto* bottomRow = new QHBoxLayout();
     bottomRow->setSpacing(14);
 
-    auto* tlCard = new QGroupBox("事件流", this);
-    tlCard->setObjectName("card");
-    auto* tl = new QVBoxLayout(tlCard);
+    tlCard_ = new QGroupBox(i18n::trs("事件流", "Event Stream"), this);
+    tlCard_->setObjectName("card");
+    auto* tl = new QVBoxLayout(tlCard_);
     tl->setContentsMargins(12, 20, 12, 12);
-    timeline_ = new QListWidget(tlCard);
+    timeline_ = new QListWidget(tlCard_);
     timeline_->setAlternatingRowColors(true);
     timeline_->setStyleSheet("QListWidget { font-family: Consolas,monospace; font-size: 11px; }"
                              "QListWidget::item { padding: 3px 2px; }");
     tl->addWidget(timeline_);
-    bottomRow->addWidget(tlCard, 3);
+    bottomRow->addWidget(tlCard_, 3);
 
-    auto* alertCard = new QGroupBox("告警", this);
-    alertCard->setObjectName("card");
-    auto* wl = new QVBoxLayout(alertCard);
+    alertCard_ = new QGroupBox(i18n::trs("告警", "Alerts"), this);
+    alertCard_->setObjectName("card");
+    auto* wl = new QVBoxLayout(alertCard_);
     wl->setContentsMargins(12, 20, 12, 12);
     wl->setSpacing(8);
-    emptyAlerts_ = new QLabel("暂无错误，一切正常 ✓", alertCard);
+    emptyAlerts_ = new QLabel(i18n::trs("暂无错误，一切正常 ✓", "No errors — all clear ✓"), alertCard_);
     emptyAlerts_->setStyleSheet("color:#22c55e; font-size:13px;");
     emptyAlerts_->setAlignment(Qt::AlignCenter);
     wl->addWidget(emptyAlerts_);
     alertsLay_ = wl;
-    bottomRow->addWidget(alertCard, 2);
+    bottomRow->addWidget(alertCard_, 2);
     root->addLayout(bottomRow, 2);
 }
 
@@ -184,4 +185,15 @@ void DashboardPanel::refresh() {
             }
         }
     }
+}
+
+void DashboardPanel::retranslate() {
+    PanelBase::retranslate();
+    budgetCard_->setTitle(i18n::trs("本周 Token 预算", "Weekly Token Budget"));
+    usageCard_->setTitle(i18n::trs("各 Agent 本周用量", "Per-Agent Usage This Week"));
+    agentsCard_->setTitle(i18n::trs("Agent 状态", "Agent Status"));
+    tlCard_->setTitle(i18n::trs("事件流", "Event Stream"));
+    alertCard_->setTitle(i18n::trs("告警", "Alerts"));
+    emptyAlerts_->setText(i18n::trs("暂无错误，一切正常 ✓", "No errors — all clear ✓"));
+    lastTimeline_.clear();  // 强制事件流下次刷新重建（文案随语言变化）
 }

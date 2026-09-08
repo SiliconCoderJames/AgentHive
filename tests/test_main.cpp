@@ -293,10 +293,11 @@ static void test_platform_end_to_end() {
         CHECK(p.usageReport("hermes", 10000, 0, "llm", "", "idem-3", dup, err));  // 105.9%
         CHECK(p.usageSummary(sum, err));
         CHECK_EQ(sum.alert_level, "over");
-        // 预算耗尽：技能调用被拒绝（429 语义）
-        std::string budgetErr;
-        CHECK(!p.skillInvoke("hermes", "code-review", "{}", "", "success", 1, 0, 0, budgetErr));
-        CHECK(budgetErr.rfind("weekly token budget exceeded", 0) == 0);
+        // 超额（105.9%）：仅告警升级，不拦截技能调用（用量是观测不是限制）
+        std::vector<zp::SkillInvocation> invs;
+        CHECK(p.skillInvoke("hermes", "code-review", "{}", "", "success", 1, 0, 0, err));
+        CHECK(p.skillInvocations("code-review", 10, invs, err));
+        CHECK(!invs.empty());  // 超额后调用仍被记录
 
         // 审计留痕
         step("audit");

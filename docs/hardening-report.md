@@ -7,7 +7,7 @@
 | 项 | 结论 | 说明 |
 |---|---|---|
 | 并发扣减事务 | **已修复 + 代码** | `UsageService::report` 改为 `BEGIN IMMEDIATE` → 事务内查重 → 原子插入 → `COMMIT`（[usage_service.cpp](../src/core/services/usage_service.cpp)）。进程内另有 Platform 全局锁串行化；跨进程场景由 IMMEDIATE 写锁保证 |
-| 超额拦截 | **已新增** | `Platform::skillInvoke` 在记录前检查周累计用量，达到上限返回错误（前缀 `weekly token budget exceeded`）；HTTP 层映射为 **429**（[server.cpp](../src/core/http/server.cpp)）。单测覆盖：预算耗尽后 skillInvoke 被拒 |
+| 超额拦截 | **已按产品决策移除** | 早期版本曾在用量达上限时拒绝技能调用（HTTP 429）。现定位为**纯观测**：周预算只是图表参考线，三级告警照常呈现，超额不拦截任何调用。另见第三轮审查的“发现与修复”表 |
 | 幂等性 | **已新增** | `token_usage` 新增 `idempotency_key` 列 + 部分唯一索引；重复键只记一次，响应含 `duplicate: true`。单测：同键两次上报 total_tokens 不变 |
 
 ## 2. 数据增长与清理

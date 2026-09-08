@@ -455,11 +455,6 @@ void HttpServer::setupRoutes() {
         int64_t tout = body.value("tokens_out", 0);
         std::string err;
         if (!p.skillInvoke(actor, req.matches[1], params, result, status, duration, tin, tout, err)) {
-            // 周预算耗尽 → 429（请求方应停止消耗并等待下周或预算调整）
-            if (err.rfind("weekly token budget exceeded", 0) == 0) {
-                send(res, fail(429, err));
-                return;
-            }
             send(res, fail(400, err));
             return;
         }
