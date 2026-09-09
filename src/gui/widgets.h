@@ -1,9 +1,12 @@
 #pragma once
 // 态势感知工作台自定义控件：环形进度、横向柱状图、Toast、Agent 卡片、
 // 告警卡片、可折叠区块卡片。全部 QPainter / 原生 widget 实现，无 QML。
+#include <QBrush>
+#include <QConicalGradient>
 #include <QFrame>
 #include <QGraphicsOpacityEffect>
 #include <QLabel>
+#include <QLinearGradient>
 #include <QPainter>
 #include <QPointer>
 #include <QPropertyAnimation>
@@ -18,14 +21,24 @@
 
 namespace ui {
 
-// 卡片悬停高亮：进入边框变强调蓝（AgentCard / 通用 QFrame 卡片）
+// 卡片悬停高亮：进入边框变强调色（AgentCard / 通用 QFrame 卡片）
 inline void hoverGlow(QFrame* frame, const char* objectName) {
     frame->setAttribute(Qt::WA_Hover);
-    QString base = QString("QFrame#%1 { background:#2d2d2d; border:1px solid #3f3f46;"
-                           " border-radius:8px; }").arg(objectName);
-    QString hover = QString("QFrame#%1:hover { background:#313131; border:1px solid %2;"
-                            " border-radius:8px; }").arg(objectName, ACCENT.name());
-    frame->setStyleSheet(base + hover);
+    frame->setStyleSheet(th(QString("QFrame#%1 { background:@card@; border:1px solid @line@;"
+                           " border-radius:8px; }"
+                           "QFrame#%1:hover { background:@fieldhover@; border:1px solid @accent@;"
+                           " border-radius:8px; }").arg(objectName)));
+}
+
+// 状态胶囊（在线/离线徽标）：主题语义色淡染底 + 亮色文字
+inline QString pillStyle(const QColor& c, int alpha = 50) {
+    return QString("font-size:10px; padding:1px 8px; border-radius:8px;"
+                   " color:%1; background:rgba(%2,%3,%4,%5);")
+        .arg(c.lighter(140).name())
+        .arg(c.red())
+        .arg(c.green())
+        .arg(c.blue())
+        .arg(alpha);
 }
 
 // ---- 环形进度：中间显示 已用/总额/百分比，临近预算橙→红，进度弧平滑动画 ----
@@ -64,18 +77,25 @@ protected:
                     side - 20, side - 20);
         double ratio = animRatio_;
         // 背景环
-        QPen pen(QColor("#3f3f46"), 12, Qt::SolidLine, Qt::RoundCap);
+        QPen pen(line(), 12, Qt::SolidLine, Qt::RoundCap);
         p.setPen(pen);
         p.drawArc(rect, 45 * 16, -270 * 16);
-        // 进度环（占比驱动颜色：蓝→橙→红渐变过渡）
+        // 进度环：外圈柔光营造发光质感，主弧沿环锥形渐变（亮端→本色）；
+        // 占比驱动颜色（蓝→蜜金→红）
         QColor c = usageColor(ratio);
         if (ratio > 0.001) {
-            QPen prog(c, 12, Qt::SolidLine, Qt::RoundCap);
+            QPen glow(QColor(c.red(), c.green(), c.blue(), 46), 22, Qt::SolidLine, Qt::RoundCap);
+            p.setPen(glow);
+            p.drawArc(rect, 45 * 16, int(-270 * 16 * ratio));
+            QConicalGradient sheen(rect.center(), 90);
+            sheen.setColorAt(0.0, c.lighter(150));
+            sheen.setColorAt(1.0, c);
+            QPen prog(QBrush(sheen), 12, Qt::SolidLine, Qt::RoundCap);
             p.setPen(prog);
             p.drawArc(rect, 45 * 16, int(-270 * 16 * ratio));
         }
-        // 中心文字
-        p.setPen(QPen(TEXT));
+        // 中心文字（百分比随用量着色，与环体呼应）
+        p.setPen(QPen(usageColor(ratio).lighter(115)));
         QFont f = p.font();
         f.setPixelSize(side / 6);
         f.setBold(true);
@@ -85,7 +105,7 @@ protected:
                    QString("%1%").arg(ratio * 100, 0, 'f', 1));
         f.setPixelSize(side / 14);
         p.setFont(f);
-        p.setPen(QPen(MUTED));
+        p.setPen(QPen(muted()));
         auto fmt = [](qint64 v) {
             QString s = QString::number(v);
             for (int i = s.size() - 3; i > 0; i -= 3) s.insert(i, ',');
@@ -133,7 +153,7 @@ protected:
         QPainter p(this);
         p.setRenderHint(QPainter::Antialiasing);
         if (entries_.isEmpty()) {
-            p.setPen(QPen(MUTED));
+            p.setPen(QPen(muted()));
             p.drawText(rect(), Qt::AlignCenter, i18n::trs("暂无用量数据", "no usage data yet"));
             return;
         }
@@ -154,28 +174,32 @@ protected:
         };
         for (int i = 0; i < entries_.size(); ++i) {
             int y = i * rowH;
-            p.setPen(QPen(TEXT));
+            p.setPen(QPen(text()));
             p.drawText(QRect(0, y, labelW - 4, rowH), Qt::AlignVCenter | Qt::AlignRight,
                        entries_[i].first);
             // 底槽
             p.setPen(Qt::NoPen);
-            p.setBrush(QColor("#3f3f46"));
+            p.setBrush(line());
             p.drawRoundedRect(QRect(barX, y + rowH / 2 - 5, barW, 10), 5, 5);
-            // 柱体：最大值高亮蓝，其余随占比变暗；宽度乘以入场扫掠进度
+            // 柱体：最大值高亮蓝，其余随占比变暗；横向渐变（本色→亮）更有质感；
+            // 宽度乘以入场扫掠进度
             double ratio = double(entries_[i].second) / double(maxV) * sweep_;
             int w = int(double(barW) * ratio);
-            QColor bar = ACCENT;
+            QColor bar = accent();
             if (entries_[i].second != maxV) {
-                bar = ACCENT.darker(100 + int((1.0 - ratio) * 90));
+                bar = accent().darker(100 + int((1.0 - ratio) * 90));
                 bar.setAlpha(210);
             }
-            p.setBrush(bar);
+            QLinearGradient sheen(barX, 0, barX + qMax(w, 4), 0);
+            sheen.setColorAt(0.0, bar);
+            sheen.setColorAt(1.0, bar.lighter(140));
+            p.setBrush(sheen);
             p.drawRoundedRect(QRect(barX, y + rowH / 2 - 5, qMax(w, 4), 10), 5, 5);
             // 数值 + 占比（等宽）
             QFont mf = p.font();
             mf.setFamily(mono());
             p.setFont(mf);
-            p.setPen(QPen(MUTED));
+            p.setPen(QPen(muted()));
             p.drawText(QRect(width() - valueW, y, valueW, rowH), Qt::AlignVCenter,
                        QString("%1 · %2%").arg(fmt(entries_[i].second))
                            .arg(ratio * 100, 0, 'f', 0));
@@ -201,11 +225,11 @@ private:
     Toast(QWidget* parent, const QString& msg, bool success) : QLabel(msg, parent) {
         setObjectName(success ? "toastOk" : "toastErr");
         setAttribute(Qt::WA_DeleteOnClose);
-        setStyleSheet(success
-            ? "QLabel#toastOk { background:#064e3b; color:#a7f3d0; border:1px solid #22c55e;"
+        setStyleSheet(th(success
+            ? "QLabel#toastOk { background:@okbg@; color:@ok@; border:1px solid @ok@;"
               " border-radius:8px; padding:10px 18px; font-size:12px; }"
-            : "QLabel#toastErr { background:#7f1d1d; color:#fecaca; border:1px solid #ef4444;"
-              " border-radius:8px; padding:10px 18px; font-size:12px; }");
+            : "QLabel#toastErr { background:@errbg@; color:@danger@; border:1px solid @danger@;"
+              " border-radius:8px; padding:10px 18px; font-size:12px; }"));
         adjustSize();
     }
     void popup() {
@@ -248,11 +272,9 @@ public:
         dot_->setFixedWidth(14);
         dot_->setAlignment(Qt::AlignCenter);
         status_ = new QLabel(this);
-        status_->setStyleSheet(
-            "font-size:10px; padding:1px 8px; border-radius:8px;"
-            "color:#a7f3d0; background:#064e3b;");
+        status_->setStyleSheet(pillStyle(ok()));
         role_ = new QLabel(this);
-        role_->setStyleSheet("color:#9ca3af; font-size:11px; background:transparent;");
+        role_->setStyleSheet(th("color:@muted@; font-size:11px; background:transparent;"));
         head->addWidget(dot_);
         head->addWidget(name_);
         head->addWidget(status_);
@@ -260,12 +282,12 @@ public:
         head->addWidget(role_);
         lay->addLayout(head);
         task_ = new QLabel(this);
-        task_->setStyleSheet("color:#e5e5e5; font-size:11px; background:transparent;");
+        task_->setStyleSheet(th("color:@text@; font-size:11px; background:transparent;"));
         task_->setWordWrap(true);
         lay->addWidget(task_);
         seen_ = new QLabel(this);
         seen_->setStyleSheet(
-            "color:#9ca3af; font-size:10px; font-family:Consolas,monospace; background:transparent;");
+            th("color:@muted@; font-size:10px; font-family:@mono@,monospace; background:transparent;"));
         lay->addWidget(seen_);
         // 在线呼吸灯：点亮的绿点每 900ms 明暗交替，离线则恒灰
         pulse_ = new QTimer(this);
@@ -282,11 +304,7 @@ public:
         online_ = status == "online";
         updateDot();
         status_->setText(online_ ? i18n::trs("在线", "online") : i18n::trs("离线", "offline"));
-        status_->setStyleSheet(online_
-            ? "font-size:10px; padding:1px 8px; border-radius:8px;"
-              "color:#a7f3d0; background:#064e3b;"
-            : "font-size:10px; padding:1px 8px; border-radius:8px;"
-              "color:#a1a1aa; background:#27272a;");
+        status_->setStyleSheet(online_ ? pillStyle(ok()) : pillStyle(muted(), 40));
         role_->setText(role);
         task_->setText(task.isEmpty() ? i18n::trs("（无当前任务）", "(no current task)") : task);
         seen_->setText(lastSeen.isEmpty() ? i18n::trs("从未活跃", "never seen")
@@ -305,8 +323,9 @@ private:
     bool pulseOn_ = true;
     void updateDot() {
         dot_->setText(online_ ? QString("<span style='color:%1;'>●</span>")
-                                    .arg(pulseOn_ ? "#22c55e" : "#15803d")
-                              : "<span style='color:#71717a;'>●</span>");
+                                    .arg(pulseOn_ ? ok().name() : ok().darker(150).name())
+                              : QString("<span style='color:%1;'>●</span>")
+                                    .arg(muted().name()));
     }
 };
 
@@ -315,9 +334,14 @@ class AlertCard : public QFrame {
 public:
     AlertCard(const QString& severity, const QString& text, QWidget* parent = nullptr)
         : QFrame(parent) {
-        QColor c = severity == "critical" ? DANGER : (severity == "warn" ? WARN : NOTE);
-        setStyleSheet(QString("QFrame { background:#2d2d2d; border-left:4px solid %1;"
-                              " border-radius:6px; padding:2px; }").arg(c.name()));
+        QColor c = severity == "critical" ? danger() : (severity == "warn" ? warn() : note());
+        // 卡底按严重度淡染（12% 透明度），左侧色条 + 同色文字
+        setStyleSheet(QString("QFrame { background:rgba(%1,%2,%3,28); border-left:4px solid %4;"
+                              " border-radius:6px; padding:2px; }")
+                          .arg(c.red())
+                          .arg(c.green())
+                          .arg(c.blue())
+                          .arg(c.name()));
         auto* lay = new QHBoxLayout(this);
         lay->setContentsMargins(12, 8, 12, 8);
         auto* label = new QLabel(text, this);
@@ -339,14 +363,14 @@ public:
         toggle->setText("▾  " + title);
         toggle->setCheckable(true);
         toggle->setChecked(true);
-        toggle->setStyleSheet(
-            "QToolButton { background:#2d2d2d; border:1px solid #3f3f46;"
+        toggle->setStyleSheet(th(
+            "QToolButton { background:@card@; border:1px solid @line@;"
             " border-radius:8px; padding:10px 14px; font-size:13px; font-weight:600;"
             " text-align:left; }"
-            "QToolButton:hover { border-color:#0ea5e9; }");
-        content_->setStyleSheet(
-            "QWidget { background:#262626; border:1px solid #3f3f46;"
-            " border-top:none; border-radius:0 0 8px 8px; }");
+            "QToolButton:hover { border-color:@accent@; }"));
+        content_->setStyleSheet(th(
+            "QWidget { background:@field@; border:1px solid @line@;"
+            " border-top:none; border-radius:0 0 8px 8px; }"));
         lay->addWidget(toggle);
         lay->addWidget(content_);
         connect(toggle, &QToolButton::toggled, this, [this, toggle](bool on) {

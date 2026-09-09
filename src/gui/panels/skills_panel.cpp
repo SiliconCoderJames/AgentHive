@@ -128,37 +128,37 @@ void SkillsPanel::refresh() {
         onSelectSkill(0);
     } else {
         // 空状态提示
-        detail_->setHtml(
+        detail_->setHtml(ui::th(
             i18n::trs(
-            "<div style='color:#9ca3af; text-align:center; margin-top:36px;'>"
+            "<div style='color:@muted@; text-align:center; margin-top:36px;'>"
             "<div style='font-size:34px;'>🧩</div>"
             "暂无注册技能<br><br>点击右上角「＋ 注册技能」，或让 Agent 通过 "
-            "<span style='font-family:Consolas;'>POST /api/skills</span> 注册（先注册后调用）</div>",
-            "<div style='color:#9ca3af; text-align:center; margin-top:36px;'>"
+            "<span style='font-family:@mono@;'>POST /api/skills</span> 注册（先注册后调用）</div>",
+            "<div style='color:@muted@; text-align:center; margin-top:36px;'>"
             "<div style='font-size:34px;'>🧩</div>"
             "No skills registered.<br><br>Click「＋ Register Skill」, or let an agent register via "
-            "<span style='font-family:Consolas;'>POST /api/skills</span> (register before invoke)</div>"));
+            "<span style='font-family:@mono@;'>POST /api/skills</span> (register before invoke)</div>")));
     }
 }
 
 void SkillsPanel::onSelectSkill(int row) {
     if (row < 0 || row >= static_cast<int>(skills_.size())) return;
     const auto& s = skills_[static_cast<size_t>(row)];
-    detail_->setHtml(
+    detail_->setHtml(ui::th(
         QString(
             "<div style='margin:4px;'>"
-            "<span style='font-size:16px; font-weight:700; color:#0ea5e9;'>%1</span>"
-            "&nbsp;<span style='color:#9ca3af;'>%2</span>"
-            "<div style='margin-top:6px; color:#e5e5e5;'>%3</div>"
-            "<div style='margin-top:10px; padding:7px 10px; background:#262626;"
-            " border-left:3px solid #0ea5e9; color:#9ca3af;'>"
-            "<b style='color:#e5e5e5;'>提供者</b> %4 &nbsp;·&nbsp; <b style='color:#e5e5e5;'>分类</b> %5"
-            " &nbsp;·&nbsp; <b style='color:#e5e5e5;'>版本</b> v%6"
-            " &nbsp;·&nbsp; <b style='color:#e5e5e5;'>状态</b> %7 &nbsp;·&nbsp; "
-            "<b style='color:#e5e5e5;'>更新</b> %8</div>"
-            "<div style='margin-top:12px; font-weight:600; color:#e5e5e5;'>参数 Schema</div>"
-            "<pre style='background:#1e1e1e; border:1px solid #3f3f46; border-radius:6px;"
-            " padding:8px; color:#a5f3fc; font-family:Consolas,monospace;'>%9</pre>"
+            "<span style='font-size:16px; font-weight:700; color:@accent@;'>%1</span>"
+            "&nbsp;<span style='color:@muted@;'>%2</span>"
+            "<div style='margin-top:6px; color:@text@;'>%3</div>"
+            "<div style='margin-top:10px; padding:7px 10px; background:@field@;"
+            " border-left:3px solid @accent@; color:@muted@;'>"
+            "<b style='color:@text@;'>提供者</b> %4 &nbsp;·&nbsp; <b style='color:@text@;'>分类</b> %5"
+            " &nbsp;·&nbsp; <b style='color:@text@;'>版本</b> v%6"
+            " &nbsp;·&nbsp; <b style='color:@text@;'>状态</b> %7 &nbsp;·&nbsp; "
+            "<b style='color:@text@;'>更新</b> %8</div>"
+            "<div style='margin-top:12px; font-weight:600; color:@text@;'>参数 Schema</div>"
+            "<pre style='background:@bg@; border:1px solid @line@; border-radius:6px;"
+            " padding:8px; color:@accenthi@; font-family:@mono@,monospace;'>%9</pre>"
             "</div>")
             .arg(QString::fromStdString(s.name).toHtmlEscaped())
             .arg(QString::fromStdString(s.display_name).toHtmlEscaped())
@@ -168,7 +168,7 @@ void SkillsPanel::onSelectSkill(int row) {
             .arg(s.version)
             .arg(QString::fromStdString(s.status).toHtmlEscaped())
             .arg(QString::fromStdString(s.updated_at))
-            .arg(QString::fromStdString(s.param_schema).toHtmlEscaped()));
+            .arg(QString::fromStdString(s.param_schema).toHtmlEscaped())));
 }
 
 void SkillsPanel::onRegister() {

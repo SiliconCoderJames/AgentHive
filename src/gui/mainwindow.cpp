@@ -1,8 +1,15 @@
 #include "mainwindow.h"
 
+#include <QAction>
+#include <QActionGroup>
+#include <QApplication>
+#include <QFrame>
 #include <QHBoxLayout>
+#include <QMenu>
 #include <QShortcut>
 #include <QStatusBar>
+
+#include <utility>
 
 #include "gui_util.h"
 #include "panels/dashboard_panel.h"
@@ -23,53 +30,73 @@ MainWindow::MainWindow(zp::Platform& platform, QWidget* parent)
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
 
-    // ---- 侧边栏：品牌区 + 图标导航 + 版本脚注 ----
-    auto* side = new QWidget(central);
-    side->setFixedWidth(172);
-    side->setStyleSheet("QWidget { background:#18181b; }");
-    auto* sideLay = new QVBoxLayout(side);
+    // ---- 侧边栏：品牌区 + 图标导航 + 版本脚注（样式统一在 applyChrome，随主题重涂）----
+    side_ = new QWidget(central);
+    side_->setFixedWidth(172);
+    auto* sideLay = new QVBoxLayout(side_);
     sideLay->setContentsMargins(0, 0, 0, 10);
     sideLay->setSpacing(0);
 
-    auto* brand = new QWidget(side);
+    auto* brand = new QWidget(side_);
     auto* brandLay = new QVBoxLayout(brand);
     brandLay->setContentsMargins(16, 16, 12, 14);
     brandLay->setSpacing(2);
-    auto* logo = new QLabel("🐝 AgentHive", brand);
-    logo->setStyleSheet("font-size:16px; font-weight:800; color:#e5e5e5; background:transparent;");
+    logo_ = new QLabel("🐝 AgentHive", brand);
     tagline_ = new QLabel(brand);
-    tagline_->setStyleSheet("font-size:10px; color:#9ca3af; background:transparent;");
-    brandLay->addWidget(logo);
+    brandLay->addWidget(logo_);
     brandLay->addWidget(tagline_);
     sideLay->addWidget(brand);
 
-    nav_ = new QListWidget(side);
-    nav_->setStyleSheet(
-        "QListWidget { background:#18181b; border:none; padding:0 6px; font-size:13px; }"
-        "QListWidget::item { padding:11px 12px; margin:2px 4px; border-radius:6px;"
-        " color:#9ca3af; border-left:3px solid transparent; }"
-        "QListWidget::item:hover { background:#262626; color:#e5e5e5; }"
-        "QListWidget::item:selected { background:#0ea5e9; color:#ffffff;"
-        " font-weight:600; border-left:3px solid #f59e0b; }");
+    // 品牌分隔线：品牌色→强调色横向渐变，蜂巢品牌签名
+    brandLine_ = new QFrame(side_);
+    brandLine_->setFixedHeight(2);
+    sideLay->addWidget(brandLine_);
+
+    nav_ = new QListWidget(side_);
+    nav_->setFocusPolicy(Qt::NoFocus);  // 去除选中项虚线焦点框；Ctrl+1..7 仍可切换面板
     sideLay->addWidget(nav_, 1);
 
-    // 脚注：版本号 + 语言切换（持久化到 QSettings）
-    auto* foot = new QWidget(side);
+    // 脚注：版本号 + 主题/字号切换 + 语言切换（持久化到 QSettings）
+    auto* foot = new QWidget(side_);
     auto* footLay = new QHBoxLayout(foot);
     footLay->setContentsMargins(10, 0, 10, 0);
-    auto* ver = new QLabel("v1.0 · local-first", foot);
-    ver->setStyleSheet("font-size:10px; color:#52525b; background:transparent;");
+    ver_ = new QLabel("v1.0 · local-first", foot);
+    themeBtn_ = new QToolButton(foot);
+    themeBtn_->setText("🎨");
+    themeBtn_->setToolTip(i18n::trs("主题与字号", "Theme & font size"));
+    themeBtn_->setPopupMode(QToolButton::InstantPopup);
+    auto* themeMenu = new QMenu(themeBtn_);
+    auto* themeGroup = new QActionGroup(themeMenu);
+    themeGroup->setExclusive(true);
+    for (int i = 0; i < static_cast<int>(ui::themes().size()); ++i) {
+        const auto& t = ui::themes()[static_cast<size_t>(i)];
+        auto* act = themeMenu->addAction(i18n::trs(t.zh, t.en));
+        act->setCheckable(true);
+        act->setChecked(i == ui::themeIdx());
+        themeGroup->addAction(act);
+        connect(act, &QAction::triggered, this, [i] { ui::setThemeIndex(i); });
+    }
+    themeMenu->addSeparator();
+    auto* fontGroup = new QActionGroup(themeMenu);
+    fontGroup->setExclusive(true);
+    const std::vector<std::pair<int, const char*>> fontSizes{
+        {12, "紧凑 12px"}, {13, "标准 13px"}, {14, "大号 14px"}};
+    for (const auto& [px, label] : fontSizes) {
+        auto* act = themeMenu->addAction(QString::fromUtf8(label));
+        act->setCheckable(true);
+        act->setChecked(ui::fontBaseRef() == px);
+        fontGroup->addAction(act);
+        connect(act, &QAction::triggered, this, [px] { ui::setFontBase(px); });
+    }
+    themeBtn_->setMenu(themeMenu);
     langBtn_ = new QToolButton(foot);
-    langBtn_->setStyleSheet(
-        "QToolButton { color:#9ca3af; font-size:10px; border:1px solid #3f3f46;"
-        " border-radius:6px; padding:2px 8px; }"
-        "QToolButton:hover { color:#e5e5e5; border-color:#0ea5e9; }");
     connect(langBtn_, &QToolButton::clicked, this, [] { i18n::toggle(); });
-    footLay->addWidget(ver);
+    footLay->addWidget(ver_);
     footLay->addStretch(1);
+    footLay->addWidget(themeBtn_);
     footLay->addWidget(langBtn_);
     sideLay->addWidget(foot);
-    layout->addWidget(side);
+    layout->addWidget(side_);
 
     stack_ = new QStackedWidget(central);
     layout->addWidget(stack_, 1);
@@ -88,6 +115,7 @@ MainWindow::MainWindow(zp::Platform& platform, QWidget* parent)
     setCentralWidget(central);
     buildNav();
     buildStatusBar();
+    applyChrome();
     applyLanguage();
 
     connect(nav_, &QListWidget::currentRowChanged, this, &MainWindow::onNavChanged);
@@ -95,6 +123,8 @@ MainWindow::MainWindow(zp::Platform& platform, QWidget* parent)
 
     // 语言切换：重译铬层（导航/页头/状态栏），面板各自处理自有文案
     i18n::listeners().push_back([this] { applyLanguage(); });
+    // 主题/字号切换：重生成 QSS、重涂铬层、重建面板
+    ui::themeListeners().push_back([this] { applyTheme(); });
 
     timer_ = new QTimer(this);
     connect(timer_, &QTimer::timeout, this, &MainWindow::onRefresh);
@@ -111,6 +141,13 @@ MainWindow::MainWindow(zp::Platform& platform, QWidget* parent)
 
 void MainWindow::buildNav() {
     nav_->clear();
+    nav_->setStyleSheet(ui::th(
+        "QListWidget { background:@deep@; border:none; padding:0 6px; font-size:13px; }"
+        "QListWidget::item { padding:11px 12px; margin:2px 4px; border-radius:6px;"
+        " color:@muted@; border-left:3px solid transparent; }"
+        "QListWidget::item:hover { background:@card@; color:@text@; }"
+        "QListWidget::item:selected { background:@selbg@; color:@seltext@;"
+        " font-weight:600; border-left:3px solid @brand@; }"));
     const QStringList items{
         "📊  " + i18n::trs("总览", "Overview"),
         "📚  " + i18n::trs("知识库", "Knowledge"),
@@ -121,7 +158,7 @@ void MainWindow::buildNav() {
         "🕘  " + i18n::trs("操作日志", "Audit"),
     };
     nav_->addItems(items);
-    nav_->item(5)->setForeground(QBrush(ui::DANGER));  // 错误报告项恒红，异常时更醒目
+    nav_->item(5)->setForeground(QBrush(ui::danger()));  // 错误报告项恒红，异常时更醒目
 }
 
 void MainWindow::applyLanguage() {
@@ -154,11 +191,39 @@ void MainWindow::rebuildPanels() {
     }
 }
 
+void MainWindow::applyChrome() {
+    side_->setStyleSheet(ui::th("QWidget { background:@deep@; }"));
+    logo_->setStyleSheet(
+        ui::th("font-size:16px; font-weight:800; color:@text@; background:transparent;"));
+    tagline_->setStyleSheet(ui::th("font-size:10px; color:@muted@; background:transparent;"));
+    brandLine_->setStyleSheet(ui::th(
+        "background:qlineargradient(x1:0,y1:0,x2:1,y2:0,"
+        "stop:0 @brand@, stop:0.55 @accent@, stop:1 transparent);"
+        "border-radius:1px; margin:0 16px 8px 16px;"));
+    ver_->setStyleSheet(ui::th("font-size:10px; color:@muted@; background:transparent;"));
+    const QString btn = ui::th(
+        "QToolButton { color:@muted@; font-size:10px; border:1px solid @line@;"
+        " border-radius:6px; padding:2px 8px; }"
+        "QToolButton:hover { color:@text@; border-color:@accent@; }");
+    langBtn_->setStyleSheet(btn);
+    themeBtn_->setStyleSheet(btn);
+}
+
+void MainWindow::applyTheme() {
+    qApp->setStyleSheet(ui::themeQss());  // 全局 QSS 随主题重生成
+    applyChrome();
+    int row = nav_->currentRow();
+    buildNav();
+    if (row >= 0) nav_->setCurrentRow(row);
+    rebuildPanels();  // 面板样式在构造时取色，整体重建
+    updateStatusBar();
+}
+
 void MainWindow::buildStatusBar() {
     statusServer_ = new QLabel(this);
     statusUsage_ = new QLabel(this);
     spin_ = new QLabel(this);
-    spin_->setStyleSheet(QString("color:%1; font-size:14px;").arg(ui::ACCENT.name()));
+    spin_->setStyleSheet(ui::th("color:@accent@; font-size:14px;"));
     statusBar()->addWidget(spin_);
     statusBar()->addWidget(statusServer_);
     statusBar()->addPermanentWidget(statusUsage_);
@@ -184,14 +249,16 @@ void MainWindow::updateStatusBar() {
     std::string err;
     zp::UsageSummary sum;
     // 服务在线指示灯：HTTP 服务随进程常驻，绿点常亮即后端可用
-    statusServer_->setText(QString("<span style='color:#22c55e;'>●</span> HTTP: "
-                                   "http://127.0.0.1:%1 · %2 %3")
+    statusServer_->setText(QString("<span style='color:%1;'>●</span> HTTP: "
+                                   "http://127.0.0.1:%2 · %3 %4")
+                               .arg(ui::ok().name())
                                .arg(platform_.httpPort())
                                .arg(i18n::trs("数据", "data"))
                                .arg(QString::fromStdString(platform_.homeDir())));
     if (platform_.usageSummary(sum, err)) {
         double pct = sum.budget > 0 ? 100.0 * sum.total_tokens / sum.budget : 0.0;
-        QString color = sum.alert_level == "none" ? "#22c55e" : (sum.alert_level == "warn" ? "#f59e0b" : "#ef4444");
+        QString color = sum.alert_level == "none" ? ui::ok().name()
+                        : (sum.alert_level == "warn" ? ui::warn().name() : ui::danger().name());
         statusUsage_->setText(
             QString("<span style='color:%1'>%2: %3 / %4 (%5%) · %6 %7</span>")
                 .arg(color)

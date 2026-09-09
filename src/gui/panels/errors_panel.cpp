@@ -65,7 +65,7 @@ ErrorsPanel::ErrorsPanel(zp::Platform& platform, QWidget* parent)
 
     // 空状态引导语
     emptyLabel_ = new QLabel(i18n::trs("暂无错误，一切正常 ✓", "No errors — all clear ✓"), this);
-    emptyLabel_->setStyleSheet("color:#22c55e; font-size:14px;");
+    emptyLabel_->setStyleSheet(ui::th("color:@ok@; font-size:14px;"));
     emptyLabel_->setAlignment(Qt::AlignCenter);
     layout->addWidget(emptyLabel_);
 
@@ -105,9 +105,9 @@ void ErrorsPanel::refresh() {
                 QString::fromStdString(e.created_at)});
         // 严重度着色：critical 红 / error 橙 / warning 黄 / info 灰
         QString sev = QString::fromStdString(e.severity);
-        QColor c = sev == "critical" ? ui::DANGER
-                                     : (sev == "error" ? ui::WARN
-                                                       : (sev == "warning" ? ui::NOTE : ui::MUTED));
+        QColor c = sev == "critical" ? ui::danger()
+                                     : (sev == "error" ? ui::warn()
+                                                       : (sev == "warning" ? ui::note() : ui::muted()));
         if (auto* item = table_->item(static_cast<int>(i), 0)) {
             item->setForeground(c);
             QFont f = item->font();

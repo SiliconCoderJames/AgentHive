@@ -70,7 +70,7 @@ DashboardPanel::DashboardPanel(zp::Platform& platform, QWidget* parent)
     wl->setContentsMargins(12, 20, 12, 12);
     wl->setSpacing(8);
     emptyAlerts_ = new QLabel(i18n::trs("暂无错误，一切正常 ✓", "No errors — all clear ✓"), alertCard_);
-    emptyAlerts_->setStyleSheet("color:#22c55e; font-size:13px;");
+    emptyAlerts_->setStyleSheet(ui::th("color:@ok@; font-size:13px;"));
     emptyAlerts_->setAlignment(Qt::AlignCenter);
     wl->addWidget(emptyAlerts_);
     alertsLay_ = wl;

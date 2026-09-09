@@ -28,7 +28,7 @@ LogsPanel::LogsPanel(zp::Platform& platform, QWidget* parent)
     auto* refreshBtn = new QPushButton(i18n::trs("筛选", "Apply"), this);
     refreshBtn->setObjectName("primary");
     countLabel_ = new QLabel(this);
-    countLabel_->setStyleSheet("color:#9ca3af; font-size:11px;");
+    countLabel_->setStyleSheet(ui::th("color:@muted@; font-size:11px;"));
     toolbar->addWidget(new QLabel(i18n::trs("身份:", "Actor:"), this));
     toolbar->addWidget(agentCombo_);
     toolbar->addWidget(new QLabel(i18n::trs("起始日期:", "Since:"), this));
@@ -83,7 +83,7 @@ void LogsPanel::refresh() {
             QFont f = dayItem->font(0);
             f.setBold(true);
             dayItem->setFont(0, f);
-            dayItem->setForeground(0, QBrush(ui::ACCENT));
+            dayItem->setForeground(0, QBrush(ui::accent()));
         }
         auto* row = new QTreeWidgetItem(dayItem);
         row->setText(0, ts.mid(11, 8));

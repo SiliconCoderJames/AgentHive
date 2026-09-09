@@ -1,10 +1,13 @@
 #pragma once
 // 所有面板的公共基类：持有 Platform 引用，提供统一 refresh() 接口与页头构造。
+#include <QFrame>
+#include <QHBoxLayout>
 #include <QLabel>
 #include <QVBoxLayout>
 #include <QWidget>
 
 #include "../i18n.h"
+#include "../theme.h"
 // 经 zplatform_core 的 PUBLIC include 路径（src/）解析
 #include "core/platform.h"
 
@@ -26,10 +29,22 @@ protected:
         zhTitle_ = zhTitle; enTitle_ = enTitle;
         zhSub_ = zhSub; enSub_ = enSub;
         headerTitle_ = new QLabel(i18n::trs(zhTitle, enTitle), this);
-        headerTitle_->setStyleSheet("font-size:17px; font-weight:700; color:#e5e5e5;");
+        headerTitle_->setStyleSheet(
+            ui::th("font-size:17px; font-weight:700; color:@text@;"));
         headerSub_ = new QLabel(i18n::trs(zhSub, enSub), this);
-        headerSub_->setStyleSheet("font-size:11px; color:#9ca3af; margin-top:1px;");
-        layout->addWidget(headerTitle_);
+        headerSub_->setStyleSheet(ui::th("font-size:11px; color:@muted@; margin-top:1px;"));
+        // 标题蜜金→天蓝竖向渐变饰条：全面板统一的品牌签名
+        auto* bar = new QFrame(this);
+        bar->setFixedSize(4, 20);
+        bar->setStyleSheet(
+            ui::th("background:qlineargradient(x1:0,y1:0,x2:0,y2:1,"
+                   "stop:0 @brand@, stop:1 @accent@); border-radius:2px;"));
+        auto* head = new QHBoxLayout;
+        head->setSpacing(9);
+        head->addWidget(bar);
+        head->addWidget(headerTitle_);
+        head->addStretch(1);
+        layout->addLayout(head);
         layout->addWidget(headerSub_);
         layout->addSpacing(6);
     }

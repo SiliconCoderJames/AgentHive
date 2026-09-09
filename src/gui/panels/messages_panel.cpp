@@ -13,17 +13,24 @@
 
 namespace {
 QString kindChip(const QString& kind) {
-    if (kind == "task") return "<span style='background:#7f1d1d;color:#fecaca;"
-                               "border-radius:4px;padding:1px 6px;'>任务</span>";
-    if (kind == "question") return "<span style='background:#78350f;color:#fde68a;"
-                                   "border-radius:4px;padding:1px 6px;'>提问</span>";
-    return "<span style='background:#164e63;color:#a5f3fc;"
-           "border-radius:4px;padding:1px 6px;'>留言</span>";
+    const auto chip = [](const QColor& c, const QString& label) {
+        return QString("<span style='background:rgba(%1,%2,%3,70);color:%4;"
+                       "border-radius:4px;padding:1px 6px;'>%5</span>")
+            .arg(c.red())
+            .arg(c.green())
+            .arg(c.blue())
+            .arg(c.lighter(140).name())
+            .arg(label);
+    };
+    if (kind == "task") return chip(ui::danger(), i18n::trs("任务", "Task"));
+    if (kind == "question") return chip(ui::warn(), i18n::trs("提问", "Q"));
+    return chip(ui::accent(), i18n::trs("留言", "Note"));
 }
 QString statusChip(const QString& s) {
-    QString color = s == "done" ? "#22c55e"
-                                 : (s == "declined" ? "#ef4444"
-                                                    : (s == "accepted" ? "#0ea5e9" : "#eab308"));
+    QString color = s == "done" ? ui::ok().name()
+                                 : (s == "declined" ? ui::danger().name()
+                                                    : (s == "accepted" ? ui::accent().name()
+                                                                       : ui::note().name()));
     return QString("<span style='color:%1;'>● %2</span>").arg(color).arg(s.toHtmlEscaped());
 }
 // 发送者头像圈：取首字符，颜色由名字哈希决定（固定 6 色板）
@@ -80,7 +87,7 @@ MessagesPanel::MessagesPanel(zp::Platform& platform, QWidget* parent)
 
     // 操作条
     infoLabel_ = new QLabel(this);
-    infoLabel_->setStyleSheet("color:#9ca3af; font-size:11px;");
+    infoLabel_->setStyleSheet(ui::th("color:@muted@; font-size:11px;"));
     auto* brow = new QHBoxLayout;
     replyBtn_ = new QPushButton(i18n::trs("回复", "Reply"), this);
     readBtn_ = new QPushButton(i18n::trs("标记已读", "Mark Read"), this);
@@ -127,9 +134,9 @@ void MessagesPanel::renderChat() {
         html += QString(
                     "<a name='%1'></a>"
                     "<div style='margin:6px 4px;'>"
-                    "<span style='color:#9ca3af; font-size:10px; font-family:Consolas;'>%2</span> %7 "
-                    "<span style='color:#e5e5e5; font-size:11px;'>%3</span>"
-                    " <span style='color:#9ca3af;'>→ %4</span> %5 %6"
+                    "<span style='color:@muted@; font-size:10px; font-family:@mono@;'>%2</span> %7 "
+                    "<span style='color:@text@; font-size:11px;'>%3</span>"
+                    " <span style='color:@muted@;'>→ %4</span> %5 %6"
                     "<div style='%9'>"
                     "<b>%8</b><br>%10"
                     "</div></div>")
@@ -142,16 +149,16 @@ void MessagesPanel::renderChat() {
                     .arg(avatar(QString::fromStdString(m.sender)))
                     .arg(QString::fromStdString(m.subject).toHtmlEscaped())
                     .arg(selected
-                             ? "background:#2d2d3d; border:1px solid #0ea5e9; border-radius:8px; padding:8px 12px;"
-                             : "background:#2d2d2d; border:1px solid #3f3f46; border-radius:8px; padding:8px 12px;")
+                             ? "background:@fieldhover@; border:1px solid @accent@; border-radius:8px; padding:8px 12px;"
+                             : "background:@card@; border:1px solid @line@; border-radius:8px; padding:8px 12px;")
                     .arg(QString::fromStdString(m.body).toHtmlEscaped()
                              .replace("\n", "<br>")
                              .left(500));
     }
-    chat_->setHtml(html.isEmpty()
-                       ? i18n::trs("<div style='color:#9ca3af; text-align:center;'>暂无消息，点击右上角发起交流</div>",
-                       "<div style='color:#9ca3af; text-align:center;'>No messages yet — start a conversation</div>")
-                       : html);
+    chat_->setHtml(ui::th(html.isEmpty()
+                       ? i18n::trs("<div style='color:@muted@; text-align:center;'>暂无消息，点击右上角发起交流</div>",
+                       "<div style='color:@muted@; text-align:center;'>No messages yet — start a conversation</div>")
+                       : html));
     // 恢复滚动位置；原本就在底部（阅读最新消息）则保持贴底
     QScrollBar* bar = chat_->verticalScrollBar();
     if (atBottom)

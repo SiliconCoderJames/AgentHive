@@ -35,7 +35,7 @@ MemoryPanel::MemoryPanel(zp::Platform& platform, QWidget* parent)
 
     auto* toolbar = new QHBoxLayout;
     headerLabel_ = new QLabel(this);
-    headerLabel_->setStyleSheet("font-size:13px; color:#9ca3af;");
+    headerLabel_->setStyleSheet(ui::th("font-size:13px; color:@muted@;"));
     auto* editBtn = new QPushButton(i18n::trs("编辑 / 新增（生成新版本）", "Edit / Add (new version)"), this);
     editBtn->setObjectName("primary");
     auto* historyBtn = new QPushButton(i18n::trs("查看历史版本", "History"), this);
@@ -91,18 +91,18 @@ void MemoryPanel::refresh() {
         cl->setSpacing(6);
         if (group.empty()) {
             auto* empty = new QLabel("该区块暂无记忆", content);
-            empty->setText(i18n::trs("该区块暂无记忆", "No memories in this section yet")); empty->setStyleSheet("color:#9ca3af; font-size:11px;");
+            empty->setText(i18n::trs("该区块暂无记忆", "No memories in this section yet")); empty->setStyleSheet(ui::th("color:@muted@; font-size:11px;"));
             cl->addWidget(empty);
         } else {
             for (const auto& m : group) {
-                auto* row = new QLabel(
-                    QString("<b style='color:#0ea5e9;'>%1</b>"
-                            " <span style='color:#9ca3af; font-size:10px;'>v%2 · %3 · %4</span><br>%5")
+                auto* row = new QLabel(ui::th(
+                    QString("<b style='color:@accent@;'>%1</b>"
+                            " <span style='color:@muted@; font-size:10px;'>v%2 · %3 · %4</span><br>%5")
                         .arg(QString::fromStdString(m.key).toHtmlEscaped())
                         .arg(m.version)
                         .arg(QString::fromStdString(m.author))
                         .arg(QString::fromStdString(m.created_at))
-                        .arg(QString::fromStdString(m.value).toHtmlEscaped().left(200)),
+                        .arg(QString::fromStdString(m.value).toHtmlEscaped().left(200))),
                     content);
                 row->setTextFormat(Qt::RichText);
                 row->setWordWrap(true);

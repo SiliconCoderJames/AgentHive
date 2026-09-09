@@ -10,6 +10,7 @@
 #include "core/util.h"
 #include "i18n.h"
 #include "mainwindow.h"
+#include "theme.h"
 
 // 程序化绘制蜂巢图标：深色圆角底 + 琥珀色六边形蜂巢 + 入口点
 static QPixmap hiveIcon(int side) {
@@ -19,7 +20,7 @@ static QPixmap hiveIcon(int side) {
     p.setRenderHint(QPainter::Antialiasing);
     qreal m = side * 0.08, w = side - 2 * m;
     QRectF box(m, m, w, w);
-    p.setBrush(QColor("#1e1e1e"));
+    p.setBrush(QColor("#10141c"));
     p.setPen(Qt::NoPen);
     p.drawRoundedRect(box, side * 0.2, side * 0.2);
     auto hex = [](QPainter& pp, const QPointF& c, qreal r) {
@@ -57,15 +58,9 @@ int main(int argc, char** argv) {
             app.setWindowIcon(QIcon(hiveIcon(64)));
     }
 
-    // 强制深色主题：QSS 统一管理（背景 #1e1e1e / 卡片 #2d2d2d / 强调 #0ea5e9）
+    // 强制深色主题：QSS 模板经 ui::th() 主题化（当前主题与字号持久化于 QSettings）
     // 注意 qt_add_resources(PREFIX "/theme") 会把子目录 qss/ 拼进资源路径
-    QFile qss(":/theme/qss/dark.qss");
-    if (qss.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        const QByteArray body = qss.readAll();
-        app.setStyleSheet(QString::fromUtf8(body));
-    } else {
-        qWarning("dark.qss open FAILED: %s", qss.errorString().toUtf8().constData());
-    }
+    app.setStyleSheet(ui::themeQss());
 
     zp::Platform platform(zp::defaultHomeDir());
     std::string err;

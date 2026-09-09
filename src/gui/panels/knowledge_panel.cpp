@@ -139,15 +139,15 @@ void KnowledgePanel::onSearch() {
         onSelectEntry(0);
     } else {
         // 空状态提示：避免面板显得单调且无从下手
-        detail_->setHtml(
-            "<div style='color:#9ca3af; text-align:center; margin-top:36px;'>"
-            "<div style='font-size:34px;'>📚</div>"
-            + i18n::trs("暂无知识条目<br><br>点击右上角「＋ 新建条目」沉淀第一条经验，"
-                        "或让任意已接入的 Agent 通过 <span style='font-family:Consolas;'>POST /api/knowledge</span> 写入",
-                        "No entries yet.<br><br>Click「＋ New Entry」to add the first one, "
-                        "or let any connected agent write via "
-                        "<span style='font-family:Consolas;'>POST /api/knowledge</span>")
-            + "</div>");
+        detail_->setHtml(ui::th(
+            QString("<div style='color:@muted@; text-align:center; margin-top:36px;'>"
+                    "<div style='font-size:34px;'>📚</div>"
+                    + i18n::trs("暂无知识条目<br><br>点击右上角「＋ 新建条目」沉淀第一条经验，"
+                                "或让任意已接入的 Agent 通过 <span style='font-family:@mono@;'>POST /api/knowledge</span> 写入",
+                                "No entries yet.<br><br>Click「＋ New Entry」to add the first one, "
+                                "or let any connected agent write via "
+                                "<span style='font-family:@mono@;'>POST /api/knowledge</span>")
+                    + "</div>")));
     }
 }
 
