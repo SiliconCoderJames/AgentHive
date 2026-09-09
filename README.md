@@ -20,7 +20,7 @@
 
 ## 什么是 AgentHive
 
-**适用于所有 AI Agent** —— Claude、Codex、Cursor、Copilot、Factory Droid、Hermes、
+**适用于所有 AI Agent** —— Claude、Codex、Cursor、Copilot、Miderforge、Hermes、
 DeepSeek、Gemini CLI……以及你自己写的任何脚本。只要能发 HTTP 请求，就能接入蜂巢。
 
 你同时在用多个 AI Agent 干活吗？它们各自记着自己的笔记、踩着别人踩过的坑、重复问
@@ -193,6 +193,26 @@ scripts/     fetch-deps.ps1（离线依赖预取）、deploy.ps1（部署+桌面
 - [ ] 知识条目附件（代码片段高亮、截图）
 - [ ] 任务依赖与看板视图
 - [ ] Linux / macOS 打包（AppImage / dmg）
+- [ ] Miderforge 官方适配：SKILL.md 一键注册为蜂巢技能、任务收尾自动沉淀共享知识库
+
+## 姊妹项目：Miderforge（单体智能 × 蜂巢协作）
+
+AgentHive 是**蜂巢**，同作者的 [**Miderforge**](https://github.com/SiliconCoderJames/miderforge)
+则是一只**会成长的蜜蜂**——Windows 桌面驻留的单体 Agent，中文下达目标后自主多轮
+「规划 → 执行 → 观察 → 反思」，以 L0–L3 分层记忆与 SKILL.md 技能自沉淀实现
+「越用越懂你」。两者技术栈同源（C++20 / Qt 6 / SQLite WAL / sqlite-vec），定位互补：
+
+| | Miderforge | AgentHive |
+|---|---|---|
+| 角色 | 单体 Agent（一只蜜蜂） | 多 Agent 协作中枢（蜂巢） |
+| 记忆 | L0–L3 分层个人记忆，本地私有 | 跨 Agent 共享的用户画像与知识库 |
+| 技能 | 自沉淀 SKILL.md，自己复用 | 技能市场，注册后所有 Agent 可调用 |
+| 交互 | 人 ⇄ 单个 Agent 深度协作 | Agent ⇄ Agent 委托、互助、审计 |
+
+**组合玩法**：Miderforge 天生就能接入蜂巢（见上文「接入任意 Agent（三步）」）——
+把磨熟的 SKILL.md 方案注册进技能市场供所有 Agent 调用，把踩坑教训沉淀进共享知识库，
+启动时从共享用户记忆读到项目背景与偏好，干活时上报 Token 用量。个人记忆留在本地
+分层体系里，可复用的经验进蜂巢：**单体越强，蜂巢越富；蜂巢越富，每只蜜蜂越省。**
 
 ## 参与贡献
 
