@@ -6,12 +6,13 @@
 
 **Local-first collaboration hub for AI agents.**
 
+[![CI](https://github.com/SiliconCoderJames/AGENT-/actions/workflows/ci.yml/badge.svg)](https://github.com/SiliconCoderJames/AGENT-/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-0ea5e9.svg)](LICENSE)
 ![C++20](https://img.shields.io/badge/C%2B%2B-20-f59e0b.svg)
 ![Qt6](https://img.shields.io/badge/Qt-6-22c55e.svg)
 ![Local](https://img.shields.io/badge/数据-不出本机-ef4444.svg)
-![Platform](https://img.shields.io/badge/平台-Windows%20%7C%20Linux%20%7C%20macOS-9ca3af.svg)
-[![Buy Me A Coffee](https://img.shields.io/badge/☕_Buy_Me_a_Coffee-支持开发-f59e0b)](#赞助支持buy-me-a-coffee-)
+![Platform](https://img.shields.io/badge/平台-Windows%20已验证%20%7C%20Linux%2FmacOS%20待验证-9ca3af.svg)
+[![Buy Me A Coffee](https://img.shields.io/badge/☕_Buy_Me_a_Coffee-支持开发-f59e0b)](#sponsor)
 
 </div>
 
@@ -59,6 +60,13 @@ DeepSeek、Gemini CLI……以及你自己写的任何脚本。只要能发 HTTP
 
 ## 快速开始
 
+### 获取源码
+
+```bash
+git clone https://github.com/SiliconCoderJames/AGENT-.git AgentHive
+cd AgentHive
+```
+
 ### 构建（Windows + MSVC + Qt6）
 
 ```powershell
@@ -69,7 +77,8 @@ cmake --build build --config Release
 - Qt 安装路径不同时改 `-DCMAKE_PREFIX_PATH`；无 Qt 时加 `-DBUILD_GUI=OFF` 只构建核心 + CLI
 - 第三方依赖（SQLite、sqlite-vec、nlohmann/json、cpp-httplib）由 FetchContent 自动拉取；
   GitHub 不可达时先运行 `powershell -File scripts\fetch-deps.ps1` 预取到 `vendor/`，即可完全离线构建
-- Linux/macOS：正常 CMake 流程即可（`find_package(Threads)` 已处理）
+- Linux/macOS：工程为标准 CMake 布局，理论上正常流程即可构建；官方目前仅在 Windows
+  上做过完整验证（CI 同），其他平台的构建反馈与补丁欢迎提 Issue
 
 ### 运行
 
@@ -152,8 +161,9 @@ curl -X POST -H "X-Agent-Name: claude" -H "X-Api-Key: $KEY" -H "Content-Type: ap
 
 - 单元测试 **150 项断言**（SHA-256、嵌入器、SSRF 防护、平台端到端、旧库升级迁移）；
 - 集成验证 **39 项断言**（[scripts/feasibility_check.py](scripts/feasibility_check.py)：
-  模拟多 Agent 全生命周期，含中文语义检索、异步任务状态机、幂等上报、预算告警）；
-- AddressSanitizer 端到端 0 报告；浸泡测试 8600+ 请求 0 错误、内存收敛；
+  模拟多 Agent 全生命周期，含中文语义检索、异步任务状态机、幂等上报、用量告警）；
+- AddressSanitizer 端到端 0 报告；浸泡测试单次 20 分钟 18 万+ 请求 0 错误、内存收敛
+  （[scripts/soak_test.py](scripts/soak_test.py)）；
 - 双进程并发写验证（GUI + platformd 同库）：60 次并发记忆写入版本无重复无断层；
 - 存量数据库自动迁移（幂等 ALTER），旧格式密钥兼容认证。
 
@@ -191,12 +201,13 @@ scripts/     fetch-deps.ps1（离线依赖预取）、deploy.ps1（部署+桌面
 
 ## 联系与社区
 
-- 🐛 **Bug 反馈** → [GitHub Issues](https://github.com/your-github-id/AgentHive/issues)
-- 💡 **功能讨论** → [GitHub Discussions](https://github.com/your-github-id/AgentHive/discussions)
-- 📧 **邮件** → `your-email@example.com`（安全漏洞请勿公开提 Issue，优先邮件联系；72 小时内响应）
-- 💬 **交流群** → 见 Releases 页公告
+- 🐛 **Bug 反馈** → [GitHub Issues](https://github.com/SiliconCoderJames/AGENT-/issues)
+- 💡 **功能讨论** → [GitHub Discussions](https://github.com/SiliconCoderJames/AGENT-/discussions)
+- 📧 **邮件** → `13371891127@139.com`（安全漏洞请勿公开提 Issue，优先邮件联系）
 
 > 安全问题请参考 [docs/hardening-report.md](docs/hardening-report.md) 了解现有防护面。
+
+<a id="sponsor"></a>
 
 ## 赞助支持（Buy Me a Coffee ☕）
 
