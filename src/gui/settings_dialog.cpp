@@ -1,22 +1,30 @@
 #include "settings_dialog.h"
 
 #include <QApplication>
+#include <QCheckBox>
 #include <QClipboard>
+#include <QComboBox>
 #include <QDesktopServices>
+#include <QFileInfo>
 #include <QFormLayout>
 #include <QGridLayout>
 #include <QHBoxLayout>
+#include <QHeaderView>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QListWidget>
+#include <QMessageBox>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QPushButton>
 #include <QScrollArea>
-#include <QTabWidget>
+#include <QStackedWidget>
+#include <QTableWidget>
 #include <QToolButton>
 #include <QUrl>
 #include <QVBoxLayout>
+#include <QShowEvent>
 
 #include <iterator>
 
@@ -46,41 +54,52 @@ SettingsDialog::SettingsDialog(zp::Platform& platform, QWidget* parent)
     : QDialog(parent), platform_(platform) {
     setWindowTitle(i18n::trs("设置", "Settings"));
     setWindowFlag(Qt::WindowContextHelpButtonHint, false);
-    resize(640, 600);
+    resize(760, 560);
 
-    auto* lay = new QVBoxLayout(this);
-    lay->setContentsMargins(14, 14, 14, 14);
-    lay->setSpacing(10);
+    // 左侧窄导航 + 右侧内容堆叠（ChatGPT/Cursor 式骨架，分区扩展不改骨架）
+    auto* root = new QHBoxLayout(this);
+    root->setContentsMargins(0, 0, 0, 0);
+    root->setSpacing(0);
 
-    auto* tabs = new QTabWidget(this);
-    buildAppearanceTab(tabs);
-    buildUpdateTab(tabs);
-    buildApiTab(tabs);
-    buildUsageTab(tabs);
-    lay->addWidget(tabs);
+    nav_ = new QListWidget(this);
+    nav_->setFixedWidth(150);
+    nav_->setFocusPolicy(Qt::NoFocus);  // 去除虚线焦点框
+    for (const auto& [icon, zh, en] : std::vector<std::tuple<const char*, const char*, const char*>>{
+             {"🎨", "外观", "Appearance"},
+             {"💾", "数据与备份", "Data & Backup"},
+             {"🔔", "通知偏好", "Notifications"},
+             {"🐝", "Agent 管理", "Agents"},
+             {"🔌", "Agent API", "Agent API"},
+             {"🔄", "更新", "Update"},
+         }) {
+        nav_->addItem(QString("%1  %2").arg(icon, i18n::trs(zh, en)));
+    }
+    root->addWidget(nav_);
 
-    auto* foot = new QHBoxLayout();
-    foot->addStretch(1);
-    auto* closeBtn = new QPushButton(i18n::trs("关闭", "Close"), this);
-    closeBtn->setFixedWidth(88);
-    connect(closeBtn, &QPushButton::clicked, this, &QDialog::close);
-    foot->addWidget(closeBtn);
-    lay->addLayout(foot);
+    stack_ = new QStackedWidget(this);
+    stack_->addWidget(buildAppearancePage());
+    stack_->addWidget(buildBackupPage());
+    stack_->addWidget(buildNotifyPage());
+    stack_->addWidget(buildAgentsPage());
+    stack_->addWidget(buildApiPage());
+    stack_->addWidget(buildUpdatePage());
+    root->addWidget(stack_, 1);
 
-    // 主题/字号变化：即时重涂对话框内取色控件与图表
+    connect(nav_, &QListWidget::currentRowChanged, stack_, &QStackedWidget::setCurrentIndex);
+    nav_->setCurrentRow(0);
+
+    // 主题/字号变化：即时重涂导航与对话框内取色控件
     themeListenerId_ = ui::addThemeListener([this] { applyChrome(); });
     applyChrome();
-
-    // 用量页每 5s 静默刷新（数据变化才重绘，避免动画反复扫掠）
-    usageTimer_ = new QTimer(this);
-    usageTimer_->setInterval(5000);
-    connect(usageTimer_, &QTimer::timeout, this, &SettingsDialog::refreshUsage);
-    usageTimer_->start();
-    refreshUsage();
 }
 
 SettingsDialog::~SettingsDialog() {
     ui::removeThemeListener(themeListenerId_);
+}
+
+void SettingsDialog::showEvent(QShowEvent*) {
+    refreshBackupList();
+    refreshAgents();
 }
 
 QLabel* SettingsDialog::thLabel(const QString& tmpl, QWidget* parent) {
@@ -91,107 +110,302 @@ QLabel* SettingsDialog::thLabel(const QString& tmpl, QWidget* parent) {
 }
 
 void SettingsDialog::applyChrome() {
+    nav_->setStyleSheet(ui::th(
+        "QListWidget { background:@deep@; border:none; outline:0; font-size:13px; }"
+        "QListWidget::item { color:@muted@; padding:11px 12px;"
+        " border-left:3px solid transparent; }"
+        "QListWidget::item:hover { color:@text@; background:@card@; }"
+        "QListWidget::item:selected { color:@seltext@; background:@selbg@;"
+        " border-left:3px solid @brand@; font-weight:600; }"));
+    for (std::size_t i = 0; i < swatches_.size() && i < ui::themes().size(); ++i)
+        swatches_[i]->setSelected(static_cast<int>(i) == ui::themeIdx());
     for (const auto& [w, tmpl] : styledLabels_) w->setStyleSheet(ui::th(tmpl));
-    dailyChart_->update();
-    modelChart_->update();
 }
 
-void SettingsDialog::buildAppearanceTab(QTabWidget* tabs) {
-    auto* page = new QWidget(tabs);
-    auto* form = new QFormLayout(page);
-    form->setContentsMargins(18, 18, 18, 18);
-    form->setSpacing(14);
+// ---- 外观：主题色卡网格 + 字号 ----
+QWidget* SettingsDialog::buildAppearancePage() {
+    auto* page = new QWidget(stack_);
+    auto* lay = new QVBoxLayout(page);
+    lay->setContentsMargins(22, 20, 22, 20);
+    lay->setSpacing(14);
 
-    themeBox_ = new QComboBox(page);
-    for (const auto& t : ui::themes()) themeBox_->addItem(i18n::trs(t.zh, t.en));
-    themeBox_->setCurrentIndex(ui::themeIdx());
-    connect(themeBox_, &QComboBox::currentIndexChanged, this,
-            [](int i) { ui::setThemeIndex(i); });
-    form->addRow(i18n::trs("配色主题", "Theme"), themeBox_);
+    auto* themeTitle = thLabel("font-size:14px; font-weight:700; color:@text@;", page);
+    themeTitle->setText(i18n::trs("页面颜色", "Theme"));
+    lay->addWidget(themeTitle);
 
+    // 色卡网格：每套主题一张迷你预览，点击即换全窗配色
+    auto* grid = new QGridLayout();
+    grid->setHorizontalSpacing(10);
+    grid->setVerticalSpacing(10);
+    for (int i = 0; i < static_cast<int>(ui::themes().size()); ++i) {
+        const auto& t = ui::themes()[static_cast<std::size_t>(i)];
+        auto* sw = new ui::ThemeSwatch(i18n::trs(t.zh, t.en), t.bg, t.deep, t.accent, t.brand,
+                                       t.text, [i] { ui::setThemeIndex(i); }, page);
+        swatches_.push_back(sw);
+        grid->addWidget(sw, i / 3, i % 3, Qt::AlignTop | Qt::AlignLeft);
+    }
+    lay->addLayout(grid);
+
+    auto* themeHint = thLabel("font-size:11px; color:@muted@;", page);
+    themeHint->setText(i18n::trs("点击色卡立即切换整套配色，选择会被记住。",
+                                 "Click a swatch to switch instantly; your choice is saved."));
+    lay->addWidget(themeHint);
+
+    auto* fontTitle = thLabel("font-size:14px; font-weight:700; color:@text@;", page);
+    fontTitle->setText(i18n::trs("界面字号", "Font size"));
+    lay->addWidget(fontTitle);
     fontBox_ = new QComboBox(page);
     const std::vector<std::pair<int, const char*>> kSizes{
         {12, "紧凑 12px"}, {13, "标准 13px"}, {14, "大号 14px"}};
-    for (const auto& [px, label] : kSizes)
-        fontBox_->addItem(QString::fromUtf8(label), px);
+    for (const auto& [px, label] : kSizes) fontBox_->addItem(QString::fromUtf8(label), px);
     fontBox_->setCurrentIndex(fontBox_->findData(ui::fontBaseRef()));
     connect(fontBox_, &QComboBox::currentIndexChanged, this, [this](int) {
         ui::setFontBase(fontBox_->currentData().toInt());
     });
-    form->addRow(i18n::trs("界面字号", "Font size"), fontBox_);
+    fontBox_->setFixedWidth(180);
+    lay->addWidget(fontBox_);
 
-    auto* hint = thLabel("font-size:11px; color:@muted@;", page);
-    hint->setText(i18n::trs("切换后立即生效并保存，重启后仍保持。",
-                            "Applied instantly and saved across restarts."));
-    hint->setWordWrap(true);
-    form->addRow(hint);
-    tabs->addTab(page, i18n::trs("外观", "Appearance"));
+    auto* fontHint = thLabel("font-size:11px; color:@muted@;", page);
+    fontHint->setText(i18n::trs("所有界面文字按所选基准等比缩放。",
+                                "All UI text scales relative to the selected base size."));
+    lay->addWidget(fontHint);
+    lay->addStretch(1);
+    return page;
 }
 
-void SettingsDialog::buildUpdateTab(QTabWidget* tabs) {
-    auto* page = new QWidget(tabs);
+// ---- 数据与备份：VACUUM INTO 快照 / 恢复 / 手动维护 ----
+QWidget* SettingsDialog::buildBackupPage() {
+    auto* page = new QWidget(stack_);
     auto* lay = new QVBoxLayout(page);
-    lay->setContentsMargins(18, 18, 18, 18);
-    lay->setSpacing(10);
+    lay->setContentsMargins(22, 20, 22, 20);
+    lay->setSpacing(12);
 
-    auto* cur = thLabel("font-size:13px; font-weight:600; color:@text@;", page);
-    cur->setText(QString(i18n::trs("当前版本", "Current version")) +
-                 QString("  v%1").arg(zp::kPlatformVersion));
-    lay->addWidget(cur);
+    auto* intro = thLabel("font-size:11px; color:@muted@;", page);
+    intro->setText(i18n::trs(
+        "备份是数据库的一致性快照（VACUUM INTO），保存在数据目录的 backup/ 下；"
+        "恢复会用快照整库替换当前数据。",
+        "Backups are consistent SQLite snapshots (VACUUM INTO) stored in the data "
+        "directory's backup/ folder; restoring replaces the current database."));
+    intro->setWordWrap(true);
+    lay->addWidget(intro);
+
+    backupTable_ = new QTableWidget(0, 2, page);
+    backupTable_->setHorizontalHeaderLabels(
+        {i18n::trs("快照文件", "Snapshot"), i18n::trs("大小", "Size")});
+    backupTable_->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
+    polishTable(backupTable_);
+    backupTable_->setSelectionBehavior(QAbstractItemView::SelectRows);
+    lay->addWidget(backupTable_, 1);
 
     auto* row = new QHBoxLayout();
-    auto* checkBtn = new QPushButton(i18n::trs("检查更新", "Check for updates"), page);
-    connect(checkBtn, &QPushButton::clicked, this, &SettingsDialog::checkUpdate);
-    auto* pageBtn = new QPushButton(i18n::trs("Releases 页面", "Releases page"), page);
-    connect(pageBtn, &QPushButton::clicked, this, [] {
-        QDesktopServices::openUrl(QUrl(QString::fromLatin1(kRepoPage)));
+    auto* backupBtn = new QPushButton(i18n::trs("立即备份", "Back up now"), page);
+    backupBtn->setObjectName("primary");
+    connect(backupBtn, &QPushButton::clicked, this, [this] {
+        std::string path, err;
+        if (platform_.backupCreate(path, err)) {
+            ui::Toast::show(this, i18n::trs("已备份：", "Backed up: ") +
+                                      QString::fromStdString(path));
+            refreshBackupList();
+        } else {
+            ui::Toast::show(this, i18n::trs("备份失败：", "Backup failed: ") +
+                                      QString::fromStdString(err), false);
+        }
     });
-    row->addWidget(checkBtn);
-    row->addWidget(pageBtn);
+    auto* restoreBtn = new QPushButton(i18n::trs("恢复所选", "Restore selected"), page);
+    connect(restoreBtn, &QPushButton::clicked, this, [this] {
+        int row = backupTable_->currentRow();
+        if (row < 0) {
+            ui::Toast::show(this, i18n::trs("请先选择一个快照", "Select a snapshot first"), false);
+            return;
+        }
+        QString name = backupTable_->item(row, 0)->text();
+        if (QMessageBox::warning(
+                this, i18n::trs("恢复快照", "Restore snapshot"),
+                i18n::trs("将用快照「%1」整库替换当前数据，未备份的更改会丢失。继续？",
+                          "Replace the current database with snapshot \"%1\"? Unsaved "
+                          "changes will be lost. Continue?")
+                    .arg(name),
+                QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
+            return;
+        std::string err;
+        if (platform_.backupRestore(name.toStdString(), err)) {
+            ui::Toast::show(this, i18n::trs("已恢复 ✓", "Restored ✓"));
+            refreshBackupList();
+        } else {
+            ui::Toast::show(this, i18n::trs("恢复失败：", "Restore failed: ") +
+                                      QString::fromStdString(err), false);
+        }
+    });
+    auto* folderBtn = new QPushButton(i18n::trs("打开备份文件夹", "Open backup folder"), page);
+    connect(folderBtn, &QPushButton::clicked, this, [this] {
+        QDesktopServices::openUrl(QUrl::fromLocalFile(
+            QString::fromStdString(platform_.homeDir()) + "/backup"));
+    });
+    row->addWidget(backupBtn);
+    row->addWidget(restoreBtn);
+    row->addWidget(folderBtn);
     row->addStretch(1);
     lay->addLayout(row);
 
-    latest_ = thLabel("font-size:12px; color:@muted@;", page);
-    latest_->setWordWrap(true);
-    lay->addWidget(latest_);
-    lay->addStretch(1);
-    tabs->addTab(page, i18n::trs("更新", "Update"));
-}
-
-void SettingsDialog::checkUpdate() {
-    if (!net_) net_ = new QNetworkAccessManager(this);
-    latest_->setText(i18n::trs("正在检查…", "Checking…"));
-    QNetworkRequest req(QUrl(QString::fromLatin1(kRepoApi)));
-    req.setHeader(QNetworkRequest::UserAgentHeader, "AgentHive");
-    req.setTransferTimeout(8000);
-    QNetworkReply* reply = net_->get(req);
-    connect(reply, &QNetworkReply::finished, this, [this, reply] {
-        reply->deleteLater();
-        if (reply->error() != QNetworkReply::NoError) {
-            latest_->setText(i18n::trs("检查失败：", "Check failed: ") + reply->errorString());
-            return;
-        }
-        const QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
-        QString tag = doc.object().value("tag_name").toString();
-        if (tag.startsWith('v')) tag = tag.mid(1);
-        const QString cur = QString::fromLatin1(zp::kPlatformVersion);
-        if (tag.isEmpty()) {
-            latest_->setText(i18n::trs("未解析到最新版本信息。",
-                                       "Could not parse release info."));
-        } else if (cmpVersion(tag, cur) > 0) {
-            latest_->setText(i18n::trs("发现新版本", "New version available") +
-                             QString("  v%1").arg(tag));
+    auto* maintBtn = new QPushButton(i18n::trs("手动维护（审计轮转 + 清理）",
+                                               "Run maintenance (audit rotation + cleanup)"), page);
+    connect(maintBtn, &QPushButton::clicked, this, [this] {
+        std::string stats, err;
+        if (platform_.maintenanceRun(zp::kManagerName, stats, err)) {
+            ui::Toast::show(this, i18n::trs("维护完成", "Maintenance done"));
         } else {
-            latest_->setText(i18n::trs("已是最新版本。", "You're up to date.") +
-                             QString("  v%1").arg(cur));
+            ui::Toast::show(this, i18n::trs("维护失败：", "Maintenance failed: ") +
+                                      QString::fromStdString(err), false);
         }
     });
+    lay->addWidget(maintBtn);
+    return page;
 }
 
-void SettingsDialog::buildApiTab(QTabWidget* tabs) {
+// ---- 通知偏好：只影响工作台界面 ----
+QWidget* SettingsDialog::buildNotifyPage() {
+    auto* page = new QWidget(stack_);
+    auto* lay = new QVBoxLayout(page);
+    lay->setContentsMargins(22, 20, 22, 20);
+    lay->setSpacing(14);
+
+    auto* form = new QFormLayout;
+    form->setSpacing(12);
+    refreshBox_ = new QComboBox(page);
+    refreshBox_->addItem(i18n::trs("3 秒（实时）", "3s (live)"), 3000);
+    refreshBox_->addItem(i18n::trs("5 秒", "5s"), 5000);
+    refreshBox_->addItem(i18n::trs("10 秒（省电）", "10s (low power)"), 10000);
+    {
+        QSettings s;
+        int ms = s.value("ui/refreshMs", 3000).toInt();
+        int idx = refreshBox_->findData(ms);
+        refreshBox_->setCurrentIndex(idx < 0 ? 0 : idx);
+    }
+    connect(refreshBox_, &QComboBox::currentIndexChanged, this, [this](int) {
+        QSettings s;
+        s.setValue("ui/refreshMs", refreshBox_->currentData().toInt());
+        ui::notifyThemeListeners();  // 主窗口监听同一通知重读偏好
+    });
+    form->addRow(i18n::trs("数据刷新频率", "Data refresh rate"), refreshBox_);
+
+    errorToastBox_ = new QCheckBox(i18n::trs("出现新的未解决错误时弹出提醒",
+                                             "Toast when a new unresolved error appears"), page);
+    {
+        QSettings s;
+        errorToastBox_->setChecked(s.value("ui/errorToast", false).toBool());
+    }
+    connect(errorToastBox_, &QCheckBox::toggled, this, [](bool on) {
+        QSettings s;
+        s.setValue("ui/errorToast", on);
+        ui::notifyThemeListeners();
+    });
+    form->addRow(errorToastBox_);
+    lay->addLayout(form);
+
+    auto* hint = thLabel("font-size:11px; color:@muted@;", page);
+    hint->setText(i18n::trs("这些偏好只影响本工作台界面，不影响 Agent 侧行为。",
+                            "These only affect this workbench UI, not agent-side behavior."));
+    lay->addWidget(hint);
+    lay->addStretch(1);
+    return page;
+}
+
+// ---- Agent 管理：注册列表 / 状态 / 移除 ----
+QWidget* SettingsDialog::buildAgentsPage() {
+    auto* page = new QWidget(stack_);
+    auto* lay = new QVBoxLayout(page);
+    lay->setContentsMargins(22, 20, 22, 20);
+    lay->setSpacing(12);
+
+    agentsTable_ = new QTableWidget(0, 5, page);
+    agentsTable_->setHorizontalHeaderLabels(
+        {i18n::trs("名称", "Name"), i18n::trs("角色", "Role"), i18n::trs("状态", "Status"),
+         i18n::trs("当前任务", "Current task"), i18n::trs("最后活跃", "Last active")});
+    agentsTable_->horizontalHeader()->setStretchLastSection(true);
+    polishTable(agentsTable_);
+    lay->addWidget(agentsTable_, 1);
+
+    auto* row = new QHBoxLayout();
+    auto* refreshBtn = new QPushButton(i18n::trs("刷新", "Refresh"), page);
+    connect(refreshBtn, &QPushButton::clicked, this, [this] { refreshAgents(); });
+    auto* removeBtn = new QPushButton(i18n::trs("移除所选", "Remove selected"), page);
+    removeBtn->setObjectName("danger");
+    connect(removeBtn, &QPushButton::clicked, this, [this] {
+        int row = agentsTable_->currentRow();
+        if (row < 0) {
+            ui::Toast::show(this, i18n::trs("请先选择一个 Agent", "Select an agent first"), false);
+            return;
+        }
+        QString name = agentsTable_->item(row, 0)->text();
+        if (name == QString::fromLatin1(zp::kManagerName)) {
+            ui::Toast::show(this, i18n::trs("管理者不可移除", "The manager cannot be removed"),
+                            false);
+            return;
+        }
+        if (QMessageBox::question(
+                this, i18n::trs("移除 Agent", "Remove agent"),
+                i18n::trs("移除「%1」后其 API Key 立即失效，需要重新注册才能接入。继续？",
+                          "Removing \"%1\" invalidates its API key immediately; it must "
+                          "re-register to join again. Continue?")
+                    .arg(name),
+                QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
+            return;
+        std::string err;
+        if (platform_.agentRemove(zp::kManagerName, name.toStdString(), err)) {
+            ui::Toast::show(this, i18n::trs("已移除 ✓", "Removed ✓"));
+            refreshAgents();
+        } else {
+            ui::Toast::show(this, i18n::trs("移除失败：", "Remove failed: ") +
+                                      QString::fromStdString(err), false);
+        }
+    });
+    row->addWidget(refreshBtn);
+    row->addWidget(removeBtn);
+    row->addStretch(1);
+    lay->addLayout(row);
+
+    auto* hint = thLabel("font-size:11px; color:@muted@;", page);
+    hint->setText(i18n::trs("移除后该 Agent 的 API Key 立即失效（操作记入审计日志）。",
+                            "Removing an agent invalidates its API key (audited)."));
+    lay->addWidget(hint);
+    return page;
+}
+
+void SettingsDialog::refreshBackupList() {
+    if (!backupTable_) return;
+    std::vector<std::string> snaps;
+    std::string err;
+    if (!platform_.backupList(snaps, err)) return;
+    backupTable_->setRowCount(static_cast<int>(snaps.size()));
+    for (size_t i = 0; i < snaps.size(); ++i) {
+        const QString name = QString::fromStdString(snaps[i]);
+        const qint64 sz = QFileInfo(QString::fromStdString(platform_.homeDir()) +
+                                    "/backup/" + name)
+                              .size();
+        setRow(backupTable_, static_cast<int>(i), {name, formatNum(sz) + " B"});
+    }
+}
+
+void SettingsDialog::refreshAgents() {
+    if (!agentsTable_) return;
+    std::vector<zp::AgentInfo> agents;
+    std::string err;
+    if (!platform_.listAgents(agents, err)) return;
+    agentsTable_->setRowCount(static_cast<int>(agents.size()));
+    for (size_t i = 0; i < agents.size(); ++i) {
+        const auto& a = agents[i];
+        setRow(agentsTable_, static_cast<int>(i),
+               {QString::fromStdString(a.name), QString::fromStdString(a.role),
+                QString::fromStdString(a.status), QString::fromStdString(a.current_task),
+                QString::fromStdString(a.last_seen_at)});
+    }
+}
+
+// ---- Agent API：端点清单 + 一键复制 ----
+QWidget* SettingsDialog::buildApiPage() {
     auto* page = new QWidget();
     auto* lay = new QVBoxLayout(page);
-    lay->setContentsMargins(18, 18, 18, 18);
+    lay->setContentsMargins(22, 20, 22, 20);
     lay->setSpacing(10);
 
     auto* addr = thLabel("font-size:13px; font-weight:600; color:@text@;", page);
@@ -216,6 +430,7 @@ void SettingsDialog::buildApiTab(QTabWidget* tabs) {
         {"GET", "/api/health"},
         {"POST", "/api/agents/register"},
         {"POST", "/api/agents/heartbeat"},
+        {"POST", "/api/agents/remove"},
         {"GET/POST", "/api/memory"},
         {"POST", "/api/knowledge"},
         {"POST", "/api/knowledge/search"},
@@ -257,73 +472,74 @@ void SettingsDialog::buildApiTab(QTabWidget* tabs) {
     lay->addLayout(grid);
     lay->addStretch(1);
 
-    auto* scroll = new QScrollArea(tabs);
+    auto* scroll = new QScrollArea(stack_);
     scroll->setWidgetResizable(true);
     scroll->setFrameShape(QFrame::NoFrame);
     scroll->setWidget(page);
-    tabs->addTab(scroll, i18n::trs("Agent API", "Agent API"));
+    return scroll;
 }
 
-void SettingsDialog::buildUsageTab(QTabWidget* tabs) {
-    auto* page = new QWidget(tabs);
+// ---- 更新：当前版本 + GitHub Releases 检查 ----
+QWidget* SettingsDialog::buildUpdatePage() {
+    auto* page = new QWidget(stack_);
     auto* lay = new QVBoxLayout(page);
-    lay->setContentsMargins(18, 18, 18, 18);
-    lay->setSpacing(12);
+    lay->setContentsMargins(22, 20, 22, 20);
+    lay->setSpacing(10);
 
-    usageHead_ = thLabel("font-size:12px; color:@muted@;", page);
-    lay->addWidget(usageHead_);
+    auto* cur = thLabel("font-size:13px; font-weight:600; color:@text@;", page);
+    cur->setText(QString(i18n::trs("当前版本", "Current version")) +
+                 QString("  v%1").arg(zp::kPlatformVersion));
+    lay->addWidget(cur);
 
-    auto* dayTitle = thLabel("font-size:12px; font-weight:600; color:@text@;", page);
-    dayTitle->setText(i18n::trs("最近 14 天逐日消耗（Token）", "Last 14 days (tokens)"));
-    lay->addWidget(dayTitle);
-    dailyChart_ = new ui::VBarChart(page);
-    lay->addWidget(dailyChart_);
+    auto* row = new QHBoxLayout();
+    auto* checkBtn = new QPushButton(i18n::trs("检查更新", "Check for updates"), page);
+    connect(checkBtn, &QPushButton::clicked, this, [this] {
+        if (!net_) net_ = new QNetworkAccessManager(this);
+        latest_->setText(i18n::trs("正在检查…", "Checking…"));
+        QNetworkRequest req(QUrl(QString::fromLatin1(kRepoApi)));
+        req.setHeader(QNetworkRequest::UserAgentHeader, "AgentHive");
+        req.setTransferTimeout(8000);
+        QNetworkReply* reply = net_->get(req);
+        connect(reply, &QNetworkReply::finished, this, [this, reply] {
+            reply->deleteLater();
+            if (reply->error() != QNetworkReply::NoError) {
+                latest_->setText(i18n::trs("检查失败：", "Check failed: ") + reply->errorString());
+                return;
+            }
+            const QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+            QString tag = doc.object().value("tag_name").toString();
+            if (tag.startsWith('v')) tag = tag.mid(1);
+            const QString curV = QString::fromLatin1(zp::kPlatformVersion);
+            if (tag.isEmpty()) {
+                latest_->setText(i18n::trs("未解析到最新版本信息。",
+                                           "Could not parse release info."));
+            } else if (cmpVersion(tag, curV) > 0) {
+                latest_->setText(i18n::trs("发现新版本", "New version available") +
+                                 QString("  v%1").arg(tag));
+            } else {
+                latest_->setText(i18n::trs("已是最新版本。", "You're up to date.") +
+                                 QString("  v%1").arg(curV));
+            }
+        });
+    });
+    auto* pageBtn = new QPushButton(i18n::trs("Releases 页面", "Releases page"), page);
+    connect(pageBtn, &QPushButton::clicked, this, [] {
+        QDesktopServices::openUrl(QUrl(QString::fromLatin1(kRepoPage)));
+    });
+    row->addWidget(checkBtn);
+    row->addWidget(pageBtn);
+    row->addStretch(1);
+    lay->addLayout(row);
 
-    auto* modelTitle = thLabel("font-size:12px; font-weight:600; color:@text@;", page);
-    modelTitle->setText(i18n::trs("按模型累计（Top 8）", "By model (top 8)"));
-    lay->addWidget(modelTitle);
-    modelChart_ = new ui::HBarChart(page);
-    modelChart_->setMinimumHeight(140);
-    lay->addWidget(modelChart_);
+    latest_ = thLabel("font-size:12px; color:@muted@;", page);
+    latest_->setWordWrap(true);
+    lay->addWidget(latest_);
 
-    tabs->addTab(page, i18n::trs("用量统计", "Usage"));
-}
-
-void SettingsDialog::refreshUsage() {
-    if (!isVisible()) return;  // 隐藏时不空转
-    std::string err;
-    zp::UsageSummary sum;
-    if (platform_.usageSummary(sum, err)) {
-        double pct = sum.budget > 0 ? 100.0 * sum.total_tokens / sum.budget : 0.0;
-        const QString head =
-            QString(i18n::trs("本周", "This week")) +
-            QString("  %1 / %2  (%3%)")
-                .arg(formatNum(sum.total_tokens))
-                .arg(formatNum(sum.budget))
-                .arg(pct, 0, 'f', 1);
-        if (head != lastHead_) {
-            lastHead_ = head;
-            usageHead_->setText(head);
-        }
-    }
-    std::vector<zp::UsageDailyPoint> pts;
-    if (platform_.usageDaily(14, pts, err)) {
-        QVector<QPair<QString, qint64>> es;
-        es.reserve(static_cast<qsizetype>(pts.size()));
-        for (const auto& pt : pts) es.push_back({QString::fromStdString(pt.day), pt.tokens});
-        if (es != lastDaily_) {
-            lastDaily_ = es;
-            dailyChart_->setEntries(es);
-        }
-    }
-    std::vector<zp::UsageModelRow> rows;
-    if (platform_.usageByModel(rows, err)) {
-        QVector<QPair<QString, qint64>> es;
-        for (size_t i = 0; i < rows.size() && i < 8; ++i)
-            es.push_back({QString::fromStdString(rows[i].model), rows[i].tokens});
-        if (es != lastModel_) {
-            lastModel_ = es;
-            modelChart_->setEntries(es);
-        }
-    }
+    auto* note = thLabel("font-size:11px; color:@muted@;", page);
+    note->setText(i18n::trs("AgentHive 纯本地运行、无遥测；不自动下载更新。",
+                            "AgentHive runs locally with no telemetry; it never auto-updates."));
+    note->setWordWrap(true);
+    lay->addWidget(note);
+    lay->addStretch(1);
+    return page;
 }

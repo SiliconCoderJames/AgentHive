@@ -199,6 +199,21 @@ void HttpServer::setupRoutes() {
         send(res, ok(arr));
     });
 
+    // ---- Agent 移除（主密钥；管理者自身不可删）----
+    srv.Post("/api/agents/remove", [&](const httplib::Request& req, httplib::Response& res) {
+        if (!checkMaster(req, p, res)) return;
+        auto body = json::parse(req.body, nullptr, false);
+        if (body.is_discarded() || !body.is_object() || !body.contains("name") ||
+            !body["name"].is_string()) {
+            send(res, fail(400, "name must be a string"));
+            return;
+        }
+        std::string err;
+        const std::string name = body["name"].get<std::string>();
+        if (!p.agentRemove(kManagerName, name, err)) { send(res, fail(400, err)); return; }
+        send(res, ok(json{{"removed", name}}));
+    });
+
     srv.Post("/api/agents/heartbeat", [&](const httplib::Request& req, httplib::Response& res) {
         std::string actor;
         if (!checkAgent(req, p, actor, res)) return;

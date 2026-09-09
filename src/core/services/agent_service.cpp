@@ -88,6 +88,11 @@ bool AgentService::listAgents(std::vector<AgentInfo>& out, std::string& err) {
     return true;
 }
 
+bool AgentService::removeAgent(const std::string& name, std::string& err) {
+    return db_.query("DELETE FROM agents WHERE name = ?",
+                     [&](Stmt& st) { st.bind(1, name); }, nullptr, err);
+}
+
 bool AgentService::nameExists(const std::string& name) {
     std::string err;
     bool found = false;

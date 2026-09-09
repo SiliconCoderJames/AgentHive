@@ -131,10 +131,13 @@ MainWindow::MainWindow(zp::Platform& platform, QWidget* parent)
     i18n::listeners().push_back([this] { applyLanguage(); });
     // 主题/字号切换：重生成 QSS、重涂铬层、重建面板
     ui::themeListeners().push_back([this] { applyTheme(); });
+    // 界面偏好（刷新频率/错误提醒）由设置对话框写入后经同一通知重读
+    ui::themeListeners().push_back([this] { applyUiPrefs(); });
 
     timer_ = new QTimer(this);
     connect(timer_, &QTimer::timeout, this, &MainWindow::onRefresh);
-    timer_->start(3000);  // 3 秒自动刷新当前面板与状态栏
+    applyUiPrefs();  // 读取刷新频率（默认 3s）与错误提醒偏好
+    timer_->start(timer_->interval());
 
     // 快捷键：Ctrl+1..7 切面板，F5 手动刷新
     for (int i = 0; i < 7; ++i) {
@@ -217,6 +220,14 @@ void MainWindow::applyChrome() {
     settingsBtn_->setStyleSheet(btn);
 }
 
+void MainWindow::applyUiPrefs() {
+    QSettings s;
+    int ms = s.value("ui/refreshMs", 3000).toInt();
+    if (ms < 1000 || ms > 60000) ms = 3000;
+    timer_->setInterval(ms);
+    errorToast_ = s.value("ui/errorToast", false).toBool();
+}
+
 void MainWindow::openSettings() {
     if (!settings_) {
         settings_ = new SettingsDialog(platform_, this);
@@ -291,6 +302,13 @@ void MainWindow::updateStatusBar() {
     std::vector<zp::ErrorReport> openErrors;
     if (platform_.errorList("open", "", 99, openErrors, err)) {
         openErrors_ = static_cast<int>(openErrors.size());
+        // 偏好开启时，新增未解决错误弹提醒（首次采样不提醒）
+        if (errorToast_ && seenOpenErrors_ >= 0 && openErrors_ > seenOpenErrors_) {
+            ui::Toast::show(this, i18n::trs("⚠ 新增 %1 条未解决错误", "⚠ %1 new unresolved "
+                                            "error(s)").arg(openErrors_ - seenOpenErrors_),
+                            false);
+        }
+        seenOpenErrors_ = openErrors_;
         nav_->item(5)->setText(
             openErrors_ > 0
                 ? QString("🚨  %1  (%2)").arg(i18n::trs("错误报告", "Errors")).arg(openErrors_)

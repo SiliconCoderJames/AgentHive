@@ -154,7 +154,7 @@ int usage() {
         "命令:\n"
         "  register --name X [--role member]              注册新 Agent（需 --master-key 或环境变量）\n"
         "  heartbeat                    [--task \"...\"]                 心跳 + 当前任务\n"
-        "  agents                                                    协作者列表（启动时必查）\n"
+        "  agents [remove --name N]                     协作者列表 / 移除（移除需主密钥）\n"
         "  memory get                   [--section S]                 读取用户记忆（启动时必查）\n"
         "  memory set    --section S --key K --value V               写入用户记忆（生成新版本）\n"
         "  memory history --section S --key K                        查看某条记忆的历史版本\n"
@@ -226,7 +226,12 @@ int main(int argc, char** argv) {
         method = "POST"; path = "/api/agents/heartbeat";
         body = {{"current_task", a.opts.count("task") ? a.opts["task"] : ""}};
     } else if (cmd == "agents") {
-        path = "/api/agents";
+        if (sub == "remove") {
+            method = "POST"; path = "/api/agents/remove"; needsAgent = false;
+            body = {{"name", a.opts.count("name") ? a.opts["name"] : ""}};
+        } else {
+            path = "/api/agents";
+        }
     } else if (cmd == "memory") {
         if (sub == "get") {
             path = "/api/memory";

@@ -21,6 +21,8 @@ public:
 private:
     ui::RingProgress* ring_ = nullptr;
     ui::HBarChart* usageChart_ = nullptr;
+    ui::VBarChart* trendChart_ = nullptr;    // 最近 14 天逐日消耗
+    ui::HBarChart* modelChart_ = nullptr;    // 按模型累计
     QGridLayout* agentGrid_ = nullptr;
     QListWidget* timeline_ = nullptr;
     QVBoxLayout* alertsLay_ = nullptr;
@@ -28,12 +30,15 @@ private:
     QGroupBox* budgetCard_ = nullptr;
     QGroupBox* usageCard_ = nullptr;
     QGroupBox* agentsCard_ = nullptr;
+    QGroupBox* trendCard_ = nullptr;
+    QGroupBox* modelCard_ = nullptr;
     QGroupBox* tlCard_ = nullptr;
     QGroupBox* alertCard_ = nullptr;
     std::vector<ui::AgentCard*> agentCards_;
     std::vector<QWidget*> alertCards_;
     QString budgetAlertLevel_;
-    QString lastTimeline_;  // 事件流去重：内容未变化时跳过重建，避免闪烁
+    QString lastTimeline_;   // 事件流去重：内容未变化时跳过重建，避免闪烁
+    QVector<QPair<QString, qint64>> lastDaily_, lastModel_;  // 用量图表去重
 
 public:
     void retranslate() override;

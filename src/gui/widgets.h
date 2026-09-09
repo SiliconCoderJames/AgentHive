@@ -1,8 +1,9 @@
 #pragma once
-// 态势感知工作台自定义控件：环形进度、横向柱状图、Toast、Agent 卡片、
-// 告警卡片、可折叠区块卡片。全部 QPainter / 原生 widget 实现，无 QML。
+// 态势感知工作台自定义控件：环形进度、横向/纵向柱状图、主题色卡、Toast、
+// Agent 卡片、告警卡片、可折叠区块卡片。全部 QPainter / 原生 widget 实现，无 QML。
 #include <QBrush>
 #include <QConicalGradient>
+#include <QEnterEvent>
 #include <QFrame>
 #include <QGraphicsOpacityEffect>
 #include <QLabel>
@@ -15,6 +16,8 @@
 #include <QVBoxLayout>
 #include <QVariantAnimation>
 #include <QWidget>
+
+#include <functional>
 
 #include "theme.h"
 #include "i18n.h"
@@ -223,6 +226,85 @@ inline QString fmtCompact(qint64 v) {
     if (s.endsWith('.')) s.chop(1);
     return s + (mega ? "M" : "k");
 }
+
+// ---- 主题色卡：迷你界面预览（底色/侧栏/文本线/强调块/品牌点），点击选择主题 ----
+class ThemeSwatch : public QFrame {
+public:
+    ThemeSwatch(const QString& name, QColor bg, QColor deep, QColor accent, QColor brand,
+                QColor text, std::function<void()> onClick, QWidget* parent = nullptr)
+        : QFrame(parent), name_(std::move(name)), bg_(std::move(bg)), deep_(std::move(deep)),
+          accent_(std::move(accent)), brand_(std::move(brand)), text_(std::move(text)),
+          onClick_(std::move(onClick)) {
+        setFixedSize(108, 78);
+        setCursor(Qt::PointingHandCursor);
+    }
+
+    void setSelected(bool on) {
+        if (selected_ == on) return;
+        selected_ = on;
+        update();
+    }
+
+protected:
+    void paintEvent(QPaintEvent*) override {
+        QPainter p(this);
+        p.setRenderHint(QPainter::Antialiasing);
+        const QRectF r = rect().adjusted(0.5, 0.5, -0.5, -0.5);
+        // 卡片底 = 主题窗口底色
+        p.setPen(Qt::NoPen);
+        p.setBrush(bg_);
+        p.drawRoundedRect(r, 9, 9);
+        // 左侧侧栏条 + 右侧内容示意线
+        p.setBrush(deep_);
+        p.drawRoundedRect(QRectF(7, 7, 20, height() - 26), 4, 4);
+        p.setPen(QPen(QColor(255, 255, 255, 36), 3, Qt::SolidLine, Qt::RoundCap));
+        for (int i = 0; i < 3; ++i)
+            p.drawLine(QPointF(34, 13 + i * 9), QPointF(width() - 10.0, 13 + i * 9));
+        p.setPen(Qt::NoPen);
+        // 强调色块 + 品牌色圆点
+        p.setBrush(accent_);
+        p.drawRoundedRect(QRectF(34, height() - 26, 30, 8), 3, 3);
+        p.setBrush(brand_);
+        p.drawEllipse(QPointF(width() - 16, height() - 22), 5, 5);
+        // 名称
+        p.setPen(QPen(text_));
+        QFont f = p.font();
+        f.setPixelSize(10);
+        p.setFont(f);
+        p.drawText(QRectF(0, height() - 17, width(), 15), Qt::AlignCenter, name_);
+        // 边框：选中 = 强调色 + 对勾；悬停 = 微亮
+        p.setBrush(Qt::NoBrush);
+        p.setPen(QPen(selected_ ? accent_ : QColor(255, 255, 255, hovered_ ? 70 : 26),
+                      selected_ ? 2 : 1));
+        p.drawRoundedRect(r, 9, 9);
+        if (selected_) {
+            p.setPen(QPen(accent_));
+            QFont bf = p.font();
+            bf.setPixelSize(11);
+            bf.setBold(true);
+            p.setFont(bf);
+            p.drawText(QRectF(0, 4, width() - 6, 14), Qt::AlignRight, "✓");
+        }
+    }
+    void mousePressEvent(QMouseEvent*) override {
+        if (onClick_) onClick_();
+    }
+    void enterEvent(QEnterEvent*) override {
+        hovered_ = true;
+        update();
+    }
+    void leaveEvent(QEvent*) override {
+        hovered_ = false;
+        update();
+    }
+
+private:
+    QString name_;
+    QColor bg_, deep_, accent_, brand_, text_;
+    std::function<void()> onClick_;
+    bool selected_ = false;
+    bool hovered_ = false;
+};
 
 // ---- 纵向柱状图：每日 Token 趋势，柱体自底部扫掠升起 ----
 // 峰值柱用品牌色蜜金 + 亮色数值，其余强调色纵向渐变；底部日期 MM-DD。

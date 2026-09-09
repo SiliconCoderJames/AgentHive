@@ -46,6 +46,8 @@ public:
     // ---- Agent ----
     void heartbeat(const std::string& name, const std::string& currentTask);
     bool listAgents(std::vector<AgentInfo>& out, std::string& err);
+    // 管理性移除（仅管理者；管理者自身不可删）；密钥随之失效，记入审计
+    bool agentRemove(const std::string& actor, const std::string& name, std::string& err);
 
     // ---- 知识库 ----
     bool knowledgeCreate(const std::string& author, const std::string& title,

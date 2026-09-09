@@ -19,6 +19,8 @@ public:
                       std::string& err) const;
     void heartbeat(const std::string& name, const std::string& currentTask);
     bool listAgents(std::vector<AgentInfo>& out, std::string& err);
+    // 管理性移除：删除注册行（密钥随之失效）；调用方负责管理者校验与审计
+    bool removeAgent(const std::string& name, std::string& err);
     bool nameExists(const std::string& name);
 
 private:

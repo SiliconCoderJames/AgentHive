@@ -147,7 +147,10 @@ bool Platform::persistAgentKey(const std::string& name, const std::string& apiKe
         if (in) { in >> j; in.close(); }
     }
     if (!j.is_object()) j = nlohmann::json::object();
-    j[name] = apiKey;
+    if (apiKey.empty())
+        j.erase(name);  // 空密钥 = 移除该条目（agentRemove 用）
+    else
+        j[name] = apiKey;
     std::ofstream out(path, std::ios::trunc);
     out << j.dump(2) << "\n";
     out.close();
@@ -189,6 +192,19 @@ bool Platform::registerAgent(const std::string& masterKey, const std::string& na
     persistAgentKey(name, outApiKey, err);
     audit_.log("master", "agent.register", name,
                nlohmann::json{{"role", actualRole}}.dump(), err);
+    return true;
+}
+
+bool Platform::agentRemove(const std::string& actor, const std::string& name, std::string& err) {
+    std::lock_guard lock(mutex_);
+    if (!isManager(actor)) { err = "only zcode can remove agents"; return false; }
+    if (name == kManagerName) { err = "cannot remove the manager agent"; return false; }
+    if (!agents_.nameExists(name)) { err = "agent not found: " + name; return false; }
+    if (!agents_.removeAgent(name, err)) return false;
+    // 密钥缓存文件同步移除该条目（尽力而为，失败不回滚删除）
+    std::string persistErr;
+    (void)persistAgentKey(name, "", persistErr);
+    audit_.log(actor, "agent.remove", name, nlohmann::json{{"removed", name}}.dump(), err);
     return true;
 }
 

@@ -47,9 +47,28 @@ DashboardPanel::DashboardPanel(zp::Platform& platform, QWidget* parent)
     agentGrid_->setSpacing(10);
     al->addWidget(gridHolder);
     al->addStretch(1);
-    root->addWidget(agentsCard_, 3);
+    root->addWidget(agentsCard_, 2);
 
-    // ---- 第三行：事件流时间线 + 告警卡片 ----
+    // ---- 第三行：逐日 Token 趋势 + 模型用量（自设置迁移至总览，主窗口直接可读）----
+    auto* trendRow = new QHBoxLayout();
+    trendRow->setSpacing(14);
+    trendCard_ = new QGroupBox(i18n::trs("最近 14 天逐日消耗", "Daily Tokens (14 days)"), this);
+    trendCard_->setObjectName("card");
+    auto* trl = new QVBoxLayout(trendCard_);
+    trl->setContentsMargins(12, 20, 12, 12);
+    trendChart_ = new ui::VBarChart(trendCard_);
+    trl->addWidget(trendChart_, 1);
+    trendRow->addWidget(trendCard_, 3);
+    modelCard_ = new QGroupBox(i18n::trs("模型用量累计", "Tokens by Model"), this);
+    modelCard_->setObjectName("card");
+    auto* ml = new QVBoxLayout(modelCard_);
+    ml->setContentsMargins(12, 20, 12, 12);
+    modelChart_ = new ui::HBarChart(modelCard_);
+    ml->addWidget(modelChart_, 1);
+    trendRow->addWidget(modelCard_, 2);
+    root->addLayout(trendRow, 2);
+
+    // ---- 第四行：事件流时间线 + 告警卡片 ----
     auto* bottomRow = new QHBoxLayout();
     bottomRow->setSpacing(14);
 
@@ -113,6 +132,28 @@ void DashboardPanel::refresh() {
                 agentGrid_->removeWidget(card);
                 card->hide();
             }
+        }
+    }
+
+    // 逐日趋势 + 模型用量（数据变化才重绘，避免 3s 刷新反复扫掠动画）
+    std::vector<zp::UsageDailyPoint> dailyPts;
+    if (platform_.usageDaily(14, dailyPts, err)) {
+        QVector<QPair<QString, qint64>> es;
+        for (const auto& d : dailyPts)
+            es.push_back({QString::fromStdString(d.day).mid(5), d.tokens});  // MM-DD
+        if (es != lastDaily_) {
+            lastDaily_ = es;
+            trendChart_->setEntries(es);
+        }
+    }
+    std::vector<zp::UsageModelRow> modelRows;
+    if (platform_.usageByModel(modelRows, err)) {
+        QVector<QPair<QString, qint64>> es;
+        for (size_t i = 0; i < modelRows.size() && i < 8; ++i)
+            es.push_back({QString::fromStdString(modelRows[i].model), modelRows[i].tokens});
+        if (es != lastModel_) {
+            lastModel_ = es;
+            modelChart_->setEntries(es);
         }
     }
 
@@ -192,6 +233,8 @@ void DashboardPanel::retranslate() {
     budgetCard_->setTitle(i18n::trs("本周 Token 预算", "Weekly Token Budget"));
     usageCard_->setTitle(i18n::trs("各 Agent 本周用量", "Per-Agent Usage This Week"));
     agentsCard_->setTitle(i18n::trs("Agent 状态", "Agent Status"));
+    trendCard_->setTitle(i18n::trs("最近 14 天逐日消耗", "Daily Tokens (14 days)"));
+    modelCard_->setTitle(i18n::trs("模型用量累计", "Tokens by Model"));
     tlCard_->setTitle(i18n::trs("事件流", "Event Stream"));
     alertCard_->setTitle(i18n::trs("告警", "Alerts"));
     emptyAlerts_->setText(i18n::trs("暂无错误，一切正常 ✓", "No errors — all clear ✓"));
