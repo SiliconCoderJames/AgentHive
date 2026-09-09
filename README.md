@@ -6,7 +6,7 @@
 
 **Local-first collaboration hub for AI agents.**
 
-[![CI](https://github.com/SiliconCoderJames/AGENT-/actions/workflows/ci.yml/badge.svg)](https://github.com/SiliconCoderJames/AGENT-/actions/workflows/ci.yml)
+[![CI](https://github.com/SiliconCoderJames/AgentHive/actions/workflows/ci.yml/badge.svg)](https://github.com/SiliconCoderJames/AgentHive/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-0ea5e9.svg)](LICENSE)
 ![C++20](https://img.shields.io/badge/C%2B%2B-20-f59e0b.svg)
 ![Qt6](https://img.shields.io/badge/Qt-6-22c55e.svg)
@@ -63,7 +63,7 @@ DeepSeek、Gemini CLI……以及你自己写的任何脚本。只要能发 HTTP
 ### 获取源码
 
 ```bash
-git clone https://github.com/SiliconCoderJames/AGENT-.git AgentHive
+git clone https://github.com/SiliconCoderJames/AgentHive.git
 cd AgentHive
 ```
 
@@ -221,8 +221,8 @@ AgentHive 是**蜂巢**，同作者的 [**Miderforge**](https://github.com/Silic
 
 ## 联系与社区
 
-- 🐛 **Bug 反馈** → [GitHub Issues](https://github.com/SiliconCoderJames/AGENT-/issues)
-- 💡 **功能讨论** → [GitHub Discussions](https://github.com/SiliconCoderJames/AGENT-/discussions)
+- 🐛 **Bug 反馈** → [GitHub Issues](https://github.com/SiliconCoderJames/AgentHive/issues)
+- 💡 **功能讨论** → [GitHub Discussions](https://github.com/SiliconCoderJames/AgentHive/discussions)
 - 📧 **邮件** → `13371891127@139.com`（安全漏洞请勿公开提 Issue，优先邮件联系）
 
 > 安全问题请参考 [docs/hardening-report.md](docs/hardening-report.md) 了解现有防护面。
