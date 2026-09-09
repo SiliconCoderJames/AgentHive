@@ -130,6 +130,7 @@ CREATE TABLE IF NOT EXISTS token_usage (
     tokens_in       INTEGER NOT NULL DEFAULT 0,
     tokens_out      INTEGER NOT NULL DEFAULT 0,
     call_type       TEXT,
+    model           TEXT NOT NULL DEFAULT '',
     reference_id    TEXT,
     idempotency_key TEXT,
     created_at      TEXT NOT NULL

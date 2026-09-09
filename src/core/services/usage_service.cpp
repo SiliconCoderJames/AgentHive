@@ -1,15 +1,20 @@
 #include "core/services/usage_service.h"
 
+#include <algorithm>
+#include <map>
+
 #include "core/util.h"
 
 namespace zp {
 
 bool UsageService::report(const std::string& agent, int64_t tokensIn, int64_t tokensOut,
-                          const std::string& callType, const std::string& referenceId,
-                          const std::string& idempotencyKey, bool& duplicate, std::string& err) {
+                          const std::string& callType, const std::string& model,
+                          const std::string& referenceId, const std::string& idempotencyKey,
+                          bool& duplicate, std::string& err) {
     duplicate = false;
     if (tokensIn < 0 || tokensOut < 0) { err = "token counts must be >= 0"; return false; }
     if (idempotencyKey.size() > 200) { err = "idempotency_key too long (max 200)"; return false; }
+    if (model.size() > 100) { err = "model too long (max 100)"; return false; }
 
     // BEGIN IMMEDIATE + 事务内查重：并发/重复上报不会双重扣减
     if (!db_.beginImmediate(err)) return false;
@@ -27,23 +32,54 @@ bool UsageService::report(const std::string& agent, int64_t tokensIn, int64_t to
         }
     }
     if (!db_.query(
-            "INSERT INTO token_usage(agent, week_start, tokens_in, tokens_out, call_type, reference_id, idempotency_key, created_at) "
-            "VALUES (?,?,?,?,?,?,?,?)",
+            "INSERT INTO token_usage(agent, week_start, tokens_in, tokens_out, call_type, model, reference_id, idempotency_key, created_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?)",
             [&](Stmt& st) {
                 st.bind(1, agent);
                 st.bind(2, weekStartIso());
                 st.bind(3, tokensIn);
                 st.bind(4, tokensOut);
                 st.bind(5, callType);
-                st.bind(6, referenceId);
-                st.bind(7, idempotencyKey);
-                st.bind(8, nowIso());
+                st.bind(6, model);
+                st.bind(7, referenceId);
+                st.bind(8, idempotencyKey);
+                st.bind(9, nowIso());
             },
             nullptr, err)) {
         db_.rollback();
         return false;
     }
     return db_.commit(err);
+}
+
+bool UsageService::daily(int days, std::vector<UsageDailyPoint>& out, std::string& err) {
+    out.clear();
+    days = std::clamp(days, 1, 90);
+    // created_at 为 UTC ISO8601，截前 10 位即日期；字典序与时间序一致
+    std::string cutoff = isoDaysAgo(days - 1).substr(0, 10);
+    std::map<std::string, int64_t> byDay;
+    if (!db_.query(
+            "SELECT substr(created_at,1,10) AS day, SUM(tokens_in + tokens_out) "
+            "FROM token_usage WHERE substr(created_at,1,10) >= ? GROUP BY day",
+            [&](Stmt& st) { st.bind(1, cutoff); },
+            [&](Stmt& st) { byDay[st.text(0)] = st.i64(1); }, err))
+        return false;
+    for (int i = days - 1; i >= 0; --i) {  // 旧 → 新，缺失天补 0
+        UsageDailyPoint p;
+        p.day = isoDaysAgo(i).substr(0, 10);
+        if (auto it = byDay.find(p.day); it != byDay.end()) p.tokens = it->second;
+        out.push_back(std::move(p));
+    }
+    return true;
+}
+
+bool UsageService::byModel(std::vector<UsageModelRow>& out, std::string& err) {
+    out.clear();
+    return db_.query(
+        "SELECT model, SUM(tokens_in + tokens_out) AS t FROM token_usage "
+        "WHERE model <> '' GROUP BY model ORDER BY t DESC LIMIT 20",
+        nullptr,
+        [&](Stmt& st) { out.push_back({st.text(0), st.i64(1)}); }, err);
 }
 
 int64_t UsageService::budget(std::string& err) {

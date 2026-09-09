@@ -170,7 +170,8 @@ int usage() {
         "  message inbox  [--kind K] [--status S]     message reply --uuid U --body B\n"
         "  message status --uuid U --status read|accepted|done|declined\n"
         "  error report   --title T --detail D [--severity S] [--source S] [--stack S]\n"
-        "  usage report   --tokens-in I --tokens-out O [--type T] [--ref R]\n"
+        "  usage report   --tokens-in I --tokens-out O [--type T] [--model M] [--ref R]\n"
+        "  usage daily    [--days N]                usage models（按模型累计）\n"
         "  usage summary                budget get / budget set --value N(主密钥)\n"
         "  audit          [--actor A] [--action A] [--limit N]\n";
     return 0;
@@ -356,10 +357,16 @@ int main(int argc, char** argv) {
             body = {{"tokens_in", toInt(a.opts["tokens-in"], 0)},
                     {"tokens_out", toInt(a.opts["tokens-out"], 0)},
                     {"call_type", a.opts.count("type") ? a.opts["type"] : ""},
+                    {"model", a.opts.count("model") ? a.opts["model"] : ""},
                     {"reference_id", a.opts.count("ref") ? a.opts["ref"] : ""},
                     {"idempotency_key", a.opts.count("idem") ? a.opts["idem"] : ""}};
         } else if (sub == "summary") {
             path = "/api/usage/summary";
+        } else if (sub == "daily") {
+            path = "/api/usage/daily";
+            if (a.opts.count("days")) path += "?days=" + a.opts["days"];
+        } else if (sub == "models") {
+            path = "/api/usage/models";
         } else return usage();
     } else if (cmd == "budget") {
         if (sub == "get") {

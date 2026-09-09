@@ -213,6 +213,99 @@ private:
     QPointer<QVariantAnimation> anim_;
 };
 
+// 紧凑数字：<1万原样，1万~100万 "12.3k"，≥100万 "1.23M"（柱顶标注用）
+inline QString fmtCompact(qint64 v) {
+    if (v < 10000) return QString::number(v);
+    const bool mega = v >= 1000000;
+    double x = mega ? double(v) / 1000000.0 : double(v) / 1000.0;
+    QString s = QString::number(x, 'f', x < 100 ? 1 : 0);
+    while (s.contains('.') && s.endsWith('0')) s.chop(1);
+    if (s.endsWith('.')) s.chop(1);
+    return s + (mega ? "M" : "k");
+}
+
+// ---- 纵向柱状图：每日 Token 趋势，柱体自底部扫掠升起 ----
+// 峰值柱用品牌色蜜金 + 亮色数值，其余强调色纵向渐变；底部日期 MM-DD。
+class VBarChart : public QWidget {
+public:
+    explicit VBarChart(QWidget* parent = nullptr) : QWidget(parent) {
+        setMinimumHeight(170);
+    }
+    void setEntries(const QVector<QPair<QString, qint64>>& entries) {
+        entries_ = entries;
+        if (anim_) anim_->stop();
+        auto* anim = new QVariantAnimation(this);
+        anim_ = anim;
+        anim->setDuration(450);
+        anim->setStartValue(0.0);
+        anim->setEndValue(1.0);
+        anim->setEasingCurve(QEasingCurve::OutCubic);
+        connect(anim, &QVariantAnimation::valueChanged, this, [this](const QVariant& v) {
+            sweep_ = v.toDouble();
+            update();
+        });
+        anim->start(QAbstractAnimation::DeleteWhenStopped);
+        update();
+    }
+
+protected:
+    void paintEvent(QPaintEvent*) override {
+        QPainter p(this);
+        p.setRenderHint(QPainter::Antialiasing);
+        if (entries_.isEmpty()) {
+            p.setPen(QPen(muted()));
+            p.drawText(rect(), Qt::AlignCenter, i18n::trs("暂无用量数据", "no usage data yet"));
+            return;
+        }
+        const int valueH = 18;  // 顶部数值标签区
+        const int labelH = 20;  // 底部日期标签区
+        QRectF plot(2, valueH, width() - 4, height() - valueH - labelH);
+        qint64 maxV = 1;
+        for (const auto& e : entries_) maxV = qMax(maxV, e.second);
+        // 网格：顶/中/底三条淡虚线
+        p.setPen(QPen(line(), 1, Qt::DashLine));
+        for (double r : {0.0, 0.5, 1.0}) {
+            double y = plot.bottom() - plot.height() * r;
+            p.drawLine(QPointF(plot.left(), y), QPointF(plot.right(), y));
+        }
+        const int n = entries_.size();
+        const double slot = plot.width() / n;
+        const double barW = qMin(26.0, slot * 0.62);
+        QFont f = p.font();
+        f.setPixelSize(9);
+        p.setFont(f);
+        for (int i = 0; i < n; ++i) {
+            double cx = plot.left() + slot * (i + 0.5);
+            double ratio = double(entries_[i].second) / double(maxV) * sweep_;
+            double h = plot.height() * ratio;
+            QRectF bar(cx - barW / 2, plot.bottom() - h, barW, h);
+            bool isMax = entries_[i].second == maxV && maxV > 1;
+            QColor base = isMax ? brand() : accent();
+            QLinearGradient sheen(bar.topLeft(), bar.bottomLeft());
+            sheen.setColorAt(0.0, base.lighter(135));
+            sheen.setColorAt(1.0, base.darker(108));
+            p.setPen(Qt::NoPen);
+            p.setBrush(sheen);
+            if (h > 0.5) p.drawRoundedRect(bar, 3, 3);
+            // 顶部数值（峰值亮色，其余弱化）
+            p.setPen(QPen(isMax ? brand() : muted()));
+            p.drawText(QRectF(cx - slot / 2, bar.top() - valueH + 2, slot, valueH),
+                       Qt::AlignCenter, fmtCompact(entries_[i].second));
+            // 底部日期 MM-DD
+            QString day = entries_[i].first;
+            if (day.size() >= 10) day = day.mid(5);
+            p.setPen(QPen(muted()));
+            p.drawText(QRectF(cx - slot / 2, plot.bottom() + 3, slot, labelH - 3),
+                       Qt::AlignCenter, day);
+        }
+    }
+
+private:
+    QVector<QPair<QString, qint64>> entries_;
+    double sweep_ = 1.0;
+    QPointer<QVariantAnimation> anim_;
+};
+
 // ---- Toast：右下角气泡提示（成功绿 / 失败红），1.8s 自动消失 ----
 class Toast : public QLabel {
 public:

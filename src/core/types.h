@@ -115,9 +115,20 @@ struct UsageSummary {
     std::string alert_level;    // none | warn | critical | over
 };
 
+struct UsageDailyPoint {
+    std::string day;            // UTC 日期 YYYY-MM-DD
+    int64_t tokens = 0;
+};
+
+struct UsageModelRow {
+    std::string model;
+    int64_t tokens = 0;
+};
+
 enum class SearchMode { Keyword, Semantic };
 
 constexpr const char* kDefaultRole = "member";
 constexpr const char* kManagerName = "zcode";
+constexpr const char* kPlatformVersion = "0.1.0";
 
 }  // namespace zp

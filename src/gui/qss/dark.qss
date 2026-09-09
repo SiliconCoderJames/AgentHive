@@ -137,6 +137,23 @@ QTableWidget::item:selected, QTreeWidget::item:selected, QListWidget::item:selec
 }
 QListWidget::item { padding: 7px; border-radius: 5px; }
 
+/* ---- 选项卡（设置对话框）---- */
+QTabWidget::pane {
+    border: 1px solid @line@;
+    border-radius: 8px;
+    top: -1px;
+    background: @bg@;
+}
+QTabBar::tab {
+    background: transparent;
+    color: @muted@;
+    padding: 7px 18px;
+    border: none;
+    border-bottom: 2px solid transparent;
+}
+QTabBar::tab:selected { color: @text@; border-bottom: 2px solid @accent@; }
+QTabBar::tab:hover:!selected { color: @text@; }
+
 /* ---- 滚动条 ---- */
 QScrollBar:vertical { background: transparent; width: 9px; margin: 2px; }
 QScrollBar::handle:vertical { background: @line@; border-radius: 4px; min-height: 30px; }

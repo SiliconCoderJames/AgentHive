@@ -69,6 +69,7 @@ bool Platform::bootstrap(std::string& err) {
     // 存量库迁移：新增列（已存在则静默跳过）
     db_.tryExec("ALTER TABLE agents ADD COLUMN salt TEXT NOT NULL DEFAULT '';");
     db_.tryExec("ALTER TABLE token_usage ADD COLUMN idempotency_key TEXT;");
+    db_.tryExec("ALTER TABLE token_usage ADD COLUMN model TEXT NOT NULL DEFAULT '';");
     db_.tryExec("CREATE UNIQUE INDEX IF NOT EXISTS idx_usage_idem "
                 "ON token_usage(idempotency_key) "
                 "WHERE idempotency_key IS NOT NULL AND idempotency_key != '';");
@@ -386,7 +387,7 @@ bool Platform::skillInvoke(const std::string& caller, const std::string& skillNa
         return false;
     if (tokensIn > 0 || tokensOut > 0) {
         bool invDup = false;
-        if (!usage_.report(caller, tokensIn, tokensOut, "skill", skillName, "", invDup, err))
+        if (!usage_.report(caller, tokensIn, tokensOut, "skill", "", skillName, "", invDup, err))
             return false;
     }
     audit_.log(caller, "skill.invoke", skillName,
@@ -545,19 +546,30 @@ bool Platform::errorResolve(const std::string& actor, const std::string& uuid,
 // ---------------- Token 用量 ----------------
 
 bool Platform::usageReport(const std::string& agent, int64_t tokensIn, int64_t tokensOut,
-                           const std::string& callType, const std::string& referenceId,
-                           const std::string& idempotencyKey, bool& duplicate, std::string& err) {
+                           const std::string& callType, const std::string& model,
+                           const std::string& referenceId, const std::string& idempotencyKey,
+                           bool& duplicate, std::string& err) {
     std::lock_guard lock(mutex_);
-    if (!usage_.report(agent, tokensIn, tokensOut, callType, referenceId, idempotencyKey,
+    if (!usage_.report(agent, tokensIn, tokensOut, callType, model, referenceId, idempotencyKey,
                        duplicate, err))
         return false;
     if (!duplicate) {
         audit_.log(agent, "usage.report", referenceId,
                    nlohmann::json{{"tokens_in", tokensIn}, {"tokens_out", tokensOut},
-                                  {"call_type", callType}}.dump(),
+                                  {"call_type", callType}, {"model", model}}.dump(),
                    err);
     }
     return true;
+}
+
+bool Platform::usageDaily(int days, std::vector<UsageDailyPoint>& out, std::string& err) {
+    std::lock_guard lock(mutex_);
+    return usage_.daily(days, out, err);
+}
+
+bool Platform::usageByModel(std::vector<UsageModelRow>& out, std::string& err) {
+    std::lock_guard lock(mutex_);
+    return usage_.byModel(out, err);
 }
 
 bool Platform::usageSummary(UsageSummary& out, std::string& err) {

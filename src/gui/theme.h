@@ -84,12 +84,26 @@ inline std::vector<std::function<void()>>& themeListeners() {
     static std::vector<std::function<void()>> l;
     return l;
 }
+// 返回监听器槽位 id（供 removeThemeListener 精确移除；1 起始）
+inline std::size_t addThemeListener(std::function<void()> f) {
+    auto& l = themeListeners();
+    l.push_back(std::move(f));
+    return l.size();
+}
+inline void removeThemeListener(std::size_t id) {
+    auto& l = themeListeners();
+    if (id > 0 && id <= l.size()) l[id - 1] = nullptr;  // 置空而非删除，保持其余槽位稳定
+}
+inline void notifyThemeListeners() {
+    for (auto& f : themeListeners())
+        if (f) f();
+}
 inline void setThemeIndex(int i) {
     i = qBound(0, i, static_cast<int>(themes().size()) - 1);
     themeIdx() = i;
     QSettings s;
     s.setValue("ui/theme", theme().id);
-    for (const auto& f : themeListeners()) f();
+    notifyThemeListeners();
 }
 
 inline int& fontBaseRef() {
@@ -104,7 +118,7 @@ inline void setFontBase(int px) {
     fontBaseRef() = qBound(12, px, 14);
     QSettings s;
     s.setValue("ui/fontBase", fontBaseRef());
-    for (const auto& f : themeListeners()) f();
+    notifyThemeListeners();
 }
 
 // ---- 取色函数（替代原编译期常量，切换主题后即时生效）----

@@ -19,6 +19,7 @@
 #include "panels/memory_panel.h"
 #include "panels/messages_panel.h"
 #include "panels/skills_panel.h"
+#include "settings_dialog.h"
 #include "theme.h"
 
 MainWindow::MainWindow(zp::Platform& platform, QWidget* parent)
@@ -89,11 +90,16 @@ MainWindow::MainWindow(zp::Platform& platform, QWidget* parent)
         connect(act, &QAction::triggered, this, [px] { ui::setFontBase(px); });
     }
     themeBtn_->setMenu(themeMenu);
+    settingsBtn_ = new QToolButton(foot);
+    settingsBtn_->setText("⚙");
+    settingsBtn_->setToolTip(i18n::trs("设置", "Settings"));
+    connect(settingsBtn_, &QToolButton::clicked, this, &MainWindow::openSettings);
     langBtn_ = new QToolButton(foot);
     connect(langBtn_, &QToolButton::clicked, this, [] { i18n::toggle(); });
     footLay->addWidget(ver_);
     footLay->addStretch(1);
     footLay->addWidget(themeBtn_);
+    footLay->addWidget(settingsBtn_);
     footLay->addWidget(langBtn_);
     sideLay->addWidget(foot);
     layout->addWidget(side_);
@@ -167,6 +173,7 @@ void MainWindow::applyLanguage() {
     tagline_->setText(i18n::trs("多 Agent 协作工作台", "multi-agent collaboration hub"));
     langBtn_->setText(i18n::g_lang == i18n::Lang::Zh ? "EN" : "中文");
     langBtn_->setToolTip(i18n::trs("切换语言", "Switch language"));
+    settingsBtn_->setToolTip(i18n::trs("设置", "Settings"));
     int row = nav_->currentRow();
     buildNav();
     if (row >= 0) nav_->setCurrentRow(row);
@@ -207,6 +214,17 @@ void MainWindow::applyChrome() {
         "QToolButton:hover { color:@text@; border-color:@accent@; }");
     langBtn_->setStyleSheet(btn);
     themeBtn_->setStyleSheet(btn);
+    settingsBtn_->setStyleSheet(btn);
+}
+
+void MainWindow::openSettings() {
+    if (!settings_) {
+        settings_ = new SettingsDialog(platform_, this);
+        settings_->setAttribute(Qt::WA_DeleteOnClose);
+    }
+    settings_->show();
+    settings_->raise();
+    settings_->activateWindow();
 }
 
 void MainWindow::applyTheme() {

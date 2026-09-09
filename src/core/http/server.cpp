@@ -3,6 +3,7 @@
 #include <httplib.h>
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <chrono>
 #include <stdexcept>
 #include <thread>
@@ -159,7 +160,7 @@ void HttpServer::setupRoutes() {
 
     srv.Get("/api/health", [&](const httplib::Request&, httplib::Response& res) {
         send(res, ok(json{{"service", "agenthive"},
-                          {"version", "0.1.0"},
+                          {"version", kPlatformVersion},
                           {"db", "sqlite3+sqlite-vec"},
                           {"time", nowIso()}}));
     });
@@ -633,9 +634,14 @@ void HttpServer::setupRoutes() {
         std::string type = body.value("call_type", "");
         std::string ref = body.value("reference_id", "");
         std::string idem = body.value("idempotency_key", "");
+        if (body.contains("model") && !body["model"].is_string()) {
+            send(res, fail(400, "model must be a string"));
+            return;
+        }
+        std::string model = body.value("model", "");
         bool duplicate = false;
         std::string err;
-        if (!p.usageReport(actor, tin, tout, type, ref, idem, duplicate, err)) {
+        if (!p.usageReport(actor, tin, tout, type, model, ref, idem, duplicate, err)) {
             send(res, fail(400, err));
             return;
         }
@@ -666,6 +672,41 @@ void HttpServer::setupRoutes() {
                           {"remaining", sum.budget - sum.total_tokens},
                           {"alert_level", sum.alert_level},
                           {"per_agent", per}}));
+    });
+
+    srv.Get("/api/usage/daily", [&](const httplib::Request& req, httplib::Response& res) {
+        std::string actor;
+        if (!checkAgent(req, p, actor, res)) return;
+        int days = 14;
+        if (req.has_param("days")) {
+            const std::string& v = req.get_param_value("days");
+            try {
+                size_t pos = 0;
+                int n = std::stoi(v, &pos);
+                if (n <= 0 || pos != v.size()) throw std::invalid_argument("days");
+                days = std::min(n, 90);
+            } catch (...) {
+                send(res, fail(400, "days must be a positive integer"));
+                return;
+            }
+        }
+        std::vector<UsageDailyPoint> pts;
+        std::string err;
+        if (!p.usageDaily(days, pts, err)) { send(res, fail(500, err)); return; }
+        json arr = json::array();
+        for (const auto& pt : pts) arr.push_back({{"day", pt.day}, {"tokens", pt.tokens}});
+        send(res, ok(json{{"days", arr}}));
+    });
+
+    srv.Get("/api/usage/models", [&](const httplib::Request& req, httplib::Response& res) {
+        std::string actor;
+        if (!checkAgent(req, p, actor, res)) return;
+        std::vector<UsageModelRow> rows;
+        std::string err;
+        if (!p.usageByModel(rows, err)) { send(res, fail(500, err)); return; }
+        json arr = json::array();
+        for (const auto& r : rows) arr.push_back({{"model", r.model}, {"tokens", r.tokens}});
+        send(res, ok(json{{"models", arr}}));
     });
 
     srv.Get("/api/usage/budget", [&](const httplib::Request& req, httplib::Response& res) {

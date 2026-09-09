@@ -274,25 +274,41 @@ static void test_platform_end_to_end() {
         CHECK_EQ(sum.total_tokens, static_cast<int64_t>(5000));
         CHECK_EQ(sum.alert_level, "none");
         bool dup = false;
-        CHECK(p.usageReport("hermes", 500, 400, "skill", "x", "", dup, err));  // 5.9%
+        CHECK(p.usageReport("hermes", 500, 400, "skill", "", "x", "", dup, err));  // 5.9%
         CHECK(p.usageSummary(sum, err));
         CHECK_EQ(sum.alert_level, "none");
         // 幂等：同一 idempotency_key 重复上报不重复扣减
-        CHECK(p.usageReport("hermes", 75000, 0, "llm", "task-1", "idem-1", dup, err));
+        CHECK(p.usageReport("hermes", 75000, 0, "llm", "", "task-1", "idem-1", dup, err));
         CHECK(!dup);
         CHECK(p.usageSummary(sum, err));
         int64_t afterFirst = sum.total_tokens;
-        CHECK(p.usageReport("hermes", 75000, 0, "llm", "task-1", "idem-1", dup, err));
+        CHECK(p.usageReport("hermes", 75000, 0, "llm", "", "task-1", "idem-1", dup, err));
         CHECK(dup);
         CHECK(p.usageSummary(sum, err));
         CHECK_EQ(sum.total_tokens, afterFirst);  // 未重复扣减
         CHECK_EQ(sum.alert_level, "warn");       // 80.9%
-        CHECK(p.usageReport("hermes", 15000, 0, "llm", "", "idem-2", dup, err));  // 95.9%
+        CHECK(p.usageReport("hermes", 15000, 0, "llm", "", "", "idem-2", dup, err));  // 95.9%
         CHECK(p.usageSummary(sum, err));
         CHECK_EQ(sum.alert_level, "critical");
-        CHECK(p.usageReport("hermes", 10000, 0, "llm", "", "idem-3", dup, err));  // 105.9%
+        CHECK(p.usageReport("hermes", 10000, 0, "llm", "", "", "idem-3", dup, err));  // 105.9%
         CHECK(p.usageSummary(sum, err));
         CHECK_EQ(sum.alert_level, "over");
+
+        // 用量统计：带模型上报 → 逐日趋势（连续日期补 0）与按模型累计
+        CHECK(p.usageReport("hermes", 1200, 300, "llm", "glm-5.3-flash", "ref-m1",
+                            "idem-m1", dup, err));
+        std::vector<zp::UsageDailyPoint> daily;
+        CHECK(p.usageDaily(7, daily, err));
+        CHECK_EQ(daily.size(), static_cast<size_t>(7));
+        CHECK(daily.front().day < daily.back().day);  // 旧 → 新排列
+        int64_t dayTotal = 0;
+        for (const auto& d : daily) dayTotal += d.tokens;
+        CHECK(dayTotal >= 1500);  // 至少覆盖本次带模型的 1500
+        std::vector<zp::UsageModelRow> models;
+        CHECK(p.usageByModel(models, err));
+        CHECK(models.size() >= 1);
+        CHECK_EQ(models.front().model, std::string("glm-5.3-flash"));
+        CHECK_EQ(models.front().tokens, static_cast<int64_t>(1500));
         // 超额（105.9%）：仅告警升级，不拦截技能调用（用量是观测不是限制）
         std::vector<zp::SkillInvocation> invs;
         CHECK(p.skillInvoke("hermes", "code-review", "{}", "", "success", 1, 0, 0, err));
@@ -355,6 +371,35 @@ static void test_platform_end_to_end() {
             auto r = cli.Put("/api/usage/budget", {{"X-Master-Key", masterKey}},
                              badBudget.dump(), "application/json");
             CHECK(r && r->status == 400);
+        }
+        // 用量统计端点：正常请求 200 + 数据形态；异常 days 400
+        auto httpDaily = cli.Get("/api/usage/daily?days=7",
+                                 {{"X-Agent-Name", "hermes"}, {"X-Api-Key", key}});
+        CHECK(httpDaily && httpDaily->status == 200);
+        if (httpDaily) {
+            auto body = json::parse(httpDaily->body);
+            CHECK_EQ(body["code"], 0);
+            CHECK(body["data"]["days"].is_array());
+            CHECK_EQ(body["data"]["days"].size(), 7);
+        }
+        auto badDays = cli.Get("/api/usage/daily?days=abc",
+                               {{"X-Agent-Name", "hermes"}, {"X-Api-Key", key}});
+        CHECK(badDays && badDays->status == 400);
+        auto badDays2 = cli.Get("/api/usage/daily?days=-3",
+                                {{"X-Agent-Name", "hermes"}, {"X-Api-Key", key}});
+        CHECK(badDays2 && badDays2->status == 400);
+        auto badModel = cli.Post("/api/usage/report",
+                                 {{"X-Agent-Name", "hermes"}, {"X-Api-Key", key}},
+                                 nlohmann::json{{"tokens_in", 1}, {"tokens_out", 1},
+                                                {"model", 42}}.dump(),
+                                 "application/json");
+        CHECK(badModel && badModel->status == 400);
+        auto httpModels = cli.Get("/api/usage/models",
+                                  {{"X-Agent-Name", "hermes"}, {"X-Api-Key", key}});
+        CHECK(httpModels && httpModels->status == 200);
+        if (httpModels) {
+            auto body = json::parse(httpModels->body);
+            CHECK(body["data"]["models"].is_array());
         }
 
         // ---- 加固项：长度校验 ----
@@ -442,10 +487,10 @@ static void test_legacy_migration() {
         CHECK(p.authenticate("legacy", "legacykey"));       // 旧格式（无盐）兼容
         CHECK(!p.authenticate("legacy", "wrong"));
         bool dup = false;
-        bool r1 = p.usageReport("legacy", 100, 50, "llm", "", "mig-1", dup, err);
+        bool r1 = p.usageReport("legacy", 100, 50, "llm", "", "", "mig-1", dup, err);
         if (!r1) std::printf("  legacy report err: %s\n", err.c_str());
         CHECK(r1);
-        CHECK(p.usageReport("legacy", 100, 50, "llm", "", "mig-1", dup, err));
+        CHECK(p.usageReport("legacy", 100, 50, "llm", "", "", "mig-1", dup, err));
         CHECK(dup);
         std::string key;
         std::string mk = readFile((tmp / "config" / "master.key").string());

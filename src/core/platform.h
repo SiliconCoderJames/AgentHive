@@ -117,9 +117,12 @@ public:
     // ---- Token 用量 ----
     // 超过周预算时拒绝（返回 false，err 前缀 "weekly token budget exceeded"）
     bool usageReport(const std::string& agent, int64_t tokensIn, int64_t tokensOut,
-                     const std::string& callType, const std::string& referenceId,
-                     const std::string& idempotencyKey, bool& duplicate, std::string& err);
+                     const std::string& callType, const std::string& model,
+                     const std::string& referenceId, const std::string& idempotencyKey,
+                     bool& duplicate, std::string& err);
     bool usageSummary(UsageSummary& out, std::string& err);
+    bool usageDaily(int days, std::vector<UsageDailyPoint>& out, std::string& err);
+    bool usageByModel(std::vector<UsageModelRow>& out, std::string& err);
     int64_t usageBudget(std::string& err);
     bool usageSetBudget(const std::string& actor, int64_t budget, std::string& err);
 
