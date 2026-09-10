@@ -6,6 +6,7 @@
 #include <QEnterEvent>
 #include <QFontMetrics>
 #include <QFrame>
+#include <QIcon>
 #include <QGraphicsOpacityEffect>
 #include <QLabel>
 #include <QLinearGradient>
@@ -645,6 +646,91 @@ inline void attachHexMotif(QTextDocument* doc) {
     p.drawEllipse(top, r * 0.3, r * 0.3);
     p.end();
     doc->addResource(QTextDocument::ImageResource, QUrl("hexmotif"), pm);
+}
+
+// ---- 程序化线性图标：统一 2px 圆角描边、随主题着色，替代大小不一的 emoji ----
+// kind: overview / knowledge / skills / memory / messages / errors / audit / gear
+inline QIcon makeIcon(const QString& kind, const QColor& color, int px = 18,
+                      const QColor& selectedColor = {}) {
+    auto paint = [&](QPixmap& pm, const QColor& c) {
+        pm.fill(Qt::transparent);
+        QPainter p(&pm);
+        p.setRenderHint(QPainter::Antialiasing);
+        p.scale(pm.width() / 24.0, pm.height() / 24.0);
+        QPen pen(c, 2.0, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+        p.setPen(pen);
+        p.setBrush(Qt::NoBrush);
+        auto poly = [&](std::initializer_list<QPointF> pts, bool close) {
+            QPolygonF f;
+            for (const auto& q : pts) f << q;
+            if (close)
+                p.drawPolygon(f);
+            else
+                p.drawPolyline(f);
+        };
+        if (kind == "overview") {  // 六边形 + 入口点（品牌母题）
+            poly({{12, 3}, {20, 7.5}, {20, 16.5}, {12, 21}, {4, 16.5}, {4, 7.5}}, true);
+            p.setPen(Qt::NoPen);
+            p.setBrush(c);
+            p.drawEllipse(QPointF(12, 12), 2.4, 2.4);
+        } else if (kind == "knowledge") {  // 摊开的书
+            poly({{4, 5},
+                  {8, 4},
+                  {12, 6},
+                  {16, 4},
+                  {20, 5},
+                  {20, 18},
+                  {15, 16.5},
+                  {12, 17.5},
+                  {9, 16.5},
+                  {4, 18}},
+                 true);
+            p.drawLine(QPointF(12, 6), QPointF(12, 17.5));
+        } else if (kind == "skills") {  // 能量螺栓
+            poly({{13, 2}, {5, 14}, {11, 14}, {9, 22}, {19, 10}, {13, 10}}, true);
+        } else if (kind == "memory") {  // 分层（对应记忆分层设计）
+            poly({{12, 3}, {21, 8}, {12, 13}, {3, 8}}, true);
+            poly({{3, 12}, {12, 17}, {21, 12}}, false);
+            poly({{3, 16}, {12, 21}, {21, 16}}, false);
+        } else if (kind == "messages") {  // 对话气泡
+            p.drawRoundedRect(QRectF(3, 4, 18, 12), 3.5, 3.5);
+            poly({{8, 16}, {8, 20}, {12, 16}}, false);
+        } else if (kind == "errors") {  // 警示三角
+            poly({{12, 3}, {22, 20}, {2, 20}}, true);
+            p.drawLine(QPointF(12, 9.5), QPointF(12, 14.5));
+            p.setPen(Qt::NoPen);
+            p.setBrush(c);
+            p.drawEllipse(QPointF(12, 17.2), 1.15, 1.15);
+        } else if (kind == "audit") {  // 时钟
+            p.drawEllipse(QPointF(12, 12), 8.5, 8.5);
+            p.drawLine(QPointF(12, 7.5), QPointF(12, 12));
+            p.drawLine(QPointF(12, 12), QPointF(15, 14));
+        } else if (kind == "gear") {  // 设置齿轮
+            p.drawEllipse(QPointF(12, 12), 6.2, 6.2);
+            p.setBrush(c);
+            p.setPen(Qt::NoPen);
+            p.drawEllipse(QPointF(12, 12), 2.1, 2.1);
+            p.setPen(pen);
+            p.setBrush(Qt::NoBrush);
+            for (int i = 0; i < 8; ++i) {
+                qreal a = M_PI / 4.0 * i;
+                p.drawLine(QPointF(12 + 6.4 * std::cos(a), 12 + 6.4 * std::sin(a)),
+                           QPointF(12 + 9.2 * std::cos(a), 12 + 9.2 * std::sin(a)));
+            }
+        }
+    };
+    QIcon icon;
+    QPixmap pm(px * 2, px * 2);
+    pm.setDevicePixelRatio(2);
+    paint(pm, color);
+    icon.addPixmap(pm);
+    if (selectedColor.isValid()) {
+        QPixmap ps(px * 2, px * 2);
+        ps.setDevicePixelRatio(2);
+        paint(ps, selectedColor);
+        icon.addPixmap(ps, QIcon::Selected);
+    }
+    return icon;
 }
 
 }  // namespace ui

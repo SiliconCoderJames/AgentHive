@@ -138,6 +138,7 @@ inline QColor warn() { return theme().warn; }
 inline QColor note() { return theme().note; }
 inline QColor text() { return theme().text; }
 inline QColor muted() { return theme().muted; }
+inline QColor selText() { return theme().selText; }
 
 inline QString mono() { return QString(theme().mono); }
 inline QString sans() { return QStringLiteral("Segoe UI, Microsoft YaHei UI"); }

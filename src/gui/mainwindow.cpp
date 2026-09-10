@@ -66,7 +66,7 @@ MainWindow::MainWindow(zp::Platform& platform, QWidget* parent)
     footLay->setContentsMargins(10, 0, 10, 0);
     ver_ = new QLabel("v1.0", foot);
     settingsBtn_ = new QToolButton(foot);
-    settingsBtn_->setText("⚙");
+    settingsBtn_->setIcon(ui::makeIcon("gear", ui::muted(), 16));
     settingsBtn_->setToolTip(i18n::trs("设置", "Settings"));
     connect(settingsBtn_, &QToolButton::clicked, this, &MainWindow::openSettings);
     langBtn_ = new QToolButton(foot);
@@ -146,16 +146,24 @@ void MainWindow::buildNav() {
         "QListWidget::item:hover { background:@card@; color:@text@; }"
         "QListWidget::item:selected { background:@selbg@; color:@seltext@;"
         " font-weight:600; border-left:3px solid @brand@; }"));
-    const QStringList items{
-        "📊  " + i18n::trs("总览", "Overview"),
-        "📚  " + i18n::trs("知识库", "Knowledge"),
-        "🧩  " + i18n::trs("技能库", "Skills"),
-        "🧠  " + i18n::trs("用户记忆", "Memory"),
-        "💬  " + i18n::trs("Agent 交流", "Messaging"),
-        "🚨  " + i18n::trs("错误报告", "Errors"),
-        "🕘  " + i18n::trs("操作日志", "Audit"),
+    // 程序化线性图标：随主题着色，错误项恒红、选中态换亮色（替代大小不一的 emoji）
+    const std::vector<std::tuple<const char*, const char*, const char*>> items{
+        {"overview", "总览", "Overview"},
+        {"knowledge", "知识库", "Knowledge"},
+        {"skills", "技能库", "Skills"},
+        {"memory", "用户记忆", "Memory"},
+        {"messages", "Agent 交流", "Messaging"},
+        {"errors", "错误报告", "Errors"},
+        {"audit", "操作日志", "Audit"},
     };
-    nav_->addItems(items);
+    for (const auto& [kind, zh, en] : items) {
+        const bool isErr = QString(kind) == "errors";
+        const QColor base = isErr ? ui::danger() : ui::muted();
+        auto* it = new QListWidgetItem(
+            ui::makeIcon(kind, base, 18, isErr ? ui::danger() : ui::selText()),
+            "  " + i18n::trs(zh, en));
+        nav_->addItem(it);
+    }
     nav_->item(5)->setForeground(QBrush(ui::danger()));  // 错误报告项恒红，异常时更醒目
 }
 
@@ -206,6 +214,7 @@ void MainWindow::applyChrome() {
         "QToolButton:hover { color:@text@; border-color:@accent@; }");
     langBtn_->setStyleSheet(btn);
     settingsBtn_->setStyleSheet(btn);
+    settingsBtn_->setIcon(ui::makeIcon("gear", ui::muted(), 16));  // 随主题重涂齿轮
 }
 
 void MainWindow::applyUiPrefs() {
