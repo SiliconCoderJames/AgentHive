@@ -7,6 +7,7 @@
 #include <QHBoxLayout>
 #include <QMessageBox>
 #include <QPlainTextEdit>
+#include <QSettings>
 #include <QSplitter>
 #include <QVBoxLayout>
 
@@ -50,6 +51,19 @@ ErrorsPanel::ErrorsPanel(zp::Platform& platform, QWidget* parent)
     table_->horizontalHeader()->setStretchLastSection(true);
     polishTable(table_);
     attachTableContextMenu(table_);
+    // 即时过滤框：置于「登记解决」左侧，需在 table_ 就绪后创建
+    filterEdit_ = makeTableFilter(table_, this);
+    toolbar->insertWidget(toolbar->indexOf(resolveBtn_), filterEdit_);
+    // 双击错误行 = 直接进入「登记解决」流程
+    connect(table_, &QTableWidget::cellDoubleClicked, this,
+            [this](int row, int) { if (row >= 0) onResolve(); });
+    // 分栏宽度持久化：跨会话记住左右比例
+    QSettings s;
+    splitter->restoreState(s.value("ui/splitter/errors").toByteArray());
+    connect(splitter, &QSplitter::splitterMoved, this, [splitter](int, int) {
+        QSettings s;
+        s.setValue("ui/splitter/errors", splitter->saveState());
+    });
     splitter->addWidget(table_);
 
     auto* right = new QWidget(splitter);
@@ -117,6 +131,12 @@ void ErrorsPanel::refresh() {
     }
     emptyLabel_->setVisible(errors_.empty());
     splitter_->setVisible(!errors_.empty());
+    applyTableFilter(table_, filterEdit_->text());  // 行已重建，重放即时过滤态
+}
+
+void ErrorsPanel::focusFilter() {
+    filterEdit_->setFocus();
+    filterEdit_->selectAll();
 }
 
 void ErrorsPanel::onResolve() {

@@ -11,6 +11,7 @@
 #include <QHBoxLayout>
 #include <QMessageBox>
 #include <QPlainTextEdit>
+#include <QSettings>
 #include <QSplitter>
 #include <QVBoxLayout>
 
@@ -59,6 +60,21 @@ KnowledgePanel::KnowledgePanel(zp::Platform& platform, QWidget* parent)
     table_->horizontalHeader()->setStretchLastSection(true);
     polishTable(table_);
     splitter->addWidget(table_);
+    // 结果即筛：对当前搜索结果做本地即时过滤（与上方服务端搜索互补）
+    viewFilter_ = makeTableFilter(table_, this,
+                                  i18n::trs("🔍  结果即筛…", "🔍  Filter results…"));
+    viewFilter_->setMaximumWidth(170);
+    toolbar->insertWidget(toolbar->indexOf(searchBtn), viewFilter_);
+    // 双击行 = 大窗阅读全文（右侧详情栏偏窄时不挤）
+    connect(table_, &QTableWidget::cellDoubleClicked, this,
+            &KnowledgePanel::onEntryViewer);
+    // 分栏宽度持久化：跨会话记住左右比例
+    QSettings s;
+    splitter->restoreState(s.value("ui/splitter/knowledge").toByteArray());
+    connect(splitter, &QSplitter::splitterMoved, this, [splitter](int, int) {
+        QSettings s;
+        s.setValue("ui/splitter/knowledge", splitter->saveState());
+    });
 
     auto* right = new QWidget(splitter);
     auto* rl = new QVBoxLayout(right);
@@ -113,6 +129,7 @@ void KnowledgePanel::onSearch() {
                {QString::fromStdString(e.title), QString::fromStdString(e.author), tags.trimmed(),
                 QString::number(e.version), QString::fromStdString(e.created_at)});
     }
+    applyTableFilter(table_, viewFilter_->text());  // 新结果套用当前过滤
 
     // 统计摘要：总数 / 今日新增 / 热门标签
     QString today = QString::fromStdString(zp::nowIso()).left(10);
@@ -185,6 +202,38 @@ void KnowledgePanel::onSelectEntry(int row) {
     }
     versionCombo_->setCurrentIndex(0);
     versionCombo_->blockSignals(false);
+}
+
+void KnowledgePanel::focusFilter() {
+    viewFilter_->setFocus();
+    viewFilter_->selectAll();
+}
+
+void KnowledgePanel::onEntryViewer(int row) {
+    if (row < 0 || row >= static_cast<int>(hits_.size())) return;
+    const auto& e = hits_[static_cast<size_t>(row)].entry;
+    QString tags;
+    for (const auto& t : e.tags) tags += QString::fromStdString(t) + " ";
+    QDialog dlg(this);
+    dlg.setWindowTitle(QString("%1 · v%2").arg(QString::fromStdString(e.title)).arg(e.version));
+    dlg.resize(780, 560);
+    auto* l = new QVBoxLayout(&dlg);
+    auto* meta = new QLabel(
+        QString("%1: %2 · %3: %4 · %5: %6 · %7: %8")
+            .arg(i18n::trs("作者", "Author"), QString::fromStdString(e.author))
+            .arg(i18n::trs("标签", "Tags"), tags.trimmed().toHtmlEscaped())
+            .arg(i18n::trs("分类", "Category"), QString::fromStdString(e.category))
+            .arg(i18n::trs("时间", "Time"), QString::fromStdString(e.created_at)));
+    meta->setStyleSheet(ui::th("color:@muted@; font-size:12px;"));
+    auto* view = new QPlainTextEdit(&dlg);
+    view->setReadOnly(true);
+    view->setPlainText(QString::fromStdString(e.content));
+    l->addWidget(meta);
+    l->addWidget(view, 1);
+    auto* close = new QDialogButtonBox(QDialogButtonBox::Close, &dlg);
+    connect(close, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+    l->addWidget(close);
+    dlg.exec();
 }
 
 void KnowledgePanel::onVersionChanged(int idx) {

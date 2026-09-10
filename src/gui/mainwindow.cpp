@@ -28,6 +28,10 @@
 MainWindow::MainWindow(zp::Platform& platform, QWidget* parent)
     : QMainWindow(parent), platform_(platform) {
     setWindowTitle("AgentHive · 多 Agent 协作工作台");
+    {   // 恢复上次窗口几何（位置/大小/最大化状态；关闭到托盘前已保存）
+        QSettings s;
+        restoreGeometry(s.value("ui/geometry").toByteArray());
+    }
 
     auto* central = new QWidget(this);
     auto* layout = new QHBoxLayout(central);
@@ -128,13 +132,28 @@ MainWindow::MainWindow(zp::Platform& platform, QWidget* parent)
         }
     }
 
-    // 快捷键：Ctrl+1..7 切面板，F5 手动刷新
+    // 快捷键：Ctrl+1..7 切面板，F5 手动刷新，Ctrl+F 聚焦本面板即时过滤，Ctrl+, 打开设置
     for (int i = 0; i < 7; ++i) {
         auto* sc = new QShortcut(QKeySequence(QString("Ctrl+%1").arg(i + 1)), this);
         connect(sc, &QShortcut::activated, this, [this, i] { nav_->setCurrentRow(i); });
     }
     auto* refreshSc = new QShortcut(QKeySequence("F5"), this);
     connect(refreshSc, &QShortcut::activated, this, &MainWindow::onRefresh);
+    auto* filterSc = new QShortcut(QKeySequence("Ctrl+F"), this);
+    connect(filterSc, &QShortcut::activated, this, [this] {
+        int idx = stack_->currentIndex();
+        if (idx >= 0 && idx < static_cast<int>(panels_.size()))
+            panels_[static_cast<size_t>(idx)]->focusFilter();
+    });
+    auto* settingsSc = new QShortcut(QKeySequence("Ctrl+,"), this);
+    connect(settingsSc, &QShortcut::activated, this, &MainWindow::openSettings);
+}
+
+void MainWindow::hideEvent(QHideEvent* e) {
+    // 任何隐藏路径（关闭到托盘 / 真正退出前）都保存窗口几何，下次启动原样恢复
+    QSettings s;
+    s.setValue("ui/geometry", saveGeometry());
+    QMainWindow::hideEvent(e);
 }
 
 void MainWindow::buildNav() {

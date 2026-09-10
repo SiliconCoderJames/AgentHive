@@ -3,6 +3,7 @@
 #include <QComboBox>
 #include <QDateEdit>
 #include <QLabel>
+#include <QLineEdit>
 #include <QTreeWidget>
 #include <vector>
 
@@ -13,10 +14,12 @@ class LogsPanel : public PanelBase {
 public:
     explicit LogsPanel(zp::Platform& platform, QWidget* parent = nullptr);
     void refresh() override;
+    void focusFilter() override;
 
 private:
     QComboBox* agentCombo_ = nullptr;
     QDateEdit* sinceEdit_ = nullptr;
+    QLineEdit* filterEdit_ = nullptr;
     QLabel* countLabel_ = nullptr;
     QTreeWidget* tree_ = nullptr;
     std::vector<zp::AuditRecord> records_;

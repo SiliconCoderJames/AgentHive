@@ -15,6 +15,7 @@
 
 class QFrame;
 class QCloseEvent;
+class QHideEvent;
 class SettingsDialog;
 class QSystemTrayIcon;
 
@@ -25,6 +26,7 @@ public:
 
 protected:
     void closeEvent(QCloseEvent*) override;  // 关闭即隐藏到托盘，服务常驻
+    void hideEvent(QHideEvent*) override;    // 任何隐藏路径都持久化窗口几何
 
 private slots:
     void onNavChanged(int row);

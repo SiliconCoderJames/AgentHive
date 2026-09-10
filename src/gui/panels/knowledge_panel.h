@@ -17,6 +17,7 @@ class KnowledgePanel : public PanelBase {
 public:
     explicit KnowledgePanel(zp::Platform& platform, QWidget* parent = nullptr);
     void refresh() override;
+    void focusFilter() override;
 
 private slots:
     void onSearch();
@@ -24,11 +25,13 @@ private slots:
     void onAddVersion();
     void onSelectEntry(int row);
     void onVersionChanged(int idx);
+    void onEntryViewer(int row);
 
 private:
     QLineEdit* searchEdit_ = nullptr;
     QCheckBox* semanticCheck_ = nullptr;
     QLineEdit* tagEdit_ = nullptr;
+    QLineEdit* viewFilter_ = nullptr;
     QLabel* statsLabel_ = nullptr;
     QTableWidget* table_ = nullptr;
     QTextBrowser* detail_ = nullptr;

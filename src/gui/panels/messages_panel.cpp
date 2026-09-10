@@ -4,6 +4,7 @@
 #include <QFormLayout>
 #include <QLineEdit>
 #include <QMessageBox>
+#include <QMouseEvent>
 #include <QPlainTextEdit>
 #include <QScrollBar>
 
@@ -84,6 +85,8 @@ MessagesPanel::MessagesPanel(zp::Platform& platform, QWidget* parent)
         selectedUuid_ = url.toString().toStdString();
         updateActions();
     });
+    // 双击气泡 = 直接进入回复（锚点即消息 uuid）
+    chat_->viewport()->installEventFilter(this);
 
     // 操作条
     infoLabel_ = new QLabel(this);
@@ -118,6 +121,20 @@ void MessagesPanel::refresh() {
     std::string err;
     platform_.messageList("", kind, status, "", 200, messages_, err);
     renderChat();
+}
+
+bool MessagesPanel::eventFilter(QObject* obj, QEvent* e) {
+    if (obj == chat_->viewport() && e->type() == QEvent::MouseButtonDblClick) {
+        auto* me = static_cast<QMouseEvent*>(e);
+        const QUrl url = chat_->anchorAt(me->position().toPoint());
+        if (!url.isEmpty()) {
+            selectedUuid_ = url.toString().toStdString();
+            updateActions();
+            onReply();
+            return true;  // 双击已消费，避免再触发选中
+        }
+    }
+    return PanelBase::eventFilter(obj, e);
 }
 
 void MessagesPanel::renderChat() {

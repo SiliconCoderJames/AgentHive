@@ -1,6 +1,7 @@
 #pragma once
 // 错误报告面板：浏览 / 筛选错误，查看堆栈与解决记录，登记解决说明。
 #include <QComboBox>
+#include <QLineEdit>
 #include <QPushButton>
 #include <QSplitter>
 #include <QTableWidget>
@@ -16,6 +17,7 @@ class ErrorsPanel : public PanelBase {
 public:
     explicit ErrorsPanel(zp::Platform& platform, QWidget* parent = nullptr);
     void refresh() override;
+    void focusFilter() override;
 
 private slots:
     void onResolve();
@@ -23,6 +25,7 @@ private slots:
 private:
     QComboBox* statusCombo_ = nullptr;
     QComboBox* severityCombo_ = nullptr;
+    QLineEdit* filterEdit_ = nullptr;
     QSplitter* splitter_ = nullptr;
     QTableWidget* table_ = nullptr;
     QTextBrowser* detail_ = nullptr;

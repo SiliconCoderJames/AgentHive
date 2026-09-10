@@ -3,6 +3,7 @@
 #include <QMessageBox>
 #include <QPainter>
 #include <QPixmap>
+#include <QSettings>
 
 #include <cstdlib>
 
@@ -83,8 +84,11 @@ int main(int argc, char** argv) {
     }
 
     MainWindow w(platform);
-    w.resize(1280, 800);
     w.setMinimumSize(1080, 680);
+    {   // 上次窗口几何由 MainWindow 自行恢复；无记录时才用默认尺寸
+        QSettings s;
+        if (!s.contains("ui/geometry")) w.resize(1280, 800);
+    }
     w.show();
     return app.exec();
 }

@@ -48,6 +48,14 @@ LogsPanel::LogsPanel(zp::Platform& platform, QWidget* parent)
     tree_->header()->setStretchLastSection(true);
     tree_->setAlternatingRowColors(true);
     layout->addWidget(tree_, 1);
+    // 即时过滤框：树建好后创建，置于「共 N 条」左侧
+    filterEdit_ = makeTreeFilter(tree_, this);
+    toolbar->insertWidget(toolbar->indexOf(countLabel_), filterEdit_);
+}
+
+void LogsPanel::focusFilter() {
+    filterEdit_->setFocus();
+    filterEdit_->selectAll();
 }
 
 void LogsPanel::refresh() {
@@ -95,5 +103,6 @@ void LogsPanel::refresh() {
         for (int c = 0; c < 5; ++c) row->setFlags(row->flags() & ~Qt::ItemIsEditable);
     }
     tree_->expandToDepth(0);
+    applyTreeFilter(tree_, filterEdit_->text());  // 树已重建，重放即时过滤态
     countLabel_->setText(i18n::trs("共 %1 条", "%1 records").arg(formatNum(static_cast<qint64>(records_.size()))));
 }

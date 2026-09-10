@@ -16,6 +16,8 @@ public:
     explicit PanelBase(zp::Platform& platform, QWidget* parent = nullptr)
         : QWidget(parent), platform_(platform) {}
     virtual void refresh() = 0;
+    // Ctrl+F：把焦点交给本面板的即时过滤框；无过滤框的面板不用覆写
+    virtual void focusFilter() {}
     // 语言切换时重译铬层文案；面板有自有文案时覆写并先调用基类
     virtual void retranslate() {
         if (headerTitle_) headerTitle_->setText(i18n::trs(zhTitle_, enTitle_));

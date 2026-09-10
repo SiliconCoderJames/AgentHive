@@ -510,7 +510,27 @@ QWidget* SettingsDialog::buildAboutPage() {
                      .arg(i18n::trs("本地优先 · 数据不出本机", "local-first · data stays local")));
     ver->setAlignment(Qt::AlignCenter);
     lay->addWidget(ver);
-    lay->addSpacing(12);
+    lay->addSpacing(10);
+
+    // 快捷键速查：随主题重涂的富文本标签（键帽用内联样式，QSS 管不到富文本内部）
+    auto* keys = new QLabel(page);
+    keys->setTextFormat(Qt::RichText);
+    keys->setAlignment(Qt::AlignCenter);
+    keys->setStyleSheet(ui::th("font-size:11px; color:@muted@;"));
+    const auto kbd = [](const QString& k) {
+        return ui::th(QString("<span style='background:@field@; color:@text@;"
+                              " border:1px solid @line@; border-radius:4px;"
+                              " padding:0 4px; font-family:@mono@,monospace;'>%1</span>")
+                          .arg(k));
+    };
+    keys->setText(QString(
+        "%1 %2　%3 %4　%5 %6　%7 %8")
+        .arg(kbd("Ctrl 1-7"), i18n::trs("切换面板", "switch panel"))
+        .arg(kbd("F5"), i18n::trs("刷新", "refresh"))
+        .arg(kbd("Ctrl+F"), i18n::trs("聚焦过滤框", "focus filter"))
+        .arg(kbd("Ctrl+,"), i18n::trs("打开设置", "open settings")));
+    lay->addWidget(keys);
+    lay->addSpacing(2);
 
     auto* row = new QHBoxLayout();
     row->addStretch(1);

@@ -1,7 +1,8 @@
 #pragma once
 // Agent 交流面板：对话流视图（气泡 + 发送者标识 + 时间戳），
-// 点击消息选中后可回复 / 流转状态。
+// 点击消息选中后可回复 / 流转状态，双击气泡直接回复。
 #include <QComboBox>
+#include <QEvent>
 #include <QLabel>
 #include <QPushButton>
 #include <QTextBrowser>
@@ -15,6 +16,7 @@ class MessagesPanel : public PanelBase {
 public:
     explicit MessagesPanel(zp::Platform& platform, QWidget* parent = nullptr);
     void refresh() override;
+    bool eventFilter(QObject* obj, QEvent* e) override;  // 双击气泡 = 回复
 
 private slots:
     void onCompose();

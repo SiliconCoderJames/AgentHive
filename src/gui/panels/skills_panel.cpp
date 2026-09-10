@@ -12,6 +12,7 @@
 #include <QLineEdit>
 #include <QMessageBox>
 #include <QPlainTextEdit>
+#include <QSettings>
 #include <QSplitter>
 #include <QVBoxLayout>
 
@@ -58,13 +59,28 @@ SkillsPanel::SkillsPanel(zp::Platform& platform, QWidget* parent)
     table_->resizeColumnsToContents();
     attachTableContextMenu(table_);
     splitter->addWidget(table_);
+    // 即时过滤框：置于「注册技能」左侧，需在 table_ 就绪后创建
+    filterEdit_ = makeTableFilter(table_, this);
+    toolbar->insertWidget(toolbar->indexOf(registerBtn), filterEdit_);
     detail_ = new QTextBrowser(splitter);
     splitter->addWidget(detail_);
     splitter->setStretchFactor(0, 3);
     splitter->setStretchFactor(1, 2);
+    // 分栏宽度持久化：跨会话记住左右比例（主题/语言切换重建面板后同样恢复）
+    QSettings s;
+    splitter->restoreState(s.value("ui/splitter/skills").toByteArray());
+    connect(splitter, &QSplitter::splitterMoved, this, [splitter](int, int) {
+        QSettings s;
+        s.setValue("ui/splitter/skills", splitter->saveState());
+    });
     layout->addWidget(splitter, 1);
 
     connect(table_, &QTableWidget::cellClicked, this, [this](int row, int) { onSelectSkill(row); });
+}
+
+void SkillsPanel::focusFilter() {
+    filterEdit_->setFocus();
+    filterEdit_->selectAll();
 }
 
 void SkillsPanel::refresh() {
@@ -121,6 +137,7 @@ void SkillsPanel::refresh() {
             restoreRow = static_cast<int>(i);
     }
     table_->resizeColumnsToContents();  // 按实际内容重算列宽，避免截断
+    applyTableFilter(table_, filterEdit_->text());  // 行已重建，重放即时过滤态
     if (restoreRow >= 0) {
         table_->selectRow(restoreRow);
         onSelectSkill(restoreRow);
