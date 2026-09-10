@@ -37,12 +37,16 @@ QLineEdit, QComboBox, QSpinBox, QDateEdit, QPlainTextEdit {
     font-size: 12px;
 }
 QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDateEdit:focus, QPlainTextEdit:focus {
-    border: 1px solid @accenthi@;
+    border: 1px solid @accent@;
     background-color: @card@;
+    outline: 0;
 }
-QComboBox::drop-down { border: none; width: 22px; }
+QComboBox { padding-right: 26px; outline: 0; }
+QComboBox::drop-down { border: none; width: 20px; }
 QComboBox::down-arrow {
     image: none;
+    width: 0;
+    height: 0;
     border-left: 4px solid transparent;
     border-right: 4px solid transparent;
     border-top: 5px solid @muted@;

@@ -60,39 +60,11 @@ MainWindow::MainWindow(zp::Platform& platform, QWidget* parent)
     nav_->setFocusPolicy(Qt::NoFocus);  // 去除选中项虚线焦点框；Ctrl+1..7 仍可切换面板
     sideLay->addWidget(nav_, 1);
 
-    // 脚注：版本号 + 主题/字号切换 + 语言切换（持久化到 QSettings）
+    // 脚注：版本号 + 设置 + 语言切换（主题/字号在 ⚙ 设置的外观页，此处不再重复入口）
     auto* foot = new QWidget(side_);
     auto* footLay = new QHBoxLayout(foot);
     footLay->setContentsMargins(10, 0, 10, 0);
-    ver_ = new QLabel("v1.0 · local-first", foot);
-    themeBtn_ = new QToolButton(foot);
-    themeBtn_->setText("🎨");
-    themeBtn_->setToolTip(i18n::trs("主题与字号", "Theme & font size"));
-    themeBtn_->setPopupMode(QToolButton::InstantPopup);
-    auto* themeMenu = new QMenu(themeBtn_);
-    auto* themeGroup = new QActionGroup(themeMenu);
-    themeGroup->setExclusive(true);
-    for (int i = 0; i < static_cast<int>(ui::themes().size()); ++i) {
-        const auto& t = ui::themes()[static_cast<size_t>(i)];
-        auto* act = themeMenu->addAction(i18n::trs(t.zh, t.en));
-        act->setCheckable(true);
-        act->setChecked(i == ui::themeIdx());
-        themeGroup->addAction(act);
-        connect(act, &QAction::triggered, this, [i] { ui::setThemeIndex(i); });
-    }
-    themeMenu->addSeparator();
-    auto* fontGroup = new QActionGroup(themeMenu);
-    fontGroup->setExclusive(true);
-    const std::vector<std::pair<int, const char*>> fontSizes{
-        {12, "紧凑 12px"}, {13, "标准 13px"}, {14, "大号 14px"}};
-    for (const auto& [px, label] : fontSizes) {
-        auto* act = themeMenu->addAction(QString::fromUtf8(label));
-        act->setCheckable(true);
-        act->setChecked(ui::fontBaseRef() == px);
-        fontGroup->addAction(act);
-        connect(act, &QAction::triggered, this, [px] { ui::setFontBase(px); });
-    }
-    themeBtn_->setMenu(themeMenu);
+    ver_ = new QLabel("v1.0", foot);
     settingsBtn_ = new QToolButton(foot);
     settingsBtn_->setText("⚙");
     settingsBtn_->setToolTip(i18n::trs("设置", "Settings"));
@@ -101,7 +73,6 @@ MainWindow::MainWindow(zp::Platform& platform, QWidget* parent)
     connect(langBtn_, &QToolButton::clicked, this, [] { i18n::toggle(); });
     footLay->addWidget(ver_);
     footLay->addStretch(1);
-    footLay->addWidget(themeBtn_);
     footLay->addWidget(settingsBtn_);
     footLay->addWidget(langBtn_);
     sideLay->addWidget(foot);
@@ -234,7 +205,6 @@ void MainWindow::applyChrome() {
         " border-radius:6px; padding:2px 8px; }"
         "QToolButton:hover { color:@text@; border-color:@accent@; }");
     langBtn_->setStyleSheet(btn);
-    themeBtn_->setStyleSheet(btn);
     settingsBtn_->setStyleSheet(btn);
 }
 

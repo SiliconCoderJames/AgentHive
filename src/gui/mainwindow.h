@@ -55,7 +55,6 @@ private:
     QLabel* spin_ = nullptr;
     QToolButton* settingsBtn_ = nullptr;
     QToolButton* langBtn_ = nullptr;
-    QToolButton* themeBtn_ = nullptr;
     QLabel* ver_ = nullptr;
     QLabel* tagline_ = nullptr;
     QPointer<SettingsDialog> settings_ = nullptr;

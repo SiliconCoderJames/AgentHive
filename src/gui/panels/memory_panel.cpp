@@ -15,6 +15,7 @@
 #include "../gui_util.h"
 #include "../i18n.h"
 #include "../widgets.h"
+#include "../widgets.h"
 
 namespace {
 // 五大区块（显示名, 存储名）
@@ -90,8 +91,12 @@ void MemoryPanel::refresh() {
         cl->setContentsMargins(14, 10, 14, 12);
         cl->setSpacing(6);
         if (group.empty()) {
-            auto* empty = new QLabel("该区块暂无记忆", content);
-            empty->setText(i18n::trs("该区块暂无记忆", "No memories in this section yet")); empty->setStyleSheet(ui::th("color:@muted@; font-size:11px;"));
+            // 空状态：蜂巢母题 + 出路提示（品牌触点，见 docs/brand.md §3）
+            auto* empty = new ui::HexEmptyState(
+                "🧠", i18n::trs("该区块暂无记忆", "No memories in this section yet"),
+                i18n::trs("通过 memory set 或工具栏写入第一条，所有 Agent 共享",
+                          "Add the first entry via memory set or the toolbar — shared by all agents"),
+                content);
             cl->addWidget(empty);
         } else {
             for (const auto& m : group) {

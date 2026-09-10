@@ -25,6 +25,7 @@ LogsPanel::LogsPanel(zp::Platform& platform, QWidget* parent)
     sinceEdit_ = new QDateEdit(this);
     sinceEdit_->setDisplayFormat("yyyy-MM-dd");
     sinceEdit_->setCalendarPopup(true);
+    sinceEdit_->setDate(QDate::currentDate().addDays(-30));  // 默认看近 30 天，而非 2000 年
     auto* refreshBtn = new QPushButton(i18n::trs("筛选", "Apply"), this);
     refreshBtn->setObjectName("primary");
     countLabel_ = new QLabel(this);
