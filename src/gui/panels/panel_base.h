@@ -30,23 +30,23 @@ protected:
         zhSub_ = zhSub; enSub_ = enSub;
         headerTitle_ = new QLabel(i18n::trs(zhTitle, enTitle), this);
         headerTitle_->setStyleSheet(
-            ui::th("font-size:17px; font-weight:700; color:@text@;"));
+            ui::th("font-size:20px; font-weight:700; color:@text@;"));
         headerSub_ = new QLabel(i18n::trs(zhSub, enSub), this);
-        headerSub_->setStyleSheet(ui::th("font-size:11px; color:@muted@; margin-top:1px;"));
+        headerSub_->setStyleSheet(ui::th("font-size:12px; color:@muted@; margin-top:2px;"));
         // 标题蜜金→天蓝竖向渐变饰条：全面板统一的品牌签名
         auto* bar = new QFrame(this);
-        bar->setFixedSize(4, 20);
+        bar->setFixedSize(4, 26);
         bar->setStyleSheet(
             ui::th("background:qlineargradient(x1:0,y1:0,x2:0,y2:1,"
                    "stop:0 @brand@, stop:1 @accent@); border-radius:2px;"));
         auto* head = new QHBoxLayout;
-        head->setSpacing(9);
+        head->setSpacing(10);
         head->addWidget(bar);
         head->addWidget(headerTitle_);
         head->addStretch(1);
         layout->addLayout(head);
         layout->addWidget(headerSub_);
-        layout->addSpacing(6);
+        layout->addSpacing(10);
     }
 
     zp::Platform& platform_;

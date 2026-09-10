@@ -34,7 +34,7 @@ inline QString formatNum(qint64 n) {
 inline void polishTable(QTableWidget* table) {
     table->setAlternatingRowColors(true);
     table->verticalHeader()->setVisible(false);
-    table->verticalHeader()->setDefaultSectionSize(26);
+    table->verticalHeader()->setDefaultSectionSize(28);
     table->setEditTriggers(QAbstractItemView::NoEditTriggers);
     table->setSelectionBehavior(QAbstractItemView::SelectRows);
     table->setSelectionMode(QAbstractItemView::SingleSelection);

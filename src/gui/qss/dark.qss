@@ -3,7 +3,7 @@
 
 * {
     font-family: "Segoe UI", "Microsoft YaHei UI", sans-serif;
-    font-size: 12px;
+    font-size: 13px;
     color: @text@;
     selection-background-color: @accent@;
     selection-color: #ffffff;
@@ -16,15 +16,16 @@ QMainWindow, QDialog { background-color: @bg@; }
 QGroupBox#card {
     background-color: @card@;
     border: 1px solid @line@;
-    border-radius: 10px;
-    padding: 14px;
-    margin-top: 8px;
+    border-radius: 12px;
+    padding: 16px;
+    margin-top: 10px;
     font-weight: 600;
 }
 QGroupBox#card::title {
     subcontrol-origin: margin;
-    left: 12px;
+    left: 14px;
     padding: 0 6px;
+    font-size: 13px;
     color: @brand@;   /* 品牌色卡片标题：蜂巢品牌签名 */
 }
 
@@ -32,17 +33,17 @@ QGroupBox#card::title {
 QLineEdit, QComboBox, QSpinBox, QDateEdit, QPlainTextEdit {
     background-color: @field@;
     border: 1px solid @line@;
-    border-radius: 6px;
-    padding: 6px 10px;
-    font-size: 12px;
+    border-radius: 8px;
+    padding: 7px 12px;
+    font-size: 13px;
 }
 QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDateEdit:focus, QPlainTextEdit:focus {
     border: 1px solid @accent@;
     background-color: @card@;
     outline: 0;
 }
-QComboBox { padding-right: 26px; outline: 0; }
-QComboBox::drop-down { border: none; width: 20px; }
+QComboBox { padding-right: 28px; outline: 0; }
+QComboBox::drop-down { border: none; width: 22px; }
 QComboBox::down-arrow {
     image: none;
     width: 0;
@@ -88,7 +89,7 @@ QMenu {
     border-radius: 8px;
     padding: 5px;
 }
-QMenu::item { padding: 6px 22px; border-radius: 5px; }
+QMenu::item { padding: 7px 24px; border-radius: 6px; }
 QMenu::item:selected { background-color: @accent@; color: #ffffff; }
 QMenu::separator { height: 1px; background: @line@; margin: 4px 8px; }
 
@@ -96,9 +97,9 @@ QMenu::separator { height: 1px; background: @line@; margin: 4px 8px; }
 QPushButton {
     background-color: @fieldhover@;
     border: none;
-    border-radius: 6px;
-    padding: 7px 16px;
-    font-size: 12px;
+    border-radius: 8px;
+    padding: 8px 18px;
+    font-size: 13px;
 }
 QPushButton:hover { background-color: @line@; }
 QPushButton:pressed { background-color: @card@; }
@@ -118,8 +119,8 @@ QPushButton:disabled { background-color: @fieldhover@; color: @muted@; }
 QTableWidget, QTreeWidget, QListWidget, QTextBrowser {
     background-color: @field@;
     border: 1px solid @line@;
-    border-radius: 8px;
-    padding: 6px;
+    border-radius: 10px;
+    padding: 8px;
     gridline-color: @line@;
     alternate-background-color: @card@;
 }
@@ -128,8 +129,8 @@ QHeaderView::section {
     color: @muted@;
     border: none;
     border-bottom: 1px solid @line@;
-    padding: 7px 8px;
-    font-size: 11px;
+    padding: 9px 10px;
+    font-size: 12px;
 }
 QTableWidget::item, QTreeWidget::item { padding: 5px; }
 QTableWidget::item:hover, QTreeWidget::item:hover, QListWidget::item:hover {
@@ -151,7 +152,7 @@ QTabWidget::pane {
 QTabBar::tab {
     background: transparent;
     color: @muted@;
-    padding: 7px 18px;
+    padding: 9px 22px;
     border: none;
     border-bottom: 2px solid transparent;
 }
