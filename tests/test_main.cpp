@@ -325,6 +325,22 @@ static void test_platform_end_to_end() {
             if (r.action == "agent.register") foundReg = true;
         CHECK(foundReg);
 
+        // Agent 管理：非管理者拒删 / 管理者不可自删 / 管理者删除后列表收缩、凭据失效
+        step("agents.remove");
+        std::string droidKey;
+        CHECK(p.registerAgent(masterKey, "droid", "member", droidKey, err));
+        CHECK(!droidKey.empty());
+        CHECK(!p.agentRemove("hermes", "droid", err));
+        CHECK(!p.agentRemove("zcode", "zcode", err));
+        CHECK(p.agentRemove("zcode", "droid", err));
+        std::vector<zp::AgentInfo> afterRemove;
+        CHECK(p.listAgents(afterRemove, err));
+        bool droidGone = true;
+        for (const auto& a : afterRemove)
+            if (a.name == "droid") droidGone = false;
+        CHECK(droidGone);
+        CHECK(!p.authenticate("droid", droidKey));  // 凭据随之失效
+
         // HTTP API 冒烟：启动服务，Agent 客户端访问
         step("http.start");
         int port = 0;
