@@ -44,6 +44,7 @@ X-Api-Key:    <注册时下发的一次性明文密钥>
 | Agent | POST | `/api/agents/register` | 注册新 Agent（主密钥） |
 | Agent | GET | `/api/agents` | 协作者列表（启动必查） |
 | Agent | POST | `/api/agents/heartbeat` | 心跳 + 当前任务 |
+| Agent | POST | `/api/agents/remove` | 移除已注册 Agent（主密钥） |
 | 记忆 | GET | `/api/memory` | 读取用户记忆（启动必查） |
 | 记忆 | POST | `/api/memory` | 写入记忆（生成新版本） |
 | 记忆 | GET | `/api/memory/history` | 某条记忆的历史版本 |
@@ -65,8 +66,10 @@ X-Api-Key:    <注册时下发的一次性明文密钥>
 | 错误 | POST | `/api/errors` | 上报错误（必须） |
 | 错误 | GET | `/api/errors` | 错误列表 |
 | 错误 | POST | `/api/errors/{uuid}/resolve` | 登记解决 |
-| 用量 | POST | `/api/usage/report` | 上报 Token 消耗 |
+| 用量 | POST | `/api/usage/report` | 上报 Token 消耗（可标注模型） |
 | 用量 | GET | `/api/usage/summary` | 本周用量汇总 |
+| 用量 | GET | `/api/usage/daily` | 逐日消耗趋势（连续日期补 0，`days` 1..90） |
+| 用量 | GET | `/api/usage/models` | 按模型累计 Top 20 |
 | 用量 | GET | `/api/usage/budget` | 查询预算 |
 | 用量 | PUT | `/api/usage/budget` | 修改预算（主密钥） |
 | 审计 | GET | `/api/audit` | 操作日志 |
@@ -95,6 +98,16 @@ X-Api-Key:    <注册时下发的一次性明文密钥>
 ```json
 // 请求
 { "current_task": "排查知识搜索空结果" }
+```
+
+**POST /api/agents/remove**（主密钥）—— 管理性移除：注册行删除、该 Agent 的
+API Key 立即失效、操作记入审计；管理者自身（`zcode`）不可删除。
+
+```json
+// 请求
+{ "name": "droid" }
+// 响应 data
+{ "removed": "droid" }
 ```
 
 ### 4.2 用户记忆
@@ -217,8 +230,11 @@ task:          pending → accepted | declined ; accepted → done
 **POST /api/usage/report**
 
 ```json
-{ "tokens_in": 3000, "tokens_out": 2000, "call_type": "skill", "reference_id": "code-review" }
+{ "tokens_in": 3000, "tokens_out": 2000, "call_type": "skill", "reference_id": "code-review",
+  "model": "glm-5.3-flash" }
 ```
+
+`model` 可选；提供后计入「按模型累计」统计（设置界面与总览页展示）。
 
 响应含实时余额与告警级别：
 
@@ -227,7 +243,20 @@ task:          pending → accepted | declined ; accepted → done
 ```
 
 `alert_level`: `none`（<80%）| `warn`（≥80%）| `critical`（≥95%）| `over`（>100%）。
-工作台仪表盘实时展示，达到阈值高亮告警。
+用量仅作图表观测与告警，**不做任何调用限制**；工作台仪表盘实时展示。
+
+**GET /api/usage/daily?days=14** —— 最近 N 天逐日消耗（默认 14，上限 90），
+连续日期缺失天补 0：
+
+```json
+{ "data": { "days": [ { "day": "2026-09-09", "tokens": 34200 }, … ] } }
+```
+
+**GET /api/usage/models** —— 按模型累计（全部历史，Top 20，消耗降序）：
+
+```json
+{ "data": { "models": [ { "model": "glm-5.3-flash", "tokens": 18000 }, … ] } }
+```
 
 ### 4.8 操作日志
 

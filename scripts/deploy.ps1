@@ -1,4 +1,4 @@
-﻿# Deploy the workbench to %LOCALAPPDATA%\ZCodePlatform and create a desktop
+﻿# Deploy the workbench to %LOCALAPPDATA%\AgentHive and create a desktop
 # shortcut. Survives repo/build directory cleanup.
 # Usage: powershell -ExecutionPolicy Bypass -File scripts\deploy.ps1
 $ErrorActionPreference = "Stop"
@@ -9,7 +9,7 @@ if (-not (Test-Path (Join-Path $src "zworkbench.exe"))) {
     exit 1
 }
 
-$dest = Join-Path $env:LOCALAPPDATA "ZCodePlatform"
+$dest = Join-Path $env:LOCALAPPDATA "AgentHive"
 New-Item -ItemType Directory -Force -Path $dest | Out-Null
 # /MIR keeps the deployed tree exactly in sync (removes stale Qt DLLs)
 robocopy $src $dest /MIR /NFL /NDL /NJH /NJS | Out-Null
@@ -28,6 +28,17 @@ $lnk.Save()
 foreach ($old in @("ZCode Platform.lnk", "ZCode 协作平台.lnk")) {
     $oldPath = Join-Path $desktop $old
     if (Test-Path $oldPath) { Remove-Item $oldPath -Force }
+}
+
+# 清理历史品牌部署目录（仅含程序副本，不含用户数据；被占用时跳过留待下次）
+$legacy = Join-Path $env:LOCALAPPDATA "ZCodePlatform"
+if (Test-Path $legacy) {
+    try {
+        Remove-Item $legacy -Recurse -Force -ErrorAction Stop
+        Write-Host "LEGACY_DIR_REMOVED=$legacy"
+    } catch {
+        Write-Host "LEGACY_DIR_BUSY=$legacy"
+    }
 }
 
 Write-Host "DEPLOY_DIR=$dest"
