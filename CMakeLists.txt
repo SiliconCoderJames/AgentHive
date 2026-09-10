@@ -119,7 +119,7 @@ if(BUILD_TESTS)
 endif()
 
 if(BUILD_GUI)
-    find_package(Qt6 QUIET COMPONENTS Widgets Network)
+    find_package(Qt6 QUIET COMPONENTS Widgets Network Svg)
     if(Qt6_FOUND)
         add_subdirectory(src/gui)
     else()

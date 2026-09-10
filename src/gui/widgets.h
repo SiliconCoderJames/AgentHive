@@ -13,6 +13,7 @@
 #include <QPainter>
 #include <QPointer>
 #include <QPropertyAnimation>
+#include <QSvgRenderer>
 #include <QTextDocument>
 #include <QTimer>
 #include <QToolButton>
@@ -648,88 +649,64 @@ inline void attachHexMotif(QTextDocument* doc) {
     doc->addResource(QTextDocument::ImageResource, QUrl("hexmotif"), pm);
 }
 
-// ---- 程序化线性图标：统一 2px 圆角描边、随主题着色，替代大小不一的 emoji ----
+// ---- 线性图标：Lucide 几何（MIT，24 网格 stroke-2 圆角端点）+ 主题色注入，
+//      QSvgRenderer 渲染为高清位图。替代 emoji 与手绘形状。
 // kind: overview / knowledge / skills / memory / messages / errors / audit / gear
 inline QIcon makeIcon(const QString& kind, const QColor& color, int px = 18,
                       const QColor& selectedColor = {}) {
-    auto paint = [&](QPixmap& pm, const QColor& c) {
+    QString inner;
+    if (kind == "overview")  // 品牌母题：六边形 + 蜂巢入口点
+        inner = "<path d='M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 "
+                "1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z'/>"
+                "<circle cx='12' cy='12' r='2.3' fill='%1' stroke='none'/>";
+    else if (kind == "knowledge")
+        inner = "<path d='M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z'/>"
+                "<path d='M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3 3h7z'/>";
+    else if (kind == "skills")
+        inner = "<polygon points='13 2 3 14 12 14 11 22 21 10 12 10 13 2'/>";
+    else if (kind == "memory")
+        inner = "<polygon points='12 2 2 7 12 12 22 7 12 2'/>"
+                "<polyline points='2 17 12 22 22 17'/>"
+                "<polyline points='2 12 12 17 22 12'/>";
+    else if (kind == "messages")
+        inner = "<path d='M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z'/>";
+    else if (kind == "errors")
+        inner = "<path d='m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3z'/>"
+                "<line x1='12' x2='12' y1='9' y2='13'/>"
+                "<line x1='12' x2='12.01' y1='17' y2='17'/>";
+    else if (kind == "audit")
+        inner = "<circle cx='12' cy='12' r='10'/>"
+                "<polyline points='12 6 12 12 16 14'/>";
+    else if (kind == "gear")
+        inner = "<path d='M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 "
+                "2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 "
+                "2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 "
+                "2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 "
+                "2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 "
+                "0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 "
+                "2 0 0 0-2-2z'/>"
+                "<circle cx='12' cy='12' r='3'/>";
+
+    auto render = [&](const QColor& c) {
+        const QString colorName = c.name();
+        const QString body = inner.contains("%1") ? inner.arg(colorName) : inner;
+        const QString svg = QString("<svg xmlns='http://www.w3.org/2000/svg' width='%1' height='%1' "
+                                    "viewBox='0 0 24 24' fill='none' stroke='%2' stroke-width='2' "
+                                    "stroke-linecap='round' stroke-linejoin='round'>%3</svg>")
+                                .arg(px * 2)
+                                .arg(colorName)
+                                .arg(body);
+        QPixmap pm(px * 2, px * 2);
         pm.fill(Qt::transparent);
+        QSvgRenderer r(svg.toUtf8());
         QPainter p(&pm);
-        p.setRenderHint(QPainter::Antialiasing);
-        p.scale(pm.width() / 24.0, pm.height() / 24.0);
-        QPen pen(c, 2.0, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
-        p.setPen(pen);
-        p.setBrush(Qt::NoBrush);
-        auto poly = [&](std::initializer_list<QPointF> pts, bool close) {
-            QPolygonF f;
-            for (const auto& q : pts) f << q;
-            if (close)
-                p.drawPolygon(f);
-            else
-                p.drawPolyline(f);
-        };
-        if (kind == "overview") {  // 六边形 + 入口点（品牌母题）
-            poly({{12, 3}, {20, 7.5}, {20, 16.5}, {12, 21}, {4, 16.5}, {4, 7.5}}, true);
-            p.setPen(Qt::NoPen);
-            p.setBrush(c);
-            p.drawEllipse(QPointF(12, 12), 2.4, 2.4);
-        } else if (kind == "knowledge") {  // 摊开的书
-            poly({{4, 5},
-                  {8, 4},
-                  {12, 6},
-                  {16, 4},
-                  {20, 5},
-                  {20, 18},
-                  {15, 16.5},
-                  {12, 17.5},
-                  {9, 16.5},
-                  {4, 18}},
-                 true);
-            p.drawLine(QPointF(12, 6), QPointF(12, 17.5));
-        } else if (kind == "skills") {  // 能量螺栓
-            poly({{13, 2}, {5, 14}, {11, 14}, {9, 22}, {19, 10}, {13, 10}}, true);
-        } else if (kind == "memory") {  // 分层（对应记忆分层设计）
-            poly({{12, 3}, {21, 8}, {12, 13}, {3, 8}}, true);
-            poly({{3, 12}, {12, 17}, {21, 12}}, false);
-            poly({{3, 16}, {12, 21}, {21, 16}}, false);
-        } else if (kind == "messages") {  // 对话气泡
-            p.drawRoundedRect(QRectF(3, 4, 18, 12), 3.5, 3.5);
-            poly({{8, 16}, {8, 20}, {12, 16}}, false);
-        } else if (kind == "errors") {  // 警示三角
-            poly({{12, 3}, {22, 20}, {2, 20}}, true);
-            p.drawLine(QPointF(12, 9.5), QPointF(12, 14.5));
-            p.setPen(Qt::NoPen);
-            p.setBrush(c);
-            p.drawEllipse(QPointF(12, 17.2), 1.15, 1.15);
-        } else if (kind == "audit") {  // 时钟
-            p.drawEllipse(QPointF(12, 12), 8.5, 8.5);
-            p.drawLine(QPointF(12, 7.5), QPointF(12, 12));
-            p.drawLine(QPointF(12, 12), QPointF(15, 14));
-        } else if (kind == "gear") {  // 设置齿轮
-            p.drawEllipse(QPointF(12, 12), 6.2, 6.2);
-            p.setBrush(c);
-            p.setPen(Qt::NoPen);
-            p.drawEllipse(QPointF(12, 12), 2.1, 2.1);
-            p.setPen(pen);
-            p.setBrush(Qt::NoBrush);
-            for (int i = 0; i < 8; ++i) {
-                qreal a = M_PI / 4.0 * i;
-                p.drawLine(QPointF(12 + 6.4 * std::cos(a), 12 + 6.4 * std::sin(a)),
-                           QPointF(12 + 9.2 * std::cos(a), 12 + 9.2 * std::sin(a)));
-            }
-        }
+        r.render(&p);
+        p.end();
+        return pm;
     };
     QIcon icon;
-    QPixmap pm(px * 2, px * 2);
-    pm.setDevicePixelRatio(2);
-    paint(pm, color);
-    icon.addPixmap(pm);
-    if (selectedColor.isValid()) {
-        QPixmap ps(px * 2, px * 2);
-        ps.setDevicePixelRatio(2);
-        paint(ps, selectedColor);
-        icon.addPixmap(ps, QIcon::Selected);
-    }
+    icon.addPixmap(render(color));
+    if (selectedColor.isValid()) icon.addPixmap(render(selectedColor), QIcon::Selected);
     return icon;
 }
 
