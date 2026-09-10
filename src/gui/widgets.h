@@ -4,6 +4,7 @@
 #include <QBrush>
 #include <QConicalGradient>
 #include <QEnterEvent>
+#include <QFontMetrics>
 #include <QFrame>
 #include <QGraphicsOpacityEffect>
 #include <QLabel>
@@ -180,13 +181,11 @@ protected:
         };
         for (int i = 0; i < entries_.size(); ++i) {
             int y = i * rowH;
+            // 名称过长省略号收尾，避免与柱体重叠
+            QFontMetrics fm(p.font());
+            QString label = fm.elidedText(entries_[i].first, Qt::ElideRight, labelW - 8);
             p.setPen(QPen(text()));
-            p.drawText(QRect(0, y, labelW - 4, rowH), Qt::AlignVCenter | Qt::AlignRight,
-                       entries_[i].first);
-            // 底槽
-            p.setPen(Qt::NoPen);
-            p.setBrush(line());
-            p.drawRoundedRect(QRect(barX, y + rowH / 2 - 5, barW, 10), 5, 5);
+            p.drawText(QRect(0, y, labelW - 4, rowH), Qt::AlignVCenter | Qt::AlignRight, label);
             // 柱体：最大值高亮蓝，其余随占比变暗；横向渐变（本色→亮）更有质感；
             // 宽度乘以入场扫掠进度
             double ratio = double(entries_[i].second) / double(maxV) * sweep_;

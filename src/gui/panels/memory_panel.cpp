@@ -15,7 +15,6 @@
 #include "../gui_util.h"
 #include "../i18n.h"
 #include "../widgets.h"
-#include "../widgets.h"
 
 namespace {
 // 五大区块（显示名, 存储名）
