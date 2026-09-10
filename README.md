@@ -4,7 +4,9 @@
 
 # AgentHive · 本地多 Agent 协作平台
 
-**Local-first collaboration hub for AI agents.**
+**单体成长，蜂巢共享** · *Grow alone, thrive together.*
+
+Local-first collaboration hub for AI agents.
 
 [![CI](https://github.com/SiliconCoderJames/AgentHive/actions/workflows/ci.yml/badge.svg)](https://github.com/SiliconCoderJames/AgentHive/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-0ea5e9.svg)](LICENSE)

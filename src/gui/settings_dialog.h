@@ -36,6 +36,7 @@ private:
     QWidget* buildAgentsPage();
     QWidget* buildApiPage();
     QWidget* buildUpdatePage();
+    QWidget* buildAboutPage();
     void refreshBackupList();
     void refreshAgents();
     void applyChrome();  // 主题变化后重涂导航与 th() 取色控件

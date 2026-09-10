@@ -14,12 +14,17 @@
 #include "panels/panel_base.h"
 
 class QFrame;
+class QCloseEvent;
 class SettingsDialog;
+class QSystemTrayIcon;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
 public:
     explicit MainWindow(zp::Platform& platform, QWidget* parent = nullptr);
+
+protected:
+    void closeEvent(QCloseEvent*) override;  // 关闭即隐藏到托盘，服务常驻
 
 private slots:
     void onNavChanged(int row);
@@ -34,6 +39,7 @@ private:
     void applyTheme();   // 主题/字号切换：重生成 QSS + 重涂铬层 + 重建面板
     void applyChrome();  // 侧边栏铬层样式（随主题重涂）
     void applyUiPrefs(); // 读取界面偏好（刷新频率/错误提醒）并应用
+    void setupTray();    // 系统托盘：蜂巢常驻 + 显示/退出
     void openSettings(); // ⚙ 设置对话框（复用同一实例，关闭即删）
 
     zp::Platform& platform_;
@@ -53,6 +59,8 @@ private:
     QLabel* ver_ = nullptr;
     QLabel* tagline_ = nullptr;
     QPointer<SettingsDialog> settings_ = nullptr;
+    QSystemTrayIcon* tray_ = nullptr;
+    bool trayHinted_ = false;
     int spinPhase_ = 0;
     QTimer* timer_ = nullptr;
     int openErrors_ = 0;      // 未解决错误数，用于导航徽标

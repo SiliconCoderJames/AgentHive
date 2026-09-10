@@ -11,12 +11,15 @@
 #include <QPainter>
 #include <QPointer>
 #include <QPropertyAnimation>
+#include <QTextDocument>
 #include <QTimer>
 #include <QToolButton>
+#include <QUrl>
 #include <QVBoxLayout>
 #include <QVariantAnimation>
 #include <QWidget>
 
+#include <cmath>
 #include <functional>
 
 #include "theme.h"
@@ -558,5 +561,91 @@ public:
 private:
     QWidget* content_;
 };
+
+// ---- 空状态母题：蜜金蜂巢三六边形 + 标题 + 出路提示（品牌触点，见 docs/brand.md §3）----
+class HexEmptyState : public QWidget {
+public:
+    HexEmptyState(const QString& emoji, const QString& title, const QString& hint,
+                  QWidget* parent = nullptr)
+        : QWidget(parent), emoji_(emoji), title_(title), hint_(hint) {
+        setMinimumHeight(180);
+    }
+
+protected:
+    void paintEvent(QPaintEvent*) override {
+        QPainter p(this);
+        p.setRenderHint(QPainter::Antialiasing);
+        const QPointF c(width() / 2.0, 64.0);
+        const qreal r = 22.0;
+        // 蜂巢三六边形：共享边拼接，描边圆角连接（与 logo 同构，浅描边弱化）
+        QPen pen(brand(), 4, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+        pen.setColor(QColor(brand().red(), brand().green(), brand().blue(), 130));
+        p.setPen(pen);
+        p.setBrush(Qt::NoBrush);
+        auto hex = [&](const QPointF& ctr) {
+            QPolygonF h;
+            for (int i = 0; i < 6; ++i) {
+                qreal a = M_PI / 180.0 * (60.0 * i - 30.0);
+                h << ctr + QPointF(r * std::cos(a), r * std::sin(a));
+            }
+            p.drawPolygon(h);
+        };
+        hex(c + QPointF(0, -r * 1.02));
+        hex(c + QPointF(-r * 0.9, r * 0.55));
+        hex(c + QPointF(r * 0.9, r * 0.55));
+        p.setPen(Qt::NoPen);
+        p.setBrush(accent());
+        p.drawEllipse(c + QPointF(0, -r * 1.02), r * 0.3, r * 0.3);
+        // emoji + 标题 + 出路提示
+        p.setPen(QPen(text()));
+        QFont f = p.font();
+        f.setPixelSize(26);
+        p.setFont(f);
+        p.drawText(QRect(0, 96, width(), 34), Qt::AlignCenter, emoji_);
+        f.setPixelSize(13);
+        f.setBold(true);
+        p.setFont(f);
+        p.drawText(QRect(0, 134, width(), 20), Qt::AlignCenter, title_);
+        f.setPixelSize(11);
+        f.setBold(false);
+        p.setFont(f);
+        p.setPen(QPen(muted()));
+        p.drawText(QRect(24, 156, width() - 48, 40), Qt::AlignHCenter | Qt::TextWordWrap, hint_);
+    }
+
+private:
+    QString emoji_, title_, hint_;
+};
+
+// 蜂巢母题注册为文档图片资源：HTML 空状态里 <img src="hexmotif"> 引用，
+// 颜色随当前主题（蜜金描边 + 强调色入口点，见 docs/brand.md §3）
+inline void attachHexMotif(QTextDocument* doc) {
+    const int w = 96, h = 70, r = 15;
+    QPixmap pm(w, h);
+    pm.fill(Qt::transparent);
+    QPainter p(&pm);
+    p.setRenderHint(QPainter::Antialiasing);
+    QPen pen(QColor(brand().red(), brand().green(), brand().blue(), 128), 3.5, Qt::SolidLine,
+             Qt::RoundCap, Qt::RoundJoin);
+    p.setPen(pen);
+    p.setBrush(Qt::NoBrush);
+    auto hex = [&](const QPointF& c) {
+        QPolygonF poly;
+        for (int i = 0; i < 6; ++i) {
+            qreal a = M_PI / 180.0 * (60.0 * i - 30.0);
+            poly << c + QPointF(r * std::cos(a), r * std::sin(a));
+        }
+        p.drawPolygon(poly);
+    };
+    const QPointF top(w / 2.0, 30.0);
+    hex(top);
+    hex(top + QPointF(-r * 0.9 * 1.68, r * 1.34));
+    hex(top + QPointF(r * 0.9 * 1.68, r * 1.34));
+    p.setPen(Qt::NoPen);
+    p.setBrush(accent());
+    p.drawEllipse(top, r * 0.3, r * 0.3);
+    p.end();
+    doc->addResource(QTextDocument::ImageResource, QUrl("hexmotif"), pm);
+}
 
 }  // namespace ui

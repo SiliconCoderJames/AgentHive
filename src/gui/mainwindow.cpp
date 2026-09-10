@@ -3,11 +3,13 @@
 #include <QAction>
 #include <QActionGroup>
 #include <QApplication>
+#include <QCloseEvent>
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QMenu>
 #include <QShortcut>
 #include <QStatusBar>
+#include <QSystemTrayIcon>
 
 #include <utility>
 
@@ -21,6 +23,7 @@
 #include "panels/skills_panel.h"
 #include "settings_dialog.h"
 #include "theme.h"
+#include "welcome_dialog.h"
 
 MainWindow::MainWindow(zp::Platform& platform, QWidget* parent)
     : QMainWindow(parent), platform_(platform) {
@@ -139,6 +142,21 @@ MainWindow::MainWindow(zp::Platform& platform, QWidget* parent)
     applyUiPrefs();  // 读取刷新频率（默认 3s）与错误提醒偏好
     timer_->start(timer_->interval());
 
+    setupTray();
+
+    // 首次运行引导：欢迎 + 三步接入 + 选主题（完成后不再弹出）
+    {
+        QSettings s;
+        if (!s.value("ui/welcomeSeen", false).toBool()) {
+            QTimer::singleShot(400, this, [this] {
+                WelcomeDialog w(platform_, this);
+                w.exec();
+                QSettings s;
+                s.setValue("ui/welcomeSeen", true);
+            });
+        }
+    }
+
     // 快捷键：Ctrl+1..7 切面板，F5 手动刷新
     for (int i = 0; i < 7; ++i) {
         auto* sc = new QShortcut(QKeySequence(QString("Ctrl+%1").arg(i + 1)), this);
@@ -226,6 +244,51 @@ void MainWindow::applyUiPrefs() {
     if (ms < 1000 || ms > 60000) ms = 3000;
     timer_->setInterval(ms);
     errorToast_ = s.value("ui/errorToast", false).toBool();
+}
+
+void MainWindow::setupTray() {
+    tray_ = new QSystemTrayIcon(QIcon(":/brand/logo.png"), this);
+    tray_->setToolTip(i18n::trs("AgentHive · 蜂巢运行中", "AgentHive · hive is running"));
+    auto* menu = new QMenu(this);
+    auto* showAct = menu->addAction(i18n::trs("显示 / 隐藏工作台", "Show / Hide workbench"));
+    connect(showAct, &QAction::triggered, this, [this] {
+        setVisible(!isVisible());
+        if (isVisible()) {
+            raise();
+            activateWindow();
+        }
+    });
+    menu->addSeparator();
+    auto* quitAct = menu->addAction(i18n::trs("退出", "Quit"));
+    connect(quitAct, &QAction::triggered, this, [] { QCoreApplication::exit(0); });
+    tray_->setContextMenu(menu);
+    connect(tray_, &QSystemTrayIcon::activated, this,
+            [this](QSystemTrayIcon::ActivationReason reason) {
+                if (reason == QSystemTrayIcon::Trigger) {
+                    setVisible(!isVisible());
+                    if (isVisible()) {
+                        raise();
+                        activateWindow();
+                    }
+                }
+            });
+    tray_->show();
+}
+
+void MainWindow::closeEvent(QCloseEvent* e) {
+    // 关闭 = 隐藏到托盘（HTTP 服务随进程常驻，Agent 不受影响）；托盘菜单退出才真正退出
+    if (tray_ && tray_->isVisible()) {
+        e->ignore();
+        hide();
+        if (!trayHinted_) {
+            trayHinted_ = true;
+            ui::Toast::show(this, i18n::trs("已最小化到托盘 · 服务仍在运行，托盘右键可退出",
+                                            "Minimized to tray — the service keeps running; "
+                                            "right-click the tray icon to quit"));
+        }
+        return;
+    }
+    QMainWindow::closeEvent(e);
 }
 
 void MainWindow::openSettings() {

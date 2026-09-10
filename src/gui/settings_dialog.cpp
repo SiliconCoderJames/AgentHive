@@ -71,6 +71,7 @@ SettingsDialog::SettingsDialog(zp::Platform& platform, QWidget* parent)
              {"🐝", "Agent 管理", "Agents"},
              {"🔌", "Agent API", "Agent API"},
              {"🔄", "更新", "Update"},
+             {"ℹ️", "关于", "About"},
          }) {
         nav_->addItem(QString("%1  %2").arg(icon, i18n::trs(zh, en)));
     }
@@ -83,6 +84,7 @@ SettingsDialog::SettingsDialog(zp::Platform& platform, QWidget* parent)
     stack_->addWidget(buildAgentsPage());
     stack_->addWidget(buildApiPage());
     stack_->addWidget(buildUpdatePage());
+    stack_->addWidget(buildAboutPage());
     root->addWidget(stack_, 1);
 
     connect(nav_, &QListWidget::currentRowChanged, stack_, &QStackedWidget::setCurrentIndex);
@@ -477,6 +479,60 @@ QWidget* SettingsDialog::buildApiPage() {
     scroll->setFrameShape(QFrame::NoFrame);
     scroll->setWidget(page);
     return scroll;
+}
+
+// ---- 关于：品牌触点（口号定稿见 docs/brand.md）----
+QWidget* SettingsDialog::buildAboutPage() {
+    auto* page = new QWidget(stack_);
+    auto* lay = new QVBoxLayout(page);
+    lay->setContentsMargins(22, 20, 22, 20);
+    lay->addStretch(2);
+
+    auto* logo = new QLabel(page);
+    QPixmap pm(":/brand/logo.png");
+    logo->setPixmap(pm.scaled(84, 84, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    logo->setAlignment(Qt::AlignCenter);
+    lay->addWidget(logo);
+
+    auto* name = thLabel("font-size:20px; font-weight:800; color:@text@;", page);
+    name->setText("AgentHive");
+    name->setAlignment(Qt::AlignCenter);
+    lay->addWidget(name);
+
+    auto* slogan = thLabel("font-size:13px; font-weight:600; color:@brand@;", page);
+    slogan->setText(i18n::trs("单体成长，蜂巢共享", "Grow alone, thrive together."));
+    slogan->setAlignment(Qt::AlignCenter);
+    lay->addWidget(slogan);
+
+    auto* ver = thLabel("font-size:11px; color:@muted@;", page);
+    ver->setText(QString("v%1  ·  %2")
+                     .arg(zp::kPlatformVersion)
+                     .arg(i18n::trs("本地优先 · 数据不出本机", "local-first · data stays local")));
+    ver->setAlignment(Qt::AlignCenter);
+    lay->addWidget(ver);
+    lay->addSpacing(12);
+
+    auto* row = new QHBoxLayout();
+    row->addStretch(1);
+    auto mk = [this, page, row](const QString& text, const char* url) {
+        auto* b = new QPushButton(text, page);
+        connect(b, &QPushButton::clicked, this,
+                [url] { QDesktopServices::openUrl(QUrl(QString::fromLatin1(url))); });
+        row->addWidget(b);
+        return b;
+    };
+    mk(i18n::trs("GitHub 仓库", "GitHub"), "https://github.com/SiliconCoderJames/AgentHive");
+    mk(i18n::trs("问题反馈", "Issues"), "https://github.com/SiliconCoderJames/AgentHive/issues");
+    mk(i18n::trs("☕ 赞助", "Sponsor"), "https://www.buymeacoffee.com/zwj8jc5rrgp");
+    row->addStretch(1);
+    lay->addLayout(row);
+
+    auto* lic = thLabel("font-size:10px; color:@muted@;", page);
+    lic->setText("© 2026 SiliconCoderJames · MIT License");
+    lic->setAlignment(Qt::AlignCenter);
+    lay->addWidget(lic);
+    lay->addStretch(3);
+    return page;
 }
 
 // ---- 更新：当前版本 + GitHub Releases 检查 ----

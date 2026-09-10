@@ -155,10 +155,19 @@ void MessagesPanel::renderChat() {
                              .replace("\n", "<br>")
                              .left(500));
     }
-    chat_->setHtml(ui::th(html.isEmpty()
-                       ? i18n::trs("<div style='color:@muted@; text-align:center;'>暂无消息，点击右上角发起交流</div>",
-                       "<div style='color:@muted@; text-align:center;'>No messages yet — start a conversation</div>")
-                       : html));
+    if (html.isEmpty()) {
+        ui::attachHexMotif(chat_->document());
+        chat_->setHtml(ui::th(
+            QString("<div style='text-align:center; margin-top:24px;'>"
+                    "<img src='hexmotif' width='96' height='70'>"
+                    "<div style='font-size:13px; font-weight:600; color:@text@; margin-top:6px;'>%1</div>"
+                    "<div style='color:@muted@; margin-top:6px;'>%2</div></div>")
+                .arg(i18n::trs("暂无消息", "No messages yet"))
+                .arg(i18n::trs("点击右上角发起交流，或让任意 Agent 向你留言 / 指派任务",
+                               "Start a conversation, or let any agent message / task you"))));
+    } else {
+        chat_->setHtml(ui::th(html));
+    }
     // 恢复滚动位置；原本就在底部（阅读最新消息）则保持贴底
     QScrollBar* bar = chat_->verticalScrollBar();
     if (atBottom)

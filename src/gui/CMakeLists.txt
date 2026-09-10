@@ -2,6 +2,7 @@ add_executable(zworkbench WIN32
     main.cpp
     mainwindow.cpp
     settings_dialog.cpp
+    welcome_dialog.cpp
     app.rc
     panels/dashboard_panel.cpp
     panels/knowledge_panel.cpp

@@ -17,6 +17,7 @@
 
 #include "../gui_util.h"
 #include "../i18n.h"
+#include "../widgets.h"
 
 SkillsPanel::SkillsPanel(zp::Platform& platform, QWidget* parent)
     : PanelBase(platform, parent) {
@@ -127,17 +128,19 @@ void SkillsPanel::refresh() {
         table_->selectRow(0);
         onSelectSkill(0);
     } else {
-        // 空状态提示
+        // 空状态：蜂巢母题 + 标题 + 出路提示
+        ui::attachHexMotif(detail_->document());
         detail_->setHtml(ui::th(
-            i18n::trs(
-            "<div style='color:@muted@; text-align:center; margin-top:36px;'>"
-            "<div style='font-size:34px;'>🧩</div>"
-            "暂无注册技能<br><br>点击右上角「＋ 注册技能」，或让 Agent 通过 "
-            "<span style='font-family:@mono@;'>POST /api/skills</span> 注册（先注册后调用）</div>",
-            "<div style='color:@muted@; text-align:center; margin-top:36px;'>"
-            "<div style='font-size:34px;'>🧩</div>"
-            "No skills registered.<br><br>Click「＋ Register Skill」, or let an agent register via "
-            "<span style='font-family:@mono@;'>POST /api/skills</span> (register before invoke)</div>")));
+            QString("<div style='text-align:center; margin-top:20px;'>"
+                    "<img src='hexmotif' width='96' height='70'>"
+                    "<div style='font-size:13px; font-weight:600; color:@text@; margin-top:6px;'>%1</div>"
+                    "<div style='color:@muted@; margin-top:6px;'>%2</div></div>")
+                .arg(i18n::trs("暂无注册技能", "No skills registered"))
+                .arg(i18n::trs("点击右上角「＋ 注册技能」，或让 Agent 通过 "
+                               "<span style='font-family:@mono@;'>POST /api/skills</span> 注册（先注册后调用）",
+                               "Click「＋ Register Skill」, or let an agent register via "
+                               "<span style='font-family:@mono@;'>POST /api/skills</span> "
+                               "(register before invoke)"))));
     }
 }
 
