@@ -54,6 +54,11 @@ public:
     // 因此密钥丢失/泄露时这是唯一恢复与轮换途径；新明文同时写入 config/agents.json 并返回一次。
     bool agentRotateKey(const std::string& actor, const std::string& name, std::string& outApiKey,
                         std::string& err);
+    // 一键接入：为给定名称签发可用凭据并返回明文密钥（幂等）。
+    // 不存在则注册（member 角色），已存在则轮换（库里只有哈希，明文不可恢复）；
+    // 保留名照常拒绝。供 GUI 接入向导在进程内以管理者身份调用。
+    bool agentProvision(const std::string& actor, const std::string& name, std::string& outApiKey,
+                        std::string& err);
 
     // ---- 知识库 ----
     bool knowledgeCreate(const std::string& author, const std::string& title,

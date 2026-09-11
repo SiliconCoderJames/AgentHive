@@ -2,6 +2,7 @@ add_executable(agenthive WIN32
     main.cpp
     mainwindow.cpp
     settings_dialog.cpp
+    connect_dialog.cpp
     welcome_dialog.cpp
     update_checker.cpp
     app.rc

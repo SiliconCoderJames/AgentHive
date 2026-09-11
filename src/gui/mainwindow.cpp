@@ -99,6 +99,8 @@ MainWindow::MainWindow(ah::Platform& platform, QWidget* parent)
     settingsBtn_ = new QToolButton(foot);
     settingsBtn_->setIcon(ui::makeIcon("gear", ui::muted(), 16));
     settingsBtn_->setToolTip(i18n::trs("设置", "Settings"));
+    // 纯图标按钮必须补可访问名称：读屏与 UIA 自动化都依赖 Name（tooltip 不算）
+    settingsBtn_->setAccessibleName(i18n::trs("设置", "Settings"));
     connect(settingsBtn_, &QToolButton::clicked, this, &MainWindow::openSettings);
     langBtn_ = new QToolButton(foot);
     connect(langBtn_, &QToolButton::clicked, this, [] { i18n::toggle(); });
@@ -219,6 +221,7 @@ void MainWindow::applyLanguage() {
     langBtn_->setText(i18n::g_lang == i18n::Lang::Zh ? "EN" : "中文");
     langBtn_->setToolTip(i18n::trs("切换语言", "Switch language"));
     settingsBtn_->setToolTip(i18n::trs("设置", "Settings"));
+    settingsBtn_->setAccessibleName(i18n::trs("设置", "Settings"));
     int row = nav_->currentRow();
     buildNav();
     if (row >= 0) nav_->setCurrentRow(row);

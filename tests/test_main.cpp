@@ -616,6 +616,18 @@ static void test_legacy_migration() {
         CHECK(!p.agentRotateKey("newagent", "newagent", denied, rotErr));
         CHECK(denied.empty());
         CHECK(!p.agentRotateKey("zcode", "ghost", denied, rotErr));
+        // 一键接入（幂等）：不存在则注册，已存在则轮换；保留名照常拒绝
+        std::string provided;
+        CHECK(p.agentProvision("zcode", "codex", provided, rotErr));
+        CHECK(p.authenticate("codex", provided));
+        std::string provided2;
+        CHECK(p.agentProvision("zcode", "codex", provided2, rotErr));
+        CHECK(provided2 != provided);                        // 第二次调用=轮换
+        CHECK(!p.authenticate("codex", provided));
+        CHECK(p.authenticate("codex", provided2));
+        CHECK(!p.agentProvision("zcode", "zcode", denied, rotErr));   // 保留名
+        CHECK(denied.empty());
+        CHECK(!p.agentProvision("codex", "claude", denied, rotErr));  // 非管理者
         p.shutdown();
     }
     std::error_code ec;

@@ -1,5 +1,7 @@
 #include "settings_dialog.h"
 
+#include "connect_dialog.h"
+
 #include <QApplication>
 #include <QCheckBox>
 #include <QClipboard>
@@ -327,6 +329,13 @@ QWidget* SettingsDialog::buildAgentsPage() {
     auto* row = new QHBoxLayout();
     auto* refreshBtn = new QPushButton(i18n::trs("刷新", "Refresh"), page);
     connect(refreshBtn, &QPushButton::clicked, this, [this] { refreshAgents(); });
+    auto* connectBtn =
+        new QPushButton(i18n::trs("一键接入常用 Agent…", "Connect common agents…"), page);
+    connect(connectBtn, &QPushButton::clicked, this, [this] {
+        ConnectDialog dlg(platform_, this);
+        dlg.exec();
+        refreshAgents();  // 接入向导可能注册了新 Agent，回来立即刷新列表
+    });
     auto* removeBtn = new QPushButton(i18n::trs("移除所选", "Remove selected"), page);
     removeBtn->setObjectName("danger");
     connect(removeBtn, &QPushButton::clicked, this, [this] {
@@ -401,6 +410,7 @@ QWidget* SettingsDialog::buildAgentsPage() {
         refreshAgents();
     });
     row->addWidget(refreshBtn);
+    row->addWidget(connectBtn);
     row->addWidget(rotateBtn);
     row->addWidget(removeBtn);
     row->addStretch(1);

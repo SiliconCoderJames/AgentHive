@@ -300,6 +300,35 @@ bool Platform::agentRotateKey(const std::string& actor, const std::string& name,
     return true;
 }
 
+bool Platform::agentProvision(const std::string& actor, const std::string& name,
+                              std::string& outApiKey, std::string& err) {
+    // 单一锁域内完成判断+写入：mutex_ 不可重入，不能转调持锁的公开方法
+    std::lock_guard lock(mutex_);
+    if (!isManager(actor)) { err = "only zcode can provision agents"; return false; }
+    if (name.empty() || name.size() > 64 || name.find_first_of(" \t\r\n") != std::string::npos) {
+        err = "invalid agent name (1..64 chars, no whitespace)";
+        return false;
+    }
+    if (isReservedName(name)) { err = "reserved agent name: " + name; return false; }
+    const bool existed = agents_.nameExists(name);
+    outApiKey = randomHex(32);
+    std::string salt = randomHex(16);
+    if (existed) {
+        if (!agents_.rotateKey(name, salt, sha256Hex(salt + outApiKey), err)) return false;
+    } else {
+        if (!agents_.registerAgent(name, kDefaultRole, salt, sha256Hex(salt + outApiKey), err))
+            return false;
+    }
+    std::string persistErr;
+    std::string auditErr;
+    if (!persistAgentKey(name, outApiKey, persistErr))
+        audit_.log("system", "system.keyfile_write_failed", name,
+                   nlohmann::json{{"error", persistErr}}.dump(), auditErr);
+    audit_.log(actor, "agent.provision", name,
+               nlohmann::json{{"mode", existed ? "rotate" : "register"}}.dump(), auditErr);
+    return true;
+}
+
 void Platform::heartbeat(const std::string& name, const std::string& currentTask) {
     std::lock_guard lock(mutex_);
     std::string prevTask, prevSeen;
