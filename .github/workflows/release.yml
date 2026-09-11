@@ -91,8 +91,16 @@ jobs:
             $notes = @"
           ## AgentHive $ver
 
-          Windows x64 本地多 Agent 协作工作台。产物未签名，首次运行可能有 SmartScreen 提示；
-          用户数据在 ``%USERPROFILE%\.agenthive``，卸载不会删除。
+          Local-first collaboration hub for AI agents, Windows x64 build.
+
+          * ``AgentHive-$ver-x64.msi`` - per-user install (no administrator rights)
+          * ``AgentHive-$ver-win64-portable.zip`` - unzip and run ``agenthive.exe``
+          * ``SHA256SUMS.txt`` - checksums
+
+          The binaries are **not code-signed**, so SmartScreen may warn on first launch.
+          Your data lives in ``%USERPROFILE%\.agenthive`` and is **not** removed on uninstall.
+
+          See ``release/RELEASE_NOTES-$ver.md`` for the full notes.
           "@
           }
           # 已存在同标签的 Release 时直接补充资产，避免重复创建失败
