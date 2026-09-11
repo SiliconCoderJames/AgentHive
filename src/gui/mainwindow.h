@@ -12,6 +12,7 @@
 #include "core/platform.h"
 #include "i18n.h"
 #include "panels/panel_base.h"
+#include "update_checker.h"
 
 class QFrame;
 class QCloseEvent;
@@ -43,6 +44,8 @@ private:
     void applyUiPrefs(); // 读取界面偏好（刷新频率/错误提醒）并应用
     void setupTray();    // 系统托盘：蜂巢常驻 + 显示/退出
     void openSettings(); // ⚙ 设置对话框（复用同一实例，关闭即删）
+    void scheduleUpdateCheck();                // 启动后的自动检查（每天一次，可关）
+    void promptUpdate(const ui::UpdateInfo&);  // 发现新版本时的选择框
 
     ah::Platform& platform_;
     QListWidget* nav_ = nullptr;
@@ -62,6 +65,8 @@ private:
     QLabel* ver_ = nullptr;
     QLabel* tagline_ = nullptr;
     QPointer<SettingsDialog> settings_ = nullptr;
+    ui::UpdateChecker* updater_ = nullptr;  // 启动时的自动更新检查（延迟创建）
+    bool quitForUpdate_ = false;            // 自动更新中：closeEvent 要真退出而非最小化到托盘
     QSystemTrayIcon* tray_ = nullptr;
     bool trayHinted_ = false;
     int spinPhase_ = 0;

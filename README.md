@@ -69,7 +69,7 @@ DeepSeek、Gemini CLI……以及你自己写的任何脚本。只要能发 HTTP
 
 | 产物 | 说明 |
 |---|---|
-| `AgentHive-<版本>-x64.msi` | 安装包。装到 `%LOCALAPPDATA%\AgentHive`，**per-user、无需管理员权限**，带开始菜单与桌面快捷方式，可在"应用和功能"里卸载 |
+| `AgentHive-<版本>-x64.msi` | 安装包。装到 `%LOCALAPPDATA%\AgentHive`，**普通用户安装无需管理员权限**；带开始菜单与桌面快捷方式，可在"应用和功能"里卸载（若以管理员身份提权安装，Windows Installer 会按全机安装登记） |
 | `AgentHive-<版本>-win64-portable.zip` | 免安装便携版，解压后直接运行 `agenthive.exe` |
 | `SHA256SUMS.txt` | 校验和 |
 
@@ -77,6 +77,20 @@ DeepSeek、Gemini CLI……以及你自己写的任何脚本。只要能发 HTTP
 - 用户数据在 `%USERPROFILE%\.agenthive`，**卸载不会删除**。
 - 当前产物**未代码签名**，首次运行可能出现 SmartScreen"未知发布者"提示。
 - 安装目录 `licenses/` 内含第三方组件许可（Qt 为 LGPLv3）。
+
+### 自动更新
+
+工作台默认**每天自动检查一次**更新（设置 → 更新 可关闭），发现新版本时提示：确认后自动下载安装包、
+**校验 SHA256**（不匹配则删除并报错）、剥离"网络来源标记"后静默升级，并重启工作台。
+便携版不会自动安装（否则系统里会多出一份），只提示到下载页手动替换。
+
+更新信息取自 release 资产里的 `latest.json`（固定 URL
+`https://github.com/SiliconCoderJames/AgentHive/releases/latest/download/latest.json`），
+不经 GitHub API，因此不需要 token、也不受 API 限流影响。开发/镜像环境可用
+`AGENTHIVE_UPDATE_URL` 覆盖清单地址。
+
+> 说明：哈希来自同一分发渠道（HTTPS + GitHub），能防传输损坏与镜像篡改，但**不等于代码签名**。
+> 产物签名后应改为校验签名。
 
 ### 获取源码
 

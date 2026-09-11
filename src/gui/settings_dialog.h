@@ -11,12 +11,14 @@
 #include <vector>
 
 #include "core/platform.h"
+#include "update_checker.h"
 #include "widgets.h"
 
 class QCheckBox;
 class QComboBox;
-class QNetworkAccessManager;
+class QProgressBar;
 class QListWidget;
+class QPushButton;
 class QStackedWidget;
 class QTableWidget;
 
@@ -52,7 +54,12 @@ private:
     QCheckBox* errorToastBox_ = nullptr;
     QTableWidget* agentsTable_ = nullptr;
     QLabel* latest_ = nullptr;  // 更新页状态行
-    QPointer<QNetworkAccessManager> net_;
+    QCheckBox* autoCheckBox_ = nullptr;
+    QPushButton* installBtn_ = nullptr;
+    QPushButton* skipBtn_ = nullptr;
+    QProgressBar* progress_ = nullptr;
+    ui::UpdateChecker* updater_ = nullptr;
+    ui::UpdateInfo pending_;    // 最近一次检查到的可用版本
     std::size_t themeListenerId_ = 0;
     // th() 取色控件登记表：切换主题时统一重涂
     std::vector<std::pair<QLabel*, QString>> styledLabels_;

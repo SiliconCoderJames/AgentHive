@@ -17,7 +17,7 @@
 
 | File | Best for | Notes |
 |---|---|---|
-| `AgentHive-1.0.0-x64.msi` | A normal install | Installs to `%LOCALAPPDATA%\AgentHive` as a **per-user install — no administrator rights needed**. Adds Start Menu and desktop shortcuts and uninstalls cleanly from *Apps & features*. |
+| `AgentHive-1.0.0-x64.msi` | A normal install | Installs to `%LOCALAPPDATA%\AgentHive`. **No administrator rights needed for a standard user install.** Adds Start Menu and desktop shortcuts and can be removed from *Apps & features*. (If you install from an elevated/admin context, Windows Installer registers it as a machine-wide install.) |
 | `AgentHive-1.0.0-win64-portable.zip` | No installation | Unzip and run `agenthive.exe`. Handy for a USB stick or a quick trial. |
 | `SHA256SUMS.txt` | Verifying integrity | See the verification section below. |
 
@@ -84,17 +84,21 @@ Get-FileHash .\AgentHive-1.0.0-win64-portable.zip  -Algorithm SHA256
 - Button hierarchy and disabled states are distinguishable; list columns no longer truncate.
 
 **Engineering**
+- **Built-in auto-update**: the workbench checks GitHub Releases once a day (toggleable in
+  Settings), and one click downloads, verifies the SHA256, and installs the new MSI — the
+  portable build is never auto-installed, so you will not end up with two copies.
 - Single source of truth for the version: the sidebar, `/api/health`, and the installer metadata
   now always agree.
-- Reproducible release pipeline: one command produces the MSI, the portable ZIP, and checksums,
-  with a runnability self-check and WiX ICE validation.
+- Reproducible release pipeline: one command produces the MSI, the portable ZIP, a machine-readable
+  `latest.json` update manifest, and checksums, with a runnability self-check and WiX ICE validation.
 - Single-instance guard: launching again focuses the existing window instead of failing with a
   "port already in use" error.
 
 ## Known limitations
 
 - Verified on **Windows x64 only**; Linux and macOS are untested (issues and PRs welcome).
-- The binaries are unsigned and there is no auto-update yet (use *Check for updates* in Settings).
+- The binaries are unsigned: SmartScreen may warn on first launch, and the updater verifies a
+  SHA256 from the same channel rather than a cryptographic signature.
 - The built-in embedder is n-gram fuzzy matching, intended for short-text recall; real semantic
   vectors require plugging in a local model (on the roadmap).
 - A skill invocation only records parameters, result, duration, and tokens — the **calling agent

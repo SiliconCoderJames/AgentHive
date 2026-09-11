@@ -29,9 +29,25 @@
     <SummaryInformation Description="$(var.ProductFullName) $(var.Version) 安装程序"
                         Manufacturer="AgentHive" />
 
-    <!-- 升级：同 UpgradeCode 的旧版本先移除再装（避免文件残留） -->
-    <MajorUpgrade DowngradeErrorMessage="已安装更高版本的 AgentHive，请先卸载后再装此版本。" />
+    <!-- 升级：同 UpgradeCode 的旧版本先移除再装（避免文件残留）。
+         AllowSameVersionUpgrades：ProductCode 由 WiX 每次构建自动生成，因此"同版本号的另一个构建"
+         （例如重打包同一个 tag、或 v1.0.0-rc1 → v1.0.0，两者 MSI 版本都被规范成 1.0.0）默认会被
+         当成两个产品并存安装——实测踩到过（同一个目录里出现两份安装记录）。开启后同版本也会先卸载旧的。 -->
+    <MajorUpgrade AllowSameVersionUpgrades="yes"
+                  DowngradeErrorMessage="已安装更高版本的 AgentHive，请先卸载后再装此版本。" />
     <MediaTemplate EmbedCab="yes" />
+
+    <?if $(var.PerMachine) = 1 ?>
+    <!-- 全机安装：默认 ALLUSERS，需要管理员权限，文件进 Program Files -->
+    <?else?>
+    <!-- 强制 per-user：Scope="perUser" 只是包的声明，**管理员账号下 ALLUSERS 未设置时
+         Windows Installer 会默认按"全机安装"处理**——结果是文件落在用户目录、注册却写进 HKLM
+         的混合状态（实测踩到），而且标准用户登录后看不到这个程序。
+         ALLUSERS=2 + MSIINSTALLPERUSER=1 才能确保始终是当前用户的安装，
+         并在 HKCU 登记卸载项（"应用和功能"里可见、无需管理员权限）。 -->
+    <Property Id="ALLUSERS" Value="2" />
+    <Property Id="MSIINSTALLPERUSER" Value="1" />
+    <?endif?>
 
     <!-- 应用与卸载入口图标 -->
     <Icon Id="AppIcon" SourceFile="$(var.IconFile)" />
@@ -69,10 +85,23 @@
       <!-- 文件清单由 scripts/gen-wix-files.ps1 从安装暂存目录生成：
            随 Qt 版本变化的 DLL 与插件目录无需人工维护 -->
       <ComponentGroupRef Id="AppFiles" />
+      <ComponentRef Id="LegacyCleanup" />
       <ComponentRef Id="StartMenuShortcut" />
       <ComponentRef Id="DesktopShortcut" />
     </Feature>
   </Package>
+
+  <!-- 清理历史可执行文件名：MSI 只会删除自己登记过的文件，不属于新包的文件会残留在安装目录。
+       重命名（zworkbench.exe → agenthive.exe）之后实测就留下了两份 exe，这里显式清掉。
+       对更早品牌的手工部署（scripts/deploy.ps1 的 /MIR 会自己同步）无影响。 -->
+  <Fragment>
+    <Component Id="LegacyCleanup" Directory="INSTALLFOLDER"
+               Guid="B7E1C4A2-5D3F-4A81-9C6E-1F2A3B4C5D6E">
+      <RemoveFile Id="RemoveLegacyExe" Name="zworkbench.exe" On="install" />
+      <RegistryValue Root="HKCU" Key="Software\AgentHive" Name="legacy_cleanup" Type="integer"
+                     Value="1" KeyPath="yes" />
+    </Component>
+  </Fragment>
 
   <!-- 安装目录：perUser = %LOCALAPPDATA%\AgentHive；perMachine = %ProgramFiles%\AgentHive -->
   <?if $(var.PerMachine) = 1 ?>

@@ -3,6 +3,7 @@ add_executable(agenthive WIN32
     mainwindow.cpp
     settings_dialog.cpp
     welcome_dialog.cpp
+    update_checker.cpp
     app.rc
     panels/dashboard_panel.cpp
     panels/knowledge_panel.cpp

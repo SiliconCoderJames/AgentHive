@@ -4,10 +4,13 @@
 #include <QActionGroup>
 #include <QApplication>
 #include <QCloseEvent>
+#include <QDesktopServices>
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QMenu>
+#include <QMessageBox>
 #include <QPixmap>
+#include <QPushButton>
 #include <QScrollArea>
 #include <QShortcut>
 #include <QStatusBar>
@@ -25,6 +28,7 @@
 #include "panels/skills_panel.h"
 #include "settings_dialog.h"
 #include "theme.h"
+#include "update_checker.h"
 #include "welcome_dialog.h"
 
 MainWindow::MainWindow(ah::Platform& platform, QWidget* parent)
@@ -141,6 +145,7 @@ MainWindow::MainWindow(ah::Platform& platform, QWidget* parent)
     timer_->start(timer_->interval());
 
     setupTray();
+    scheduleUpdateCheck();  // 启动后延迟做一次自动检查（每天最多一次，可在设置里关闭）
 
     // 首次运行引导：欢迎 + 三步接入 + 选主题（完成后不再弹出）
     {
@@ -276,6 +281,66 @@ void MainWindow::applyUiPrefs() {
     errorToast_ = s.value("ui/errorToast", false).toBool();
 }
 
+void MainWindow::scheduleUpdateCheck() {
+    // 启动后延迟 5 秒（不跟首屏刷新抢资源），且每天最多一次
+    if (!ui::UpdateChecker::autoCheckEnabled()) return;
+    if (!ui::UpdateChecker::autoCheckDue(24)) return;
+    QTimer::singleShot(5000, this, [this] {
+        updater_ = new ui::UpdateChecker(this);
+        connect(updater_, &ui::UpdateChecker::updateAvailable, this,
+                [this](const ui::UpdateInfo& info) { promptUpdate(info); });
+        // 启动时的自动检查失败要静默：断网/公司代理下不该弹错误框
+        connect(updater_, &ui::UpdateChecker::failed, this, [](const QString&) {});
+        updater_->check();
+    });
+}
+
+void MainWindow::promptUpdate(const ui::UpdateInfo& info) {
+    if (info.version == ui::UpdateChecker::skippedVersion()) return;  // 用户已选择跳过
+    QMessageBox box(this);
+    box.setIcon(QMessageBox::Information);
+    box.setWindowTitle(i18n::trs("发现新版本", "Update available"));
+    box.setText(i18n::trs("AgentHive 有新版本可用", "A new AgentHive version is available"));
+    box.setInformativeText(
+        i18n::trs("当前版本 v%1 → 最新版本 v%2\n\n下载后将校验 SHA256 再安装；"
+                  "数据目录不受影响，可稍后再更新。",
+                  "Current v%1 → latest v%2\n\nThe download is verified against its SHA256 "
+                  "before installing. Your data directory is untouched.")
+            .arg(QString::fromLatin1(ah::kPlatformVersion), info.version));
+    QPushButton* install = box.addButton(i18n::trs("下载并安装", "Download & install"),
+                                         QMessageBox::AcceptRole);
+    QPushButton* later = box.addButton(i18n::trs("稍后", "Later"), QMessageBox::RejectRole);
+    QPushButton* skip = box.addButton(i18n::trs("跳过此版本", "Skip this version"),
+                                      QMessageBox::DestructiveRole);
+    box.setDefaultButton(later);
+    box.exec();
+    if (box.clickedButton() == skip) {
+        ui::UpdateChecker::skipVersion(info.version);
+        return;
+    }
+    if (box.clickedButton() != install) return;
+    if (!ui::UpdateChecker::isInstalledCopy()) {
+        // 便携版不自动装：装 MSI 会在系统里多一份
+        QMessageBox::information(
+            this, i18n::trs("便携版", "Portable build"),
+            i18n::trs("当前是便携版，请到下载页手动替换；自动安装会另装一份到系统目录。",
+                      "This is the portable build - please update it manually from the releases "
+                      "page; automatic install would add a second copy to the system."));
+        QDesktopServices::openUrl(QUrl(info.notesUrl));
+        return;
+    }
+    ui::Toast::show(this, i18n::trs("正在下载更新…", "Downloading update…"));
+    connect(updater_, &ui::UpdateChecker::installing, this, [this] {
+        ui::Toast::show(this, i18n::trs("正在安装更新", "Installing update"));
+        quitForUpdate_ = true;   // 让 closeEvent 真退出而不是最小化到托盘
+        QTimer::singleShot(1500, qApp, [] { QCoreApplication::quit(); });
+    });
+    connect(updater_, &ui::UpdateChecker::failed, this, [this](const QString& why) {
+        QMessageBox::warning(this, i18n::trs("更新失败", "Update failed"), why);
+    });
+    updater_->downloadAndInstall(info);
+}
+
 void MainWindow::setupTray() {
     tray_ = new QSystemTrayIcon(QIcon(":/brand/logo.png"), this);
     tray_->setToolTip(i18n::trs("AgentHive · 蜂巢运行中", "AgentHive · hive is running"));
@@ -306,6 +371,13 @@ void MainWindow::setupTray() {
 }
 
 void MainWindow::closeEvent(QCloseEvent* e) {
+    // 自动更新：安装程序会让本进程关闭，此时必须真退出——否则"关闭即最小化到托盘"
+    // 会让进程继续占着 exe，安装程序无法替换文件（实测踩到过）。
+    if (quitForUpdate_) {
+        QMainWindow::closeEvent(e);
+        QCoreApplication::quit();
+        return;
+    }
     // 关闭 = 隐藏到托盘（HTTP 服务随进程常驻，Agent 不受影响）；托盘菜单退出才真正退出
     if (tray_ && tray_->isVisible()) {
         e->ignore();

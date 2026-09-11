@@ -17,6 +17,7 @@
 #include "core/http/url_guard.h"
 #include "core/platform.h"
 #include "core/util.h"
+#include "core/version_util.h"
 
 namespace fs = std::filesystem;
 using nlohmann::json;
@@ -144,6 +145,31 @@ static void test_constant_time_equals() {
     CHECK(!ah::constantTimeEquals("", "a"));
     CHECK(!ah::constantTimeEquals("0000000000", "1000000000"));  // 首字节差异
     CHECK(!ah::constantTimeEquals("0000000000", "0000000001"));  // 末字节差异
+}
+
+// 版本比较：更新检查的唯一判据，必须严格（判错会导致漏升级或降级误报）
+static void test_version_compare() {
+    using ah::compareVersions;
+    using ah::isNewerVersion;
+    CHECK_EQ(compareVersions("1.0.0", "1.0.0"), 0);
+    CHECK_EQ(compareVersions("v1.0.0", "1.0.0"), 0);   // v 前缀等价
+    CHECK_EQ(compareVersions("1.2", "1.2.0"), 0);     // 缺位补 0
+    CHECK(compareVersions("1.0.1", "1.0.0") > 0);
+    CHECK(compareVersions("1.1.0", "1.0.9") > 0);
+    CHECK(compareVersions("2.0.0", "1.99.99") > 0);
+    CHECK(compareVersions("1.0.0", "1.0.1") < 0);
+    CHECK(compareVersions("1.10.0", "1.9.0") > 0);     // 数值比较而非字符串比较
+    CHECK(compareVersions("0.9.9", "1.0.0") < 0);
+    // 预发布后缀：同号更旧；两个都是预发布按后缀比较
+    CHECK(compareVersions("1.0.0-rc1", "1.0.0") < 0);
+    CHECK(compareVersions("1.0.0", "1.0.0-rc1") > 0);
+    CHECK(compareVersions("1.0.0-rc1", "1.0.0-rc2") < 0);
+    CHECK(compareVersions("1.0.1-rc1", "1.0.0") > 0);  // 号更大优先于预发布后缀
+    // isNewerVersion：更新提示的判据
+    CHECK(isNewerVersion("1.0.1", "1.0.0"));
+    CHECK(!isNewerVersion("1.0.0", "1.0.0"));
+    CHECK(!isNewerVersion("0.9.0", "1.0.0"));
+    CHECK(!isNewerVersion("1.0.0-rc1", "1.0.0"));      // 预发布不该提示正式版用户升级
 }
 
 static std::string readFile(const std::string& path) {
@@ -590,6 +616,7 @@ int main() {
     run("embedder", test_embedder);
     run("url_guard", test_url_guard);
     run("constant_time", test_constant_time_equals);
+    run("version_compare", test_version_compare);
     run("platform_e2e", test_platform_end_to_end);
     run("legacy_migration", test_legacy_migration);
 

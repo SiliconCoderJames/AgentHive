@@ -8,9 +8,10 @@
     2. cmake --install to a clean stage dir (this is where windeployqt puts the Qt runtime)
     3. assert the stage really is runnable (exe, Qt DLLs, platform plugin, MSVC runtime)
     4. generate the WiX file manifest from the stage dir
-    5. build the MSI with WiX (pinned version, see -WixVersion)
+    5. build the MSI with WiX (pinned version, see -WixVersion) + ICE validation
     6. zip the stage dir as the portable build
     7. write SHA256SUMS.txt
+    8. write latest.json (the in-app updater's manifest)
 
   Everything lands in release/ (overridable with -OutDir).
 
@@ -33,6 +34,9 @@ param(
     [string]$OutDir = "release",
     [string]$StageDir = "_stage",
     [string]$WixVersion = "6.0.2",
+    # owner/repo used to build the download URLs inside latest.json (the in-app updater
+    # consumes them); CI passes ${{ github.repository }} so forks stay correct.
+    [string]$Repo = "SiliconCoderJames/AgentHive",
     [switch]$SkipBuild,
     [switch]$PerMachine
 )
@@ -150,18 +154,54 @@ Copy-Item -Path (Join-Path $StageDir "*") -Destination $inner -Recurse -Force
 Compress-Archive -Path $inner -DestinationPath $zipPath -CompressionLevel Optimal
 Remove-Item -Recurse -Force $staging
 
-Step "7/7 checksums"
+Step "7/8 checksums"
 $sums = Join-Path $OutDir "SHA256SUMS.txt"
 $lines = @()
+$hashes = @{}
 foreach ($f in @($msi, $zipPath)) {
     $h = (Get-FileHash -Algorithm SHA256 (Join-Path $root $f)).Hash.ToLower()
+    $hashes[(Split-Path -Leaf $f)] = $h
     $lines += "$h  $(Split-Path -Leaf $f)"
 }
 [System.IO.File]::WriteAllLines((Join-Path $root $sums), $lines, (New-Object System.Text.UTF8Encoding($false)))
 $lines | ForEach-Object { Write-Host "  $_" }
 
+Step "8/8 update manifest (latest.json)"
+# The in-app updater reads this instead of the GitHub API: it is fetched from the stable
+# URL https://github.com/<repo>/releases/latest/download/latest.json, so it needs no token
+# and is not subject to the unauthenticated API rate limit. It carries the SHA256 of every
+# artifact, which is what the updater verifies before installing.
+$msiName = Split-Path -Leaf $msi
+$zipNameOnly = Split-Path -Leaf $zipPath
+$base = "https://github.com/$Repo/releases/download/v$verNumeric"
+$manifest = [ordered]@{
+    version      = $verNumeric
+    tag          = "v$verNumeric"
+    published_at = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+    repo         = $Repo
+    notes_url    = "https://github.com/$Repo/releases/tag/v$verNumeric"
+    msi          = [ordered]@{
+        name   = $msiName
+        url    = "$base/$msiName"
+        sha256 = $hashes[$msiName]
+        size   = (Get-Item (Join-Path $root $msi)).Length
+    }
+    portable     = [ordered]@{
+        name   = $zipNameOnly
+        url    = "$base/$zipNameOnly"
+        sha256 = $hashes[$zipNameOnly]
+        size   = (Get-Item (Join-Path $root $zipPath)).Length
+    }
+}
+$manifestPath = Join-Path $OutDir "latest.json"
+$json = ($manifest | ConvertTo-Json -Depth 4)
+[System.IO.File]::WriteAllText((Join-Path $root $manifestPath), $json + "`n",
+                              (New-Object System.Text.UTF8Encoding($false)))
+Write-Host "  $manifestPath"
+Write-Host $json
+
 Write-Host "`n=== artifacts ===" -ForegroundColor Green
-Get-ChildItem $OutDir -File | Where-Object { $_.Extension -in @(".msi", ".zip", ".txt") } |
+Get-ChildItem $OutDir -File | Where-Object { $_.Extension -in @(".msi", ".zip", ".txt", ".json") } |
     Select-Object Name, @{n = 'MB'; e = { [math]::Round($_.Length / 1MB, 2) } } | Format-Table -AutoSize | Out-Host
 
 # Native commands above may leave a non-zero $LASTEXITCODE even on success

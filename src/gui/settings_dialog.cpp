@@ -14,10 +14,9 @@
 #include <QJsonObject>
 #include <QListWidget>
 #include <QMessageBox>
-#include <QNetworkAccessManager>
-#include <QNetworkReply>
-#include <QNetworkRequest>
+#include <QProgressBar>
 #include <QPushButton>
+#include <QTimer>
 #include <QScrollArea>
 #include <QStackedWidget>
 #include <QTableWidget>
@@ -34,25 +33,12 @@
 #include "widgets.h"
 
 namespace {
-constexpr const char* kRepoApi =
-    "https://api.github.com/repos/SiliconCoderJames/AgentHive/releases/latest";
+// 下载页链接（更新检查与下载由 ui::UpdateChecker 负责，那里用 release 资产的 latest.json）
 constexpr const char* kRepoPage = "https://github.com/SiliconCoderJames/AgentHive/releases";
 
 // 设置导航项：kind 取自 ui::makeIcon 的图标种类
 constexpr const char* kNavKinds[] = {"palette",  "database", "bell", "overview",
                                      "plug",     "refresh",  "info"};
-
-// 版本比较（形如 0.1.0）：a > b 返回 1，相等 0，否则 -1
-int cmpVersion(const QString& a, const QString& b) {
-    const QStringList pa = a.split('.');
-    const QStringList pb = b.split('.');
-    for (int i = 0; i < qMax(pa.size(), pb.size()); ++i) {
-        int x = i < pa.size() ? pa[i].toInt() : 0;
-        int y = i < pb.size() ? pb[i].toInt() : 0;
-        if (x != y) return x > y ? 1 : -1;
-    }
-    return 0;
-}
 }  // namespace
 
 SettingsDialog::SettingsDialog(ah::Platform& platform, QWidget* parent)
@@ -567,7 +553,7 @@ QWidget* SettingsDialog::buildAboutPage() {
     return page;
 }
 
-// ---- 更新：当前版本 + GitHub Releases 检查 ----
+// ---- 更新：自动检查 + 一键升级（走 release 资产的 latest.json，见 update_checker.h）----
 QWidget* SettingsDialog::buildUpdatePage() {
     auto* page = new QWidget(stack_);
     auto* lay = new QVBoxLayout(page);
@@ -579,55 +565,119 @@ QWidget* SettingsDialog::buildUpdatePage() {
                  QString("  v%1").arg(ah::kPlatformVersion));
     lay->addWidget(cur);
 
+    autoCheckBox_ = new QCheckBox(
+        i18n::trs("每天自动检查一次更新", "Check for updates automatically (once a day)"), page);
+    autoCheckBox_->setChecked(ui::UpdateChecker::autoCheckEnabled());
+    connect(autoCheckBox_, &QCheckBox::toggled, this,
+            [](bool on) { ui::UpdateChecker::setAutoCheckEnabled(on); });
+    lay->addWidget(autoCheckBox_);
+
+    if (!ui::UpdateChecker::isInstalledCopy()) {
+        auto* portable = thLabel("font-size:11px; color:@muted@;", page);
+        portable->setText(i18n::trs(
+            "当前是便携版：不会自动安装（否则系统里会多出一份），请到下载页手动替换。",
+            "Portable build: automatic install is disabled (it would add a second copy) — "
+            "download the new archive manually."));
+        portable->setWordWrap(true);
+        lay->addWidget(portable);
+    }
+
     auto* row = new QHBoxLayout();
     auto* checkBtn = new QPushButton(i18n::trs("检查更新", "Check for updates"), page);
-    connect(checkBtn, &QPushButton::clicked, this, [this] {
-        if (!net_) net_ = new QNetworkAccessManager(this);
-        latest_->setText(i18n::trs("正在检查…", "Checking…"));
-        QNetworkRequest req(QUrl(QString::fromLatin1(kRepoApi)));
-        req.setHeader(QNetworkRequest::UserAgentHeader, "AgentHive");
-        req.setTransferTimeout(8000);
-        QNetworkReply* reply = net_->get(req);
-        connect(reply, &QNetworkReply::finished, this, [this, reply] {
-            reply->deleteLater();
-            if (reply->error() != QNetworkReply::NoError) {
-                latest_->setText(i18n::trs("检查失败：", "Check failed: ") + reply->errorString());
-                return;
-            }
-            const QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
-            QString tag = doc.object().value("tag_name").toString();
-            if (tag.startsWith('v')) tag = tag.mid(1);
-            const QString curV = QString::fromLatin1(ah::kPlatformVersion);
-            if (tag.isEmpty()) {
-                latest_->setText(i18n::trs("未解析到最新版本信息。",
-                                           "Could not parse release info."));
-            } else if (cmpVersion(tag, curV) > 0) {
-                latest_->setText(i18n::trs("发现新版本", "New version available") +
-                                 QString("  v%1").arg(tag));
-            } else {
-                latest_->setText(i18n::trs("已是最新版本。", "You're up to date.") +
-                                 QString("  v%1").arg(curV));
-            }
-        });
-    });
-    auto* pageBtn = new QPushButton(i18n::trs("Releases 页面", "Releases page"), page);
-    connect(pageBtn, &QPushButton::clicked, this, [] {
-        QDesktopServices::openUrl(QUrl(QString::fromLatin1(kRepoPage)));
-    });
+    installBtn_ = new QPushButton(i18n::trs("下载并安装", "Download & install"), page);
+    installBtn_->setObjectName("primary");
+    installBtn_->setEnabled(false);
+    skipBtn_ = new QPushButton(i18n::trs("跳过此版本", "Skip this version"), page);
+    skipBtn_->setVisible(false);
+    auto* pageBtn = new QPushButton(i18n::trs("打开下载页", "Open releases page"), page);
     row->addWidget(checkBtn);
+    row->addWidget(installBtn_);
+    row->addWidget(skipBtn_);
     row->addWidget(pageBtn);
     row->addStretch(1);
     lay->addLayout(row);
+
+    progress_ = new QProgressBar(page);
+    progress_->setRange(0, 100);
+    progress_->setVisible(false);
+    lay->addWidget(progress_);
 
     latest_ = thLabel("font-size:12px; color:@muted@;", page);
     latest_->setWordWrap(true);
     lay->addWidget(latest_);
 
     auto* note = thLabel("font-size:11px; color:@muted@;", page);
-    note->setText(i18n::trs("AgentHive 纯本地运行、无遥测；不自动下载更新。",
-                            "AgentHive runs locally with no telemetry; it never auto-updates."));
+    note->setText(i18n::trs(
+        "更新从 GitHub Releases 获取：下载后先校验 SHA256 再安装，校验不通过会删除文件。"
+        "纯本地运行、无遥测；安装包为 per-user，不需要管理员权限。",
+        "Updates come from GitHub Releases: the download is verified against its SHA256 before "
+        "installing, and deleted if the checksum does not match. No telemetry; the installer is "
+        "per-user and needs no administrator rights."));
     note->setWordWrap(true);
     lay->addWidget(note);
     lay->addStretch(1);
+
+    updater_ = new ui::UpdateChecker(this);
+    connect(updater_, &ui::UpdateChecker::checking, this, [this] {
+        latest_->setText(i18n::trs("正在检查…", "Checking…"));
+        installBtn_->setEnabled(false);
+    });
+    connect(updater_, &ui::UpdateChecker::upToDate, this, [this](const QString& cur) {
+        pending_ = {};
+        installBtn_->setEnabled(false);
+        skipBtn_->setVisible(false);
+        latest_->setText(i18n::trs("已是最新版本。", "You're up to date.") + "  v" + cur);
+    });
+    connect(updater_, &ui::UpdateChecker::updateAvailable, this,
+            [this](const ui::UpdateInfo& info) {
+                pending_ = info;
+                const bool skipped = (info.version == ui::UpdateChecker::skippedVersion());
+                latest_->setText(i18n::trs("发现新版本 ", "New version available ") + "v" +
+                                 info.version +
+                                 (skipped ? i18n::trs("（此前被跳过）", " (previously skipped)") : ""));
+                installBtn_->setEnabled(ui::UpdateChecker::isInstalledCopy());
+                skipBtn_->setVisible(true);
+            });
+    connect(updater_, &ui::UpdateChecker::failed, this, [this](const QString& why) {
+        progress_->setVisible(false);
+        latest_->setText(i18n::trs("更新失败：", "Update failed: ") + why);
+    });
+    connect(updater_, &ui::UpdateChecker::downloadProgress, this,
+            [this](qint64 got, qint64 total) {
+                progress_->setVisible(true);
+                progress_->setRange(0, 100);
+                progress_->setValue(total > 0 ? int(got * 100 / total) : 0);
+                latest_->setText(i18n::trs("正在下载更新…", "Downloading update…") + "  " +
+                                 QString::number(got / 1048576.0, 'f', 1) + " / " +
+                                 (total > 0 ? QString::number(total / 1048576.0, 'f', 1) : "?") +
+                                 " MB");
+            });
+    connect(updater_, &ui::UpdateChecker::verifying, this, [this] {
+        progress_->setVisible(false);
+        latest_->setText(i18n::trs("正在校验 SHA256…", "Verifying SHA256…"));
+    });
+    connect(updater_, &ui::UpdateChecker::installing, this, [this] {
+        latest_->setText(i18n::trs("已启动安装程序，工作台即将退出…",
+                                  "Installer launched - the workbench will now exit…"));
+        ui::Toast::show(this, i18n::trs("正在安装更新", "Installing update"));
+        // 让出时间给安装程序读取文件，然后退出（MSI 自身也会关闭仍在运行的实例）
+        QTimer::singleShot(1500, qApp, [] { QCoreApplication::quit(); });
+    });
+
+    connect(checkBtn, &QPushButton::clicked, this, [this] { updater_->check(); });
+    connect(installBtn_, &QPushButton::clicked, this, [this] {
+        if (pending_.valid()) updater_->downloadAndInstall(pending_);
+    });
+    connect(skipBtn_, &QPushButton::clicked, this, [this] {
+        if (pending_.valid()) {
+            ui::UpdateChecker::skipVersion(pending_.version);
+            latest_->setText(i18n::trs("已跳过 v", "Skipped v") + pending_.version +
+                             i18n::trs("，下次检查仍会显示。", " - it will still show up next time."));
+            skipBtn_->setVisible(false);
+        }
+    });
+    connect(pageBtn, &QPushButton::clicked, this, [] {
+        QDesktopServices::openUrl(QUrl(QString::fromLatin1(kRepoPage)));
+    });
     return page;
 }
