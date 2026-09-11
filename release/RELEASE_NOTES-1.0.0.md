@@ -52,7 +52,8 @@ interval, and take backups.
 
 ## Verify your download
 
-Every artifact is built by GitHub Actions from the tagged commit, and the checksums are published
+Every artifact is built from the tagged commit with the reproducible pipeline in
+`scripts/package.ps1` — the same pipeline CI uses — and the checksums are published
 alongside them in `SHA256SUMS.txt`:
 
 ```powershell
