@@ -105,6 +105,10 @@ Do not publish this artifact as-is.
 Write-Host "  OK  vcruntime140.dll"
 
 Step "4/7 generate WiX file manifest"
+# release/ is fully untracked now (published via GitHub Releases), so the output dir may not
+# exist on a fresh clone; gen-wix-files.ps1 writes with [IO.File]::WriteAllText, which does
+# not create directories.
+New-Item -ItemType Directory -Force -Path (Join-Path $root "$OutDir/wix") | Out-Null
 if ($PerMachine) {
     & "$PSScriptRoot/gen-wix-files.ps1" -StageDir (Join-Path $root $StageDir) `
         -OutFile (Join-Path $root "$OutDir/wix/files.generated.wxs") -PerMachine
@@ -127,7 +131,7 @@ $msi = Join-Path $OutDir "MiderHive-$verNumeric-x64.msi"
 # Adding an already-present extension reports a non-zero exit code; that is not a failure.
 wix extension add -g "WixToolset.Util.wixext/$WixVersion" 2>&1 | Out-Host
 if ($LASTEXITCODE -ne 0) { Write-Host "(extension already installed, continuing)" }
-wix build (Join-Path $OutDir "wix/MiderHive.wxs") (Join-Path $OutDir "wix/files.generated.wxs") `
+wix build (Join-Path $root "installer/MiderHive.wxs") (Join-Path $OutDir "wix/files.generated.wxs") `
     -arch x64 -ext WixToolset.Util.wixext `
     -d Version="$verNumeric" -d Scope="$scope" -d PerMachine=$pm `
     -d IconFile="$root/src/gui/icon.ico" `

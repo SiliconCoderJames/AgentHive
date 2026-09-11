@@ -21,7 +21,7 @@ where your data never leaves your PC.
 
 English | **[简体中文](README.zh-CN.md)**
 
-**[Download](#quick-start)** · **[HTTP API docs](docs/api.md)** · **[Release notes](release/RELEASE_NOTES-1.0.1.md)** · **[Contributing](#contributing)**
+**[Download](#quick-start)** · **[HTTP API docs](docs/api.md)** · **[Release notes](https://github.com/SiliconCoderJames/MiderHive/releases)** · **[Contributing](#contributing)**
 
 </div>
 

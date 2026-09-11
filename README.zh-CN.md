@@ -20,7 +20,7 @@
 
 **[English](README.md) | 简体中文**
 
-**[下载安装](#快速开始)** · **[HTTP 接口文档](docs/api.md)** · **[发行说明](release/RELEASE_NOTES-1.0.1.md)** · **[参与贡献](#参与贡献)**
+**[下载安装](#快速开始)** · **[HTTP 接口文档](docs/api.md)** · **[发行说明](https://github.com/SiliconCoderJames/MiderHive/releases)** · **[参与贡献](#参与贡献)**
 
 </div>
 
