@@ -43,8 +43,9 @@ jobs:
         shell: pwsh
         run: |
           # windows-latest 不再保证预装 VS 2022：运行时探测可用的最新 VS 生成器
+          # （cmake --help 按新→旧排列，取第一个即最新）
           $gen = (cmake --help | Select-String 'Visual Studio \d+ 20\d\d' |
-            Select-Object -Last 1).Matches[0].Value
+            Select-Object -First 1).Matches[0].Value
           if (-not $gen) { throw 'no Visual Studio generator detected on runner' }
           Write-Host "using generator: $gen"
           # -QtPrefix 指向 install-qt-action 安装的 Qt
