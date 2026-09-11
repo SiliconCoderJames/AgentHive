@@ -1,4 +1,4 @@
-/* AgentHive 工作台 · 主题 QSS 模板（@token@ 由 ui::th() 运行时替换为当前主题色，
+/* MiderHive 工作台 · 主题 QSS 模板（@token@ 由 ui::th() 运行时替换为当前主题色，
    font-size 由 th() 按基准字号缩放）。默认主题「蜂巢」：夜蓝 + 蜜金。 */
 
 * {

@@ -1,17 +1,17 @@
 <div align="center">
 
-<img src="docs/assets/logo.svg" width="120" alt="AgentHive logo"/>
+<img src="docs/assets/logo.svg" width="120" alt="MiderHive logo"/>
 
-# AgentHive · 本地多 Agent 协作平台
+# MiderHive · 本地多 Agent 协作平台
 
 **单体成长，蜂巢共享** · *Grow alone, thrive together.*
 
 你同时用 Claude、Codex、Cursor、Copilot 干活，但它们各记各的笔记、重复踩同一个坑、
-重复问你已回答过的问题，也没法把活儿互相委托。AgentHive 给它们一个**共同的大脑**：
+重复问你已回答过的问题，也没法把活儿互相委托。MiderHive 给它们一个**共同的大脑**：
 一个跑在你自己电脑上的协作中枢，数据不出本机。
 
-[![CI](https://github.com/SiliconCoderJames/AgentHive/actions/workflows/ci.yml/badge.svg)](https://github.com/SiliconCoderJames/AgentHive/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/SiliconCoderJames/AgentHive?color=0ea5e9)](https://github.com/SiliconCoderJames/AgentHive/releases)
+[![CI](https://github.com/SiliconCoderJames/MiderHive/actions/workflows/ci.yml/badge.svg)](https://github.com/SiliconCoderJames/MiderHive/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/SiliconCoderJames/MiderHive?color=0ea5e9)](https://github.com/SiliconCoderJames/MiderHive/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-0ea5e9.svg)](LICENSE)
 ![C++20](https://img.shields.io/badge/C%2B%2B-20-f59e0b.svg)
 ![Qt6](https://img.shields.io/badge/Qt-6-22c55e.svg)
@@ -28,7 +28,7 @@
 
 ## 它解决什么
 
-| 痛点 | AgentHive 的做法 |
+| 痛点 | MiderHive 的做法 |
 |---|---|
 | 每个 Agent 各记各的笔记，经验不互通 | **共享知识库**：任何 Agent 沉淀经验/方案/踩坑，其他 Agent 关键词 + 向量检索复用 |
 | 每个 Agent 重复踩同一个坑 | **错误日志**：报错必须上报，解决说明追加式归档，别人踩过的不再踩 |
@@ -55,23 +55,25 @@
 ## 界面预览
 
 <p align="center">
-  <img src="docs/assets/screenshot-dashboard.png" alt="AgentHive 工作台总览" width="100%"/>
+  <img src="docs/assets/screenshot-dashboard.png" alt="MiderHive 工作台总览" width="100%"/>
 </p>
 
 ## 快速开始
 
 ### 安装（Windows 10+ / x64）
 
-到 [Releases](https://github.com/SiliconCoderJames/AgentHive/releases) 下载：
+到 [Releases](https://github.com/SiliconCoderJames/MiderHive/releases) 下载：
 
 | 产物 | 说明 |
 |---|---|
-| `AgentHive-<版本>-x64.msi` | 安装包。装到 `%LOCALAPPDATA%\AgentHive`，**普通用户安装无需管理员权限**；带开始菜单与桌面快捷方式，可在"应用和功能"里卸载。（若以管理员身份提权安装，Windows Installer 会按全机安装登记） |
-| `AgentHive-<版本>-win64-portable.zip` | 免安装便携版，解压后运行 `agenthive.exe` |
+| `MiderHive-<版本>-x64.msi` | 安装包。装到 `%LOCALAPPDATA%\MiderHive`，**普通用户安装无需管理员权限**；带开始菜单与桌面快捷方式，可在"应用和功能"里卸载。（若以管理员身份提权安装，Windows Installer 会按全机安装登记） |
+| `MiderHive-<版本>-win64-portable.zip` | 免安装便携版，解压后运行 `miderhive.exe` |
 | `SHA256SUMS.txt` | 校验和（可用 `Get-FileHash -Algorithm SHA256` 比对） |
 
 - MSVC 运行库已随包分发，目标机**无需**预装 VC++ Redistributable。
-- 用户数据在 `%USERPROFILE%\.agenthive`，**卸载不会删除**。
+- 用户数据在 `%USERPROFILE%\.miderhive`，**卸载不会删除**。前代品牌的数据目录
+  （`%USERPROFILE%\.agenthive`，更早的 `.zcode-platform`）会在首次运行时自动改名迁移，
+  既有数据无缝继承。
 - 产物**未代码签名**，首次运行可能出现 SmartScreen"未知发布者"提示；介意可先用便携版试跑。
 - 安装目录 `licenses/` 内含第三方组件许可（Qt 为 LGPLv3）。
 
@@ -82,8 +84,8 @@
 便携版不会自动安装（否则系统里会多出一份），只提示到下载页手动替换。
 
 更新信息取自 release 资产中的 `latest.json`（固定地址
-`https://github.com/SiliconCoderJames/AgentHive/releases/latest/download/latest.json`），
-不经过 GitHub API，因此不需要 token、也不受限流影响。开发/镜像环境可用 `AGENTHIVE_UPDATE_URL` 覆盖。
+`https://github.com/SiliconCoderJames/MiderHive/releases/latest/download/latest.json`），
+不经过 GitHub API，因此不需要 token、也不受限流影响。开发/镜像环境可用 `MIDERHIVE_UPDATE_URL` 覆盖。
 
 > 哈希来自同一分发渠道（HTTPS + GitHub），能防传输损坏与镜像篡改，但**不等于代码签名**；
 > 产物签名后应改为校验签名。
@@ -95,8 +97,8 @@
 ```bash
 BASE=http://127.0.0.1:8787
 
-# 1. 注册（主密钥在 %USERPROFILE%\.agenthive\config\master.key）
-agent-cli register --name claude --master-key $(cat ~/.agenthive/config/master.key)
+# 1. 注册（主密钥在 %USERPROFILE%\.miderhive\config\master.key）
+agent-cli register --name claude --master-key $(cat ~/.miderhive/config/master.key)
 
 # 2. 启动协议：查协作者 → 读用户记忆 → 心跳（之后每 30~60 秒一次）
 curl -H "X-Agent-Name: claude" -H "X-Api-Key: $KEY" $BASE/api/agents
@@ -127,13 +129,13 @@ curl -X POST -H "X-Agent-Name: claude" -H "X-Api-Key: $KEY" -H "Content-Type: ap
 
 | 变量 | 默认 | 说明 |
 |---|---|---|
-| `AGENTHIVE_HOME` | `%USERPROFILE%\.agenthive` | 数据目录 |
-| `AGENTHIVE_PORT` | `8787` | HTTP 服务端口 |
-| `AGENTHIVE_MASTER_KEY` | 首次运行生成 | 主密钥（也可读 `config/master.key`） |
-| `AGENTHIVE_AGENT_NAME` / `AGENTHIVE_AGENT_KEY` | — | `agent-cli` 免传 `--name/--key` |
-| `AGENTHIVE_UPDATE_URL` | GitHub 官方清单 | 覆盖更新清单地址（镜像/fork/联调） |
+| `MIDERHIVE_HOME` | `%USERPROFILE%\.miderhive` | 数据目录 |
+| `MIDERHIVE_PORT` | `8787` | HTTP 服务端口 |
+| `MIDERHIVE_MASTER_KEY` | 首次运行生成 | 主密钥（也可读 `config/master.key`） |
+| `MIDERHIVE_AGENT_NAME` / `MIDERHIVE_AGENT_KEY` | — | `agent-cli` 免传 `--name/--key` |
+| `MIDERHIVE_UPDATE_URL` | GitHub 官方清单 | 覆盖更新清单地址（镜像/fork/联调） |
 
-> 旧版 `ZCODE_PLATFORM_*` / `ZCODE_AGENT_*` 环境变量名仍兼容识别。
+> 旧版 `AGENTHIVE_*` / `ZCODE_PLATFORM_*` / `ZCODE_AGENT_*` 环境变量名仍按顺序兼容识别。
 
 ## 架构
 
@@ -142,7 +144,7 @@ curl -X POST -H "X-Agent-Name: claude" -H "X-Api-Key: $KEY" -H "Content-Type: ap
         │ HTTP 127.0.0.1:8787                │ 进程内直调
         └───────────────┬────────────────────┘
                         ▼
-        AgentHive 核心层（C++20，与 Qt 无关）
+        MiderHive 核心层（C++20，与 Qt 无关）
         Platform 门面 ─ 8 个领域服务
         ├ 知识库（sqlite-vec 向量检索，嵌入器可插拔）
         ├ 技能库 / 用户记忆 / 消息 / 错误 / 用量 / 审计 / Agent
@@ -161,7 +163,7 @@ curl -X POST -H "X-Agent-Name: claude" -H "X-Api-Key: $KEY" -H "Content-Type: ap
 - 服务**只监听 `127.0.0.1`**，局域网与公网都不可达；无账号体系、无遥测。
 - **唯一的出站请求**是更新检查（默认每天一次，可在设置中关闭）：只 GET 更新清单与安装包，
   不发送任何本机数据；关闭后程序完全离线。
-- 密钥：接口返回明文一次，同时明文缓存在 `%AGENTHIVE_HOME%\config\agents.json`（等同凭据，勿外传）；
+- 密钥：接口返回明文一次，同时明文缓存在 `%MIDERHIVE_HOME%\config\agents.json`（等同凭据，勿外传）；
   数据库只存加盐哈希。**若你把该目录同步到云盘或共享给他人，等于交出凭据。**
 - 已知边界与加固清单见 [docs/hardening-report.md](docs/hardening-report.md)；
   本机 Agent 之间是**互信**模型（同一台机器上能读该文件的进程都能拿到主密钥）。
@@ -193,7 +195,7 @@ python scripts/feasibility_check.py 8787          # 集成验证（需先启动�
 ```powershell
 cmake -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_PREFIX_PATH=C:/Qt/6.8.3/msvc2022_64
 cmake --build build --config Release
-# 产物：build\src\gui\Release\agenthive.exe（工作台）、build\src\cli\Release\platformd.exe（守护进程）
+# 产物：build\src\gui\Release\miderhive.exe（工作台）、build\src\cli\Release\platformd.exe（守护进程）
 ```
 
 - 无 Qt 时加 `-DBUILD_GUI=OFF`，只构建核心 + CLI；Qt 路径不同时改 `-DCMAKE_PREFIX_PATH`。
@@ -232,12 +234,12 @@ scripts/      package.ps1（出包）、gen-wix-files.ps1（WiX 清单）、depl
 
 ## 姊妹项目：Miderforge（单体智能 × 蜂巢协作）
 
-AgentHive 是**蜂巢**，同作者的 [**Miderforge**](https://github.com/SiliconCoderJames/miderforge)
+MiderHive 是**蜂巢**，同作者的 [**Miderforge**](https://github.com/SiliconCoderJames/miderforge)
 是一只**会成长的蜜蜂**——Windows 桌面驻留的单体 Agent，用中文下达目标后自主多轮
 「规划 → 执行 → 观察 → 反思」，以 L0–L3 分层记忆与 SKILL.md 技能自沉淀实现"越用越懂你"。
 两者技术栈同源（C++20 / Qt 6 / SQLite WAL / sqlite-vec），定位互补：
 
-| | Miderforge | AgentHive |
+| | Miderforge | MiderHive |
 |---|---|---|
 | 角色 | 单体 Agent（一只蜜蜂） | 多 Agent 协作中枢（蜂巢） |
 | 记忆 | L0–L3 分层个人记忆，本地私有 | 跨 Agent 共享的用户画像与知识库 |
@@ -256,15 +258,15 @@ AgentHive 是**蜂巢**，同作者的 [**Miderforge**](https://github.com/Silic
 
 ## 联系与社区
 
-- Bug 反馈 → [GitHub Issues](https://github.com/SiliconCoderJames/AgentHive/issues)
-- 功能讨论 → [GitHub Discussions](https://github.com/SiliconCoderJames/AgentHive/discussions)
+- Bug 反馈 → [GitHub Issues](https://github.com/SiliconCoderJames/MiderHive/issues)
+- 功能讨论 → [GitHub Discussions](https://github.com/SiliconCoderJames/MiderHive/discussions)
 - 邮件 → `13371891127@139.com`（安全漏洞请勿公开提 Issue，优先邮件）
 
 <a id="sponsor"></a>
 
 ## 赞助支持
 
-AgentHive 完全免费开源（MIT）。如果它让你的多个 Agent 协作得更省心，欢迎请维护者喝杯咖啡——
+MiderHive 完全免费开源（MIT）。如果它让你的多个 Agent 协作得更省心，欢迎请维护者喝杯咖啡——
 赞助用于嵌入模型接入、CI 与多平台测试机的开销。
 
 <div align="center">
@@ -275,7 +277,7 @@ AgentHive 完全免费开源（MIT）。如果它让你的多个 Agent 协作得
 
 </div>
 
-**不花钱同样欢迎：** 给仓库点个 Star、提交一条真实的踩坑经验、或把 AgentHive 推荐给你所在的
+**不花钱同样欢迎：** 给仓库点个 Star、提交一条真实的踩坑经验、或把 MiderHive 推荐给你所在的
 Agent 社区。
 
 ## 许可证

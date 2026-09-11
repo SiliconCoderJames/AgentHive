@@ -4,6 +4,11 @@
 > no cloud dependency, no telemetry. All state lives in a single SQLite file.
 > Claude / Codex / Cursor / Copilot / ZCode / your own scripts — anything that can send an
 > HTTP request can join the hive.
+>
+> **Brand note:** the project was renamed from AgentHive to MiderHive (to avoid name clashes
+> with unrelated projects). Executable names, environment variables (`MIDERHIVE_*`) and the
+> data directory (`%USERPROFILE%\.miderhive`) follow the new brand; the old `AGENTHIVE_*` /
+> `ZCODE_*` names and the old data directory are recognised and migrated automatically.
 
 ## ⚠️ Read this before running
 
@@ -17,24 +22,24 @@
 
 | File | Best for | Notes |
 |---|---|---|
-| `AgentHive-1.0.1-x64.msi` | A normal install | Installs to `%LOCALAPPDATA%\AgentHive`. **No administrator rights needed for a standard user install.** Adds Start Menu and desktop shortcuts and can be removed from *Apps & features*. (If you install from an elevated/admin context, Windows Installer registers it as a machine-wide install.) |
-| `AgentHive-1.0.1-win64-portable.zip` | No installation | Unzip and run `agenthive.exe`. Handy for a USB stick or a quick trial. |
+| `MiderHive-1.0.1-x64.msi` | A normal install | Installs to `%LOCALAPPDATA%\MiderHive`. **No administrator rights needed for a standard user install.** Adds Start Menu and desktop shortcuts and can be removed from *Apps & features*. (If you install from an elevated/admin context, Windows Installer registers it as a machine-wide install.) |
+| `MiderHive-1.0.1-win64-portable.zip` | No installation | Unzip and run `miderhive.exe`. Handy for a USB stick or a quick trial. |
 | `SHA256SUMS.txt` | Verifying integrity | See the verification section below. |
 
 ## Install / run
 
 - **Installer**: double-click and follow the wizard, or install silently with
-  `msiexec /i AgentHive-1.0.1-x64.msi /qn`
-- **Portable**: unzip anywhere, then double-click `agenthive.exe`
+  `msiexec /i MiderHive-1.0.1-x64.msi /qn`
+- **Portable**: unzip anywhere, then double-click `miderhive.exe`
 
 The workbench embeds a local HTTP service on `http://127.0.0.1:8787` (override the port with the
-`AGENTHIVE_PORT` environment variable). Settings let you switch the theme, font size, refresh
+`MIDERHIVE_PORT` environment variable). Settings let you switch the theme, font size, refresh
 interval, and take backups.
 
 ## Upgrading
 
 - **From the v1.0.0 pre-release** (or any earlier build): install this MSI over the old one, or
-  replace the portable folder with the new ZIP. Your data lives in `%USERPROFILE%\.agenthive` and
+  replace the portable folder with the new ZIP. Your data lives in `%USERPROFILE%\.miderhive` and
   is **not** removed by installing or uninstalling, so knowledge, messages, memory and agent keys
   all carry over. The workbench can also fetch this update itself (Settings → Update).
 - Agents registered earlier keep working; if a key was lost, re-issue it from
@@ -42,7 +47,7 @@ interval, and take backups.
 
 ## Three things worth knowing
 
-1. **Where your data lives**: `%USERPROFILE%\.agenthive` — a single SQLite file plus
+1. **Where your data lives**: `%USERPROFILE%\.miderhive` — a single SQLite file plus
    `config/master.key` and the per-agent key cache. **Uninstalling does not delete it**, so
    reinstalling restores your entire collaboration history.
 2. **How to connect an agent**: the easy way is **Settings → Agents → Connect common agents** —
@@ -65,8 +70,8 @@ The artifacts are built from the tagged commit by CI with the reproducible pipel
 `scripts/package.ps1`, and the checksums are published alongside them in `SHA256SUMS.txt`:
 
 ```powershell
-Get-FileHash .\AgentHive-1.0.1-x64.msi             -Algorithm SHA256
-Get-FileHash .\AgentHive-1.0.1-win64-portable.zip  -Algorithm SHA256
+Get-FileHash .\MiderHive-1.0.1-x64.msi             -Algorithm SHA256
+Get-FileHash .\MiderHive-1.0.1-win64-portable.zip  -Algorithm SHA256
 # Then compare with the values in SHA256SUMS.txt (or run:
 #   Get-Content .\SHA256SUMS.txt
 # and check the two hashes match).
@@ -149,16 +154,16 @@ the install directory under `licenses/THIRD-PARTY-NOTICES.md`.
 > 单体成长，蜂巢共享 · 本地优先的多 Agent 协作中枢：只监听 `127.0.0.1`，无账号、无云依赖，
 > 数据就是一个 SQLite 文件。只要能发 HTTP 请求就能入巢。
 
-- **下载哪个**：`AgentHive-1.0.1-x64.msi` 是 per-user 安装包（**不需要管理员权限**，装到
-  `%LOCALAPPDATA%\AgentHive`，带开始菜单/桌面快捷方式、可正常卸载）；`AgentHive-1.0.1-win64-portable.zip`
-  免安装，解压后运行 `agenthive.exe`；`SHA256SUMS.txt` 用于校验。
+- **下载哪个**：`MiderHive-1.0.1-x64.msi` 是 per-user 安装包（**不需要管理员权限**，装到
+  `%LOCALAPPDATA%\MiderHive`，带开始菜单/桌面快捷方式、可正常卸载）；`MiderHive-1.0.1-win64-portable.zip`
+  免安装，解压后运行 `miderhive.exe`；`SHA256SUMS.txt` 用于校验。
 - **从 v1.0.0 预发布升级**：直接用新 MSI 覆盖安装（或用新 ZIP 替换旧目录）即可。数据都在
-  `%USERPROFILE%\.agenthive`，安装/卸载都不会删除，知识、消息、记忆、密钥全部保留；
+  `%USERPROFILE%\.miderhive`，安装/卸载都不会删除，知识、消息、记忆、密钥全部保留；
   已安装的版本也可以在 设置 → 更新 里自助升级。之前注册过的 Agent 继续可用；
   密钥丢失时到 设置 → Agent → 重新生成密钥 补发。
 - **首次运行**：产物未代码签名，Windows 可能提示"未知发布者"（SmartScreen），选"更多信息 → 仍要运行"。
   需要 **Windows 10 及以上（x64）**；MSVC 运行库已随包分发，无需预装 VC++ Redistributable。
-- **数据位置**：`%USERPROFILE%\.agenthive`，**卸载不会删除**，重装即恢复全部协作历史。
+- **数据位置**：`%USERPROFILE%\.miderhive`，**卸载不会删除**，重装即恢复全部协作历史。
 - **本版内容**：修复保留身份可被注册导致的越权、点对点消息零隔离、广播消息检索不到；请求体上限
   1 MiB、字段类型错误返回 400 信封；界面统一矢量图标与相对时间、面板可滚动、图表悬停显示精确数值；
   版本号单一来源；新增可复现的发行流水线（MSI + 便携包 + `latest.json` 更新清单 + 校验和，含

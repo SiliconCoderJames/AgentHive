@@ -1,24 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  AgentHive · Windows 安装包（WiX v4+）
+  MiderHive · Windows 安装包（WiX v4+）
 
   设计取舍：
-  * Scope="perUser"：装到 %LOCALAPPDATA%\AgentHive，与 scripts/deploy.ps1 的既有约定一致，
-    安装无需管理员权限（不弹 UAC）。需要企业批量下发（GPO/SCCM）时用 -dPerMachine=1 切到
-    全机安装：wix build -dPerMachine=1 ...
-  * 用户数据 %USERPROFILE%\.agenthive **不在本包管理范围内**，卸载时不会被删除。
+  * Scope="perUser"：装到 %LOCALAPPDATA%\MiderHive，安装无需管理员权限（不弹 UAC）。
+    需要企业批量下发（GPO/SCCM）时用 -dPerMachine=1 切到全机安装：wix build -dPerMachine=1 ...
+  * 用户数据 %USERPROFILE%\.miderhive **不在本包管理范围内**，卸载时不会被删除。
   * 文件清单由构建产物目录自动收获（Files 扩展），无需维护组件 GUID 列表。
   * 版本号由构建流水线传入：wix build -dVersion=1.0.0 ...
+  * UpgradeCode 沿用前代品牌 AgentHive 的值：老版本（含 1.0.x）安装本包时按"同产品升级"
+    处理——先完整卸载旧的，再装新的，不会出现两份并存。
 -->
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
      xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
 
-  <?define ProductName = "AgentHive" ?>
-  <?define ProductFullName = "AgentHive 多 Agent 协作工作台" ?>
-  <?define ExeName = "agenthive.exe" ?>
+  <?define ProductName = "MiderHive" ?>
+  <?define ProductFullName = "MiderHive 多 Agent 协作工作台" ?>
+  <?define ExeName = "miderhive.exe" ?>
 
   <Package Name="$(var.ProductFullName)"
-           Manufacturer="AgentHive"
+           Manufacturer="MiderHive"
            Version="$(var.Version)"
            UpgradeCode="7F3C2A64-9B1E-4E0D-9A6E-2C5B8D41F7A3"
            Scope="$(var.Scope)"
@@ -27,14 +28,14 @@
            Codepage="65001">
 
     <SummaryInformation Description="$(var.ProductFullName) $(var.Version) 安装程序"
-                        Manufacturer="AgentHive" />
+                        Manufacturer="MiderHive" />
 
     <!-- 升级：同 UpgradeCode 的旧版本先移除再装（避免文件残留）。
          AllowSameVersionUpgrades：ProductCode 由 WiX 每次构建自动生成，因此"同版本号的另一个构建"
          （例如重打包同一个 tag、或 v1.0.0-rc1 → v1.0.0，两者 MSI 版本都被规范成 1.0.0）默认会被
          当成两个产品并存安装——实测踩到过（同一个目录里出现两份安装记录）。开启后同版本也会先卸载旧的。 -->
     <MajorUpgrade AllowSameVersionUpgrades="yes"
-                  DowngradeErrorMessage="已安装更高版本的 AgentHive，请先卸载后再装此版本。" />
+                  DowngradeErrorMessage="已安装更高版本的 MiderHive，请先卸载后再装此版本。" />
     <MediaTemplate EmbedCab="yes" />
 
     <?if $(var.PerMachine) = 1 ?>
@@ -53,7 +54,7 @@
     <Icon Id="AppIcon" SourceFile="$(var.IconFile)" />
     <Property Id="ARPPRODUCTICON" Value="AppIcon" />
     <Property Id="ARPNOMODIFY" Value="1" />
-    <Property Id="ARPHELPLINK" Value="https://github.com/SiliconCoderJames/AgentHive" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/SiliconCoderJames/MiderHive" />
 
     <!-- 系统版本要求（Qt 6.8 / C++20 需要 Windows 10+）。
          这里不用 VersionNT：Windows Installer 会把本包的 VersionNT 从 603 一路降级到 500
@@ -70,7 +71,7 @@
                       Name="CurrentMajorVersionNumber" />
     </Property>
     <Launch Condition="Installed OR WINMAJORVERSION"
-            Message="AgentHive 需要 Windows 10 或更高版本（Qt 6.8 与 C++20 的要求）。" />
+            Message="MiderHive 需要 Windows 10 或更高版本（Qt 6.8 与 C++20 的要求）。" />
 
     <!-- 安装期间若工作台正在运行：提示并自动关闭，避免文件占用导致安装失败 -->
     <util:CloseApplication Id="CloseWorkbench"
@@ -78,10 +79,10 @@
                            CloseMessage="yes"
                            PromptToContinue="no"
                            RebootPrompt="no"
-                           Description="AgentHive 工作台正在运行，安装程序将先关闭它。" />
+                           Description="MiderHive 工作台正在运行，安装程序将先关闭它。" />
 
     <Feature Id="Main" Title="$(var.ProductFullName)" Level="1"
-             Description="AgentHive 工作台、命令行客户端与 Qt 运行时">
+             Description="MiderHive 工作台、命令行客户端与 Qt 运行时">
       <!-- 文件清单由 scripts/gen-wix-files.ps1 从安装暂存目录生成：
            随 Qt 版本变化的 DLL 与插件目录无需人工维护 -->
       <ComponentGroupRef Id="AppFiles" />
@@ -92,18 +93,20 @@
   </Package>
 
   <!-- 清理历史可执行文件名：MSI 只会删除自己登记过的文件，不属于新包的文件会残留在安装目录。
-       重命名（zworkbench.exe → agenthive.exe）之后实测就留下了两份 exe，这里显式清掉。
-       对更早品牌的手工部署（scripts/deploy.ps1 的 /MIR 会自己同步）无影响。 -->
+       品牌更名（agenthive.exe → miderhive.exe）之后，手工部署（scripts/deploy.ps1）留下的旧
+       agenthive.exe 不会被老安装包的升级逻辑删掉，这里显式清掉；zworkbench.exe 是更早的内部代号。
+       对由老 MSI 安装的 agenthive.exe 无影响——MajorUpgrade 会先整体卸载旧产品（含其文件）。 -->
   <Fragment>
     <Component Id="LegacyCleanup" Directory="INSTALLFOLDER"
                Guid="B7E1C4A2-5D3F-4A81-9C6E-1F2A3B4C5D6E">
       <RemoveFile Id="RemoveLegacyExe" Name="zworkbench.exe" On="install" />
-      <RegistryValue Root="HKCU" Key="Software\AgentHive" Name="legacy_cleanup" Type="integer"
+      <RemoveFile Id="RemoveLegacyAgenthiveExe" Name="agenthive.exe" On="install" />
+      <RegistryValue Root="HKCU" Key="Software\MiderHive" Name="legacy_cleanup" Type="integer"
                      Value="1" KeyPath="yes" />
     </Component>
   </Fragment>
 
-  <!-- 安装目录：perUser = %LOCALAPPDATA%\AgentHive；perMachine = %ProgramFiles%\AgentHive -->
+  <!-- 安装目录：perUser = %LOCALAPPDATA%\MiderHive；perMachine = %ProgramFiles%\MiderHive -->
   <?if $(var.PerMachine) = 1 ?>
   <Fragment>
     <StandardDirectory Id="ProgramFiles64Folder">
@@ -135,7 +138,7 @@
                 WorkingDirectory="INSTALLFOLDER"
                 Icon="AppIcon" />
       <RemoveFolder Id="RemoveAppMenuFolder" Directory="AppMenuFolder" On="uninstall" />
-      <RegistryValue Root="HKCU" Key="Software\AgentHive" Name="startmenu" Type="integer"
+      <RegistryValue Root="HKCU" Key="Software\MiderHive" Name="startmenu" Type="integer"
                      Value="1" KeyPath="yes" />
     </Component>
   </Fragment>
@@ -149,7 +152,7 @@
                 Target="[INSTALLFOLDER]$(var.ExeName)"
                 WorkingDirectory="INSTALLFOLDER"
                 Icon="AppIcon" />
-      <RegistryValue Root="HKCU" Key="Software\AgentHive" Name="desktop" Type="integer"
+      <RegistryValue Root="HKCU" Key="Software\MiderHive" Name="desktop" Type="integer"
                      Value="1" KeyPath="yes" />
     </Component>
   </Fragment>

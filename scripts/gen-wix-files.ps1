@@ -15,7 +15,7 @@
   ANSI, which corrupts non-ASCII comments and can break parsing.
 
 .PARAMETER StageDir
-  Directory produced by cmake --install (agenthive.exe, Qt DLLs, plugin subdirs, licenses/).
+  Directory produced by cmake --install (miderhive.exe, Qt DLLs, plugin subdirs, licenses/).
 
 .PARAMETER OutFile
   Path of the .wxs file to write.
@@ -34,8 +34,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 $StageDir = (Resolve-Path $StageDir).Path
-if (-not (Test-Path (Join-Path $StageDir "agenthive.exe"))) {
-    throw "stage dir has no agenthive.exe: $StageDir (run cmake --install first)"
+if (-not (Test-Path (Join-Path $StageDir "miderhive.exe"))) {
+    throw "stage dir has no miderhive.exe: $StageDir (run cmake --install first)"
 }
 
 function XmlEsc([string]$s) {
@@ -76,7 +76,7 @@ if ($subDirs.Count -gt 0) {
 function ComponentGuid([string]$relPath) {
     $md5 = [System.Security.Cryptography.MD5]::Create()
     try {
-        $bytes = $md5.ComputeHash([System.Text.Encoding]::UTF8.GetBytes("AgentHive.Component/$relPath"))
+        $bytes = $md5.ComputeHash([System.Text.Encoding]::UTF8.GetBytes("MiderHive.Component/$relPath"))
     } finally {
         $md5.Dispose()
     }
@@ -102,7 +102,7 @@ foreach ($d in ($byDir.Keys | Sort-Object)) {
         } else {
             # User-profile install: ICE38 requires an HKCU registry value as the key path
             [void]$sb.AppendLine(('        <File Id="{0}" Source="{1}" />' -f $fid, (XmlEsc $f.FullName)))
-            [void]$sb.AppendLine(('        <RegistryValue Root="HKCU" Key="Software\AgentHive\Components" Name="{0}" Type="integer" Value="1" KeyPath="yes" />' -f $c))
+            [void]$sb.AppendLine(('        <RegistryValue Root="HKCU" Key="Software\MiderHive\Components" Name="{0}" Type="integer" Value="1" KeyPath="yes" />' -f $c))
         }
         # ICE64: every directory created under the user profile must be registered for
         # removal, otherwise uninstalling leaves empty folders behind. One RemoveFolder

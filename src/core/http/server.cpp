@@ -183,7 +183,7 @@ void HttpServer::setupRoutes() {
     Platform& p = platform_;
 
     srv.Get("/api/health", [&](const httplib::Request&, httplib::Response& res) {
-        send(res, ok(json{{"service", "agenthive"},
+        send(res, ok(json{{"service", "miderhive"},
                           {"version", kPlatformVersion},
                           {"db", "sqlite3+sqlite-vec"},
                           {"time", nowIso()}}));

@@ -3,16 +3,19 @@
 #include <cstdint>
 #include <cstdlib>
 #include <ctime>
+#include <initializer_list>
 #include <string>
 #include <vector>
 
 namespace ah {
 
-// 读取环境变量：新名优先，旧名兜底（品牌更名 AgentHive 前的 ZCODE_* 仍生效）
-inline std::string envOr(const char* newName, const char* legacyName,
+// 读取环境变量：多个名字按顺序取第一个非空者（品牌更名后依次为
+// MIDERHIVE_* → AGENTHIVE_* → ZCODE_*，旧名永久兼容识别）
+inline std::string envOr(std::initializer_list<const char*> names,
                          const std::string& fallback = {}) {
-    if (const char* env = std::getenv(newName); env && *env) return env;
-    if (const char* env = std::getenv(legacyName); env && *env) return env;
+    for (const char* name : names) {
+        if (const char* env = std::getenv(name); env && *env) return env;
+    }
     return fallback;
 }
 

@@ -16,7 +16,7 @@ release/*
 !release/RELEASE_NOTES-*.md
 !release/wix/
 release/wix/*
-!release/wix/AgentHive.wxs
+!release/wix/MiderHive.wxs
 
 # ---- 第三方依赖（FetchContent 缓存，scripts/fetch-deps.ps1 可重建）----
 vendor/

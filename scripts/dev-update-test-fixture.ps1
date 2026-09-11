@@ -1,8 +1,8 @@
 # End-to-end check of the in-app updater against a local fake release.
 # ASCII-only on purpose (Windows PowerShell 5.1 misreads UTF-8-without-BOM scripts).
 param(
-    [string]$Exe  = "E:\AgentHive\build\full\src\gui\Release\agenthive.exe",
-    [string]$Root = "E:\AgentHive\.upd-test",
+    [string]$Exe  = "E:\MiderHive\build\full\src\gui\Release\miderhive.exe",
+    [string]$Root = "E:\MiderHive\.upd-test",
     [int]$Port    = 19801,
     [string]$Mode = "badsig"   # badsig = correct download, wrong sha256 (verify must reject)
 )

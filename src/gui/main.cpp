@@ -7,6 +7,7 @@
 #include <QPixmap>
 #include <QScreen>
 #include <QSettings>
+#include <QStringList>
 
 #include <cstdlib>
 
@@ -22,11 +23,11 @@ namespace {
 // 而第二个实例会因 8787 端口被占用弹出"HTTP 服务启动失败"的警告框。
 // 这里用本地 socket 做互斥：已有实例就把它唤到前台，然后本进程直接退出。 ----
 QString singleInstanceKey() {
-    std::string port = ah::envOr("AGENTHIVE_PORT", "ZCODE_PLATFORM_PORT");
+    std::string port = ah::envOr({"MIDERHIVE_PORT", "AGENTHIVE_PORT", "ZCODE_PLATFORM_PORT"});
     if (port.empty()) port = "8787";
     // 以数据目录 + 端口为键：同一份数据同时只允许一个工作台
     const std::string home = ah::defaultHomeDir();
-    return QString("AgentHive-%1-%2")
+    return QString("MiderHive-%1-%2")
         .arg(QString::fromStdString(ah::sha256Hex(home + ":" + port)).left(16),
              QString::fromStdString(port));
 }
@@ -44,6 +45,22 @@ bool notifyExistingInstance(const QString& key) {
 }
 
 }  // namespace
+
+// QSettings 位置迁移：品牌更名后组织/应用名变化，把旧位置（agenthive / AgentHive 多
+// Agent 协作工作台）的主题、字号、几何、更新检查等设置一次性搬到新位置。
+// 仅当新位置还没有任何键时执行；旧位置的键保留不删，旧版本回退启动仍能读回。
+void migrateLegacySettings() {
+    QSettings fresh;
+    if (!fresh.allKeys().isEmpty()) return;
+    QSettings legacyApp("agenthive", "AgentHive 多 Agent 协作工作台");
+    const QStringList keys = legacyApp.allKeys();
+    for (const QString& k : keys) fresh.setValue(k, legacyApp.value(k));
+    // i18n 的 ui/lang 曾单独存在 ("agenthive","agenthive") 位置
+    QSettings legacyI18n("agenthive", "agenthive");
+    const QVariant lang = legacyI18n.value("ui/lang");
+    if (lang.isValid() && !fresh.contains("ui/lang")) fresh.setValue("ui/lang", lang);
+    fresh.sync();
+}
 
 // 程序化绘制蜂巢图标：深色圆角底 + 琥珀色六边形蜂巢 + 入口点
 static QPixmap hiveIcon(int side) {
@@ -79,8 +96,9 @@ static QPixmap hiveIcon(int side) {
 
 int main(int argc, char** argv) {
     QApplication app(argc, argv);
-    app.setApplicationName("AgentHive 多 Agent 协作工作台");
-    app.setOrganizationName("agenthive");
+    app.setApplicationName("MiderHive 多 Agent 协作工作台");
+    app.setOrganizationName("miderhive");
+    migrateLegacySettings();
     i18n::load();
     {
         // 优先使用仓库品牌图标（与 README 一致），缺失时回退到程序化绘制的蜂巢
@@ -105,7 +123,7 @@ int main(int argc, char** argv) {
     ah::Platform platform(ah::defaultHomeDir());
     std::string err;
     if (!platform.bootstrap(err)) {
-        QMessageBox::critical(nullptr, "AgentHive 工作台",
+        QMessageBox::critical(nullptr, "MiderHive 工作台",
                               QString::fromStdString("平台初始化失败: " + err));
         return 1;
     }
@@ -113,12 +131,13 @@ int main(int argc, char** argv) {
     // 内置 HTTP 服务供 Agent 接入（仅绑定 127.0.0.1）
     int port = 8787;
     {
-        std::string portEnv = ah::envOr("AGENTHIVE_PORT", "ZCODE_PLATFORM_PORT");
+        std::string portEnv =
+            ah::envOr({"MIDERHIVE_PORT", "AGENTHIVE_PORT", "ZCODE_PLATFORM_PORT"});
         if (!portEnv.empty()) port = std::atoi(portEnv.c_str());
     }
     std::string serr;
     if (!platform.startHttpServer(port, serr)) {
-        QMessageBox::warning(nullptr, "AgentHive 工作台",
+        QMessageBox::warning(nullptr, "MiderHive 工作台",
                              QString::fromStdString("HTTP 服务启动失败，Agent 将无法接入: " + serr));
     }
 

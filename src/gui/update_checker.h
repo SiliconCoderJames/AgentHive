@@ -48,7 +48,7 @@ public:
     static QString skippedVersion();
     static void skipVersion(const QString& version);
 
-    // 运行的是安装版（%LOCALAPPDATA%\AgentHive）还是便携版
+    // 运行的是安装版（%LOCALAPPDATA%\MiderHive，兼容旧品牌 %LOCALAPPDATA%\AgentHive）还是便携版
     static bool isInstalledCopy();
 
     void check();                                       // 拉清单并比对版本

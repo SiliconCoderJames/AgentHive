@@ -67,7 +67,7 @@ jobs:
       - name: Upload workflow artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: AgentHive-windows-x64
+          name: MiderHive-windows-x64
           path: |
             release/*.msi
             release/*.zip
@@ -82,8 +82,8 @@ jobs:
         run: |
           $ver = "${{ steps.ver.outputs.version }}" -replace '^v', ''
           $tag = "v$ver"
-          $msi = "release/AgentHive-$ver-x64.msi"
-          $zip = "release/AgentHive-$ver-win64-portable.zip"
+          $msi = "release/MiderHive-$ver-x64.msi"
+          $zip = "release/MiderHive-$ver-win64-portable.zip"
           $sums = "release/SHA256SUMS.txt"
           # latest.json is what the in-app updater fetches
           # (https://github.com/<repo>/releases/latest/download/latest.json) - it must be
@@ -100,16 +100,16 @@ jobs:
             Write-Host "using release notes from $notesFile"
           } else {
             $notes = @"
-          ## AgentHive $ver
+          ## MiderHive $ver
 
           Local-first collaboration hub for AI agents, Windows x64 build.
 
-          * ``AgentHive-$ver-x64.msi`` - per-user install (no administrator rights)
-          * ``AgentHive-$ver-win64-portable.zip`` - unzip and run ``agenthive.exe``
+          * ``MiderHive-$ver-x64.msi`` - per-user install (no administrator rights)
+          * ``MiderHive-$ver-win64-portable.zip`` - unzip and run ``miderhive.exe``
           * ``SHA256SUMS.txt`` - checksums
 
           The binaries are **not code-signed**, so SmartScreen may warn on first launch.
-          Your data lives in ``%USERPROFILE%\.agenthive`` and is **not** removed on uninstall.
+          Your data lives in ``%USERPROFILE%\.miderhive`` and is **not** removed on uninstall.
 
           See ``release/RELEASE_NOTES-$ver.md`` for the full notes.
           "@
@@ -127,5 +127,5 @@ jobs:
             # --target 让新建的标签指向本次实际构建的 commit（workflow_dispatch 手动触发时
             # 标签还不存在，不加会把标签打到默认分支头上，产物与 commit 对不上）
             gh release create $tag $msi $zip $sums $manifest `
-              --title "AgentHive $ver" --notes $notes --target $env:GITHUB_SHA @pre
+              --title "MiderHive $ver" --notes $notes --target $env:GITHUB_SHA @pre
           }

@@ -1,6 +1,6 @@
 ---
 name: 🐛 Bug 报告
-about: 报告 AgentHive 的缺陷
+about: 报告 MiderHive 的缺陷
 title: '[Bug] 简要描述'
 labels: bug
 assignees: ''

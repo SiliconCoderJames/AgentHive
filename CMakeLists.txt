@@ -1,25 +1,25 @@
 cmake_minimum_required(VERSION 3.25)
-project(AgentHive VERSION 1.0.1 LANGUAGES C CXX)
+project(MiderHive VERSION 1.0.1 LANGUAGES C CXX)
 
-# ---- 版本号：默认取 project(VERSION)，发布流水线用 -DAGENTHIVE_VERSION=v1.2.3 覆盖 ----
-set(AGENTHIVE_VERSION "${PROJECT_VERSION}" CACHE STRING "发布版本（可带 v 前缀与预发布后缀）")
-# 传参校验：PowerShell 5.1 会把未加引号的 -DAGENTHIVE_VERSION=1.0.0 截断成 "...=1"，
+# ---- 版本号：默认取 project(VERSION)，发布流水线用 -DMIDERHIVE_VERSION=v1.2.3 覆盖 ----
+set(MIDERHIVE_VERSION "${PROJECT_VERSION}" CACHE STRING "发布版本（可带 v 前缀与预发布后缀）")
+# 传参校验：PowerShell 5.1 会把未加引号的 -DMIDERHIVE_VERSION=1.0.0 截断成 "...=1"，
 # 于是静默产出一个错误版本号（界面/API/安装包全错）。这类失败模式最难发现，
 # 因此这里宁可 configure 直接失败，并给出正确写法。
-if(NOT AGENTHIVE_VERSION MATCHES "^v?[0-9]+\\.[0-9]+\\.[0-9]+")
+if(NOT MIDERHIVE_VERSION MATCHES "^v?[0-9]+\\.[0-9]+\\.[0-9]+")
     message(FATAL_ERROR
-        "AGENTHIVE_VERSION 必须是 v?主.次.修订 形式，当前收到 '${AGENTHIVE_VERSION}'。\n"
-        "提示：PowerShell 5.1 会截断未加引号的 -DAGENTHIVE_VERSION=1.0.0，"
-        "请写成 \"-DAGENTHIVE_VERSION=1.0.0\"（整体加引号），或直接用 scripts/package.ps1。")
+        "MIDERHIVE_VERSION 必须是 v?主.次.修订 形式，当前收到 '${MIDERHIVE_VERSION}'。\n"
+        "提示：PowerShell 5.1 会截断未加引号的 -DMIDERHIVE_VERSION=1.0.0，"
+        "请写成 \"-DMIDERHIVE_VERSION=1.0.0\"（整体加引号），或直接用 scripts/package.ps1。")
 endif()
-string(REGEX REPLACE "^v" "" _ver_raw "${AGENTHIVE_VERSION}")
+string(REGEX REPLACE "^v" "" _ver_raw "${MIDERHIVE_VERSION}")
 # 允许 "1.2.3-rc1"：MSI 的 ProductVersion 必须是纯 x.y.z 数字形式
-string(REGEX MATCH "^[0-9]+\\.[0-9]+\\.[0-9]+" AGENTHIVE_VERSION_NUMERIC "${_ver_raw}")
-string(REPLACE "." ";" _ver_parts "${AGENTHIVE_VERSION_NUMERIC}")
-list(GET _ver_parts 0 AGENTHIVE_VERSION_MAJOR)
-list(GET _ver_parts 1 AGENTHIVE_VERSION_MINOR)
-list(GET _ver_parts 2 AGENTHIVE_VERSION_PATCH)
-message(STATUS "AgentHive version: ${AGENTHIVE_VERSION} (installer: ${AGENTHIVE_VERSION_NUMERIC})")
+string(REGEX MATCH "^[0-9]+\\.[0-9]+\\.[0-9]+" MIDERHIVE_VERSION_NUMERIC "${_ver_raw}")
+string(REPLACE "." ";" _ver_parts "${MIDERHIVE_VERSION_NUMERIC}")
+list(GET _ver_parts 0 MIDERHIVE_VERSION_MAJOR)
+list(GET _ver_parts 1 MIDERHIVE_VERSION_MINOR)
+list(GET _ver_parts 2 MIDERHIVE_VERSION_PATCH)
+message(STATUS "MiderHive version: ${MIDERHIVE_VERSION} (installer: ${MIDERHIVE_VERSION_NUMERIC})")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

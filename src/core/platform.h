@@ -22,7 +22,8 @@ namespace ah {
 
 class HttpServer;
 
-// 数据目录：环境变量 AGENTHIVE_HOME 优先（兼容 ZCODE_PLATFORM_HOME），否则 %USERPROFILE%\.agenthive
+// 数据目录：环境变量 MIDERHIVE_HOME 优先（兼容 AGENTHIVE_HOME / ZCODE_PLATFORM_HOME），
+// 否则 %USERPROFILE%\.miderhive
 std::string defaultHomeDir();
 
 class Platform {

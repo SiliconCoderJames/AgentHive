@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""重绘 AgentHive 品牌图标：全出血圆角贴片（角部真透明、无白边距）+ 蜂巢三六边形 + 入口蓝点。
+"""重绘 MiderHive 品牌图标：全出血圆角贴片（角部真透明、无白边距）+ 蜂巢三六边形 + 入口蓝点。
 
 几何与 docs/assets/logo.svg 完全一致；产物：
   docs/assets/logo.png  256px 全出血透明 PNG（GUI 窗口图标）

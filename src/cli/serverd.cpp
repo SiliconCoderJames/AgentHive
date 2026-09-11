@@ -20,7 +20,8 @@ int main() {
     }
     int port = 8787;
     {
-        std::string portEnv = ah::envOr("AGENTHIVE_PORT", "ZCODE_PLATFORM_PORT");
+        std::string portEnv =
+            ah::envOr({"MIDERHIVE_PORT", "AGENTHIVE_PORT", "ZCODE_PLATFORM_PORT"});
         if (!portEnv.empty()) port = std::atoi(portEnv.c_str());
     }
     if (!platform.startHttpServer(port, err)) {

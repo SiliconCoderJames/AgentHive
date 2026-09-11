@@ -15,9 +15,11 @@
 
 namespace {
 
-// 工作台 HTTP 端口与 core 的取值顺序一致（AGENTHIVE_PORT 优先，默认 8787）
+// 工作台 HTTP 端口与 core 的取值顺序一致（MIDERHIVE_PORT 优先，旧名兜底，默认 8787）
 QString baseUrl() {
-    const QString fromEnv = qEnvironmentVariable("AGENTHIVE_PORT");
+    QString fromEnv = qEnvironmentVariable("MIDERHIVE_PORT");
+    if (fromEnv.isEmpty()) fromEnv = qEnvironmentVariable("AGENTHIVE_PORT");
+    if (fromEnv.isEmpty()) fromEnv = qEnvironmentVariable("ZCODE_PLATFORM_PORT");
     const QString port = fromEnv.isEmpty() ? QStringLiteral("8787") : fromEnv;
     return QStringLiteral("http://127.0.0.1:") + port;
 }
@@ -34,9 +36,9 @@ ConnectDialog::ConnectDialog(ah::Platform& platform, QWidget* parent)
     presets_ = {
         {"ZCode", "zcode-agent",
          "ZCode 的执行器通过环境变量接入（agent-cli / platformd 已内置支持）："
-         "设置 AGENTHIVE_AGENT_NAME、AGENTHIVE_AGENT_KEY、AGENTHIVE_PORT 后即可自动心跳上线。",
+         "设置 MIDERHIVE_AGENT_NAME、MIDERHIVE_AGENT_KEY、MIDERHIVE_PORT 后即可自动心跳上线。",
          "ZCode's runner connects via environment variables (built into agent-cli / "
-         "platformd): set AGENTHIVE_AGENT_NAME, AGENTHIVE_AGENT_KEY and AGENTHIVE_PORT."},
+         "platformd): set MIDERHIVE_AGENT_NAME, MIDERHIVE_AGENT_KEY and MIDERHIVE_PORT."},
         {"Codex / ChatGPT", "codex",
          "把生成的指令块粘贴到项目的 AGENTS.md（或 ~/.codex/AGENTS.md），让 Codex 在任务中"
          "按该说明调用本工作台 HTTP API。",
@@ -56,9 +58,9 @@ ConnectDialog::ConnectDialog(ah::Platform& platform, QWidget* parent)
          "Generic HTTP integration: put the credentials into Hermes' config or startup "
          "environment, then call the API as described in the block."},
         {"Cursor", "cursor",
-         "把生成的指令块粘贴到 .cursor/rules/agenthive.mdc（项目规则），Cursor 会按规则"
+         "把生成的指令块粘贴到 .cursor/rules/miderhive.mdc（项目规则），Cursor 会按规则"
          "读入。",
-         "Paste the generated block into .cursor/rules/agenthive.mdc (Project Rules); "
+         "Paste the generated block into .cursor/rules/miderhive.mdc (Project Rules); "
          "Cursor picks rules up from there."},
         {"GitHub Copilot", "copilot",
          "把生成的指令块粘贴到 .github/copilot-instructions.md（仓库自定义指令）。",
@@ -178,7 +180,7 @@ QString ConnectDialog::buildSnippet(const QString& tool, const QString& name, co
                                     const QString& hint) const {
     const QString url = baseUrl();
     return QStringLiteral(
-               "# Connect %1 to AgentHive\n"
+               "# Connect %1 to MiderHive\n"
                "\n"
                "Base URL : %2\n"
                "Agent    : %3\n"
@@ -199,7 +201,7 @@ QString ConnectDialog::buildSnippet(const QString& tool, const QString& name, co
                "## 3) Collaborate: list teammates\n"
                "curl %2/api/agents -H \"X-Agent-Name: %3\" -H \"X-Api-Key: %4\"\n"
                "\n"
-               "## Full endpoint reference: AgentHive > Settings > Agent API\n"
+               "## Full endpoint reference: MiderHive > Settings > Agent API\n"
                "\n"
                "## Where to put this\n"
                "%5\n")

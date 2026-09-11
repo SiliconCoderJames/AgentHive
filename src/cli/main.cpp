@@ -98,14 +98,19 @@ struct Client {
     std::string masterKey;
 
     explicit Client(const Args& a)
-        : http("http://127.0.0.1:" + ah::envOr("AGENTHIVE_PORT", "ZCODE_PLATFORM_PORT", "8787")),
-          name(a.gopts.count("name") ? a.gopts.at("name")
-                                     : ah::envOr("AGENTHIVE_AGENT_NAME", "ZCODE_AGENT_NAME")),
-          key(a.gopts.count("key") ? a.gopts.at("key")
-                                   : ah::envOr("AGENTHIVE_AGENT_KEY", "ZCODE_AGENT_KEY")),
+        : http("http://127.0.0.1:" +
+               ah::envOr({"MIDERHIVE_PORT", "AGENTHIVE_PORT", "ZCODE_PLATFORM_PORT"}, "8787")),
+          name(a.gopts.count("name")
+                   ? a.gopts.at("name")
+                   : ah::envOr({"MIDERHIVE_AGENT_NAME", "AGENTHIVE_AGENT_NAME",
+                                "ZCODE_AGENT_NAME"})),
+          key(a.gopts.count("key")
+                  ? a.gopts.at("key")
+                  : ah::envOr({"MIDERHIVE_AGENT_KEY", "AGENTHIVE_AGENT_KEY", "ZCODE_AGENT_KEY"})),
           masterKey(a.gopts.count("master-key")
                         ? a.gopts.at("master-key")
-                        : ah::envOr("AGENTHIVE_MASTER_KEY", "ZCODE_PLATFORM_MASTER_KEY",
+                        : ah::envOr({"MIDERHIVE_MASTER_KEY", "AGENTHIVE_MASTER_KEY",
+                                     "ZCODE_PLATFORM_MASTER_KEY"},
                                     readMasterKeyFromDisk())) {}
 
     json call(const std::string& method, const std::string& path, const json* body,
@@ -115,7 +120,7 @@ struct Client {
             if (name.empty() || key.empty()) {
                 json err{{"code", -1},
                          {"message",
-                          "missing --name/--key (or AGENTHIVE_AGENT_NAME/AGENTHIVE_AGENT_KEY)"},
+                          "missing --name/--key (or MIDERHIVE_AGENT_NAME/MIDERHIVE_AGENT_KEY)"},
                          {"data", nullptr}};
                 return err;
             }
@@ -146,10 +151,10 @@ struct Client {
 
 int usage() {
     std::cout <<
-        "agent-cli: AgentHive 多 Agent 协作平台命令行客户端（适用于任意 AI Agent）\n"
+        "agent-cli: MiderHive 多 Agent 协作平台命令行客户端（适用于任意 AI Agent）\n"
         "全局选项需放在命令之前: agent-cli --name X --key K [--master-key M] [--port N] <命令> ...\n"
-        "环境: AGENTHIVE_AGENT_NAME AGENTHIVE_AGENT_KEY AGENTHIVE_MASTER_KEY AGENTHIVE_PORT\n"
-        "      （旧 ZCODE_* 环境变量名仍兼容识别）\n"
+        "环境: MIDERHIVE_AGENT_NAME MIDERHIVE_AGENT_KEY MIDERHIVE_MASTER_KEY MIDERHIVE_PORT\n"
+        "      （旧 AGENTHIVE_* / ZCODE_* 环境变量名仍兼容识别）\n"
         "\n"
         "命令:\n"
         "  register --name X [--role member]              注册新 Agent（需 --master-key 或环境变量）\n"

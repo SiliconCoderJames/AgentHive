@@ -37,7 +37,9 @@ def register():
 
 
 if __name__ == "__main__":
-    master = os.environ.get("AGENTHIVE_MASTER_KEY") or os.environ.get("ZCODE_PLATFORM_MASTER_KEY", "")
+    master = (os.environ.get("MIDERHIVE_MASTER_KEY")
+              or os.environ.get("AGENTHIVE_MASTER_KEY")
+              or os.environ.get("ZCODE_PLATFORM_MASTER_KEY", ""))
     hdr = {"Content-Type": "application/json", "X-Master-Key": master}
     req = urllib.request.Request(BASE + "/api/agents/register",
                                  data=json.dumps({"name": AGENT}).encode(),

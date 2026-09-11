@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""AgentHive 本地多 Agent 协作平台 · 可行性验证脚本
+"""MiderHive 本地多 Agent 协作平台 · 可行性验证脚本
 
 以三个外部 Agent（claude/codex/hermes）的真实协作流程走通全部核心场景，
 仅通过 HTTP API 交互（模拟真实接入方式），逐条断言协作规则落地。
@@ -279,14 +279,18 @@ def s13_broadcast(agents):
 
 def main():
     global MASTER
-    MASTER = os.environ.get("AGENTHIVE_MASTER_KEY") or os.environ.get("ZCODE_PLATFORM_MASTER_KEY", "")
+    MASTER = (os.environ.get("MIDERHIVE_MASTER_KEY")
+              or os.environ.get("AGENTHIVE_MASTER_KEY")
+              or os.environ.get("ZCODE_PLATFORM_MASTER_KEY", ""))
     if not MASTER:
-        print("需要环境变量 AGENTHIVE_MASTER_KEY（兼容 ZCODE_PLATFORM_MASTER_KEY）")
+        print("需要环境变量 MIDERHIVE_MASTER_KEY（兼容 AGENTHIVE_* / ZCODE_* 旧名）")
         return 2
 
     agents = {n: {} for n in ("claude", "codex", "hermes")}
     # zcode 管理者密钥：由运行方从数据目录 config/agents.json 提供
-    agents["zcode"] = {"key": os.environ.get("AGENTHIVE_ZCODE_KEY") or os.environ.get("ZCODE_ZCODE_KEY", "")}
+    agents["zcode"] = {"key": (os.environ.get("MIDERHIVE_ZCODE_KEY")
+                               or os.environ.get("AGENTHIVE_ZCODE_KEY")
+                               or os.environ.get("ZCODE_ZCODE_KEY", ""))}
 
     s01_health()
     s02_register(agents)

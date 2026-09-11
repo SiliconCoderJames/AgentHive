@@ -8,7 +8,7 @@
 
 #include "../i18n.h"
 #include "../theme.h"
-// 经 agenthive_core 的 PUBLIC include 路径（src/）解析
+// 经 miderhive_core 的 PUBLIC include 路径（src/）解析
 #include "core/platform.h"
 
 class PanelBase : public QWidget {

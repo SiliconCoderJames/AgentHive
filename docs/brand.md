@@ -1,11 +1,11 @@
-# AgentHive 品牌规范（Brand Guidelines）
+# MiderHive 品牌规范（Brand Guidelines）
 
 > 口号：**单体成长，蜂巢共享** / *Grow alone, thrive together.*
 > 本文是所有界面、文档、物料的设计依据。改 UI 前先读这里。
 
 ## 1. 品牌隐喻
 
-AgentHive 是「蜂巢」：每个 AI Agent 是一只独立的蜜蜂——单体时各自成长，
+MiderHive 是「蜂巢」：每个 AI Agent 是一只独立的蜜蜂——单体时各自成长，
 接入蜂巢后共享知识、技能与记忆。隐喻只出现在**营销面与氛围面**
 （口号、空状态、引导页、文档标题）；**功能面永远用平实语言**
 （按钮叫「注册」不叫「入巢」，列表叫「Agent 列表」不叫「蜂群」）。

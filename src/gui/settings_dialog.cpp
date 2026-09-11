@@ -36,7 +36,7 @@
 
 namespace {
 // 下载页链接（更新检查与下载由 ui::UpdateChecker 负责，那里用 release 资产的 latest.json）
-constexpr const char* kRepoPage = "https://github.com/SiliconCoderJames/AgentHive/releases";
+constexpr const char* kRepoPage = "https://github.com/SiliconCoderJames/MiderHive/releases";
 
 // 设置导航项：kind 取自 ui::makeIcon 的图标种类
 constexpr const char* kNavKinds[] = {"palette",  "database", "bell", "overview",
@@ -548,7 +548,7 @@ QWidget* SettingsDialog::buildAboutPage() {
     lay->addWidget(logo);
 
     auto* name = thLabel("font-size:20px; font-weight:800; color:@text@;", page);
-    name->setText("AgentHive");
+    name->setText("MiderHive");
     name->setAlignment(Qt::AlignCenter);
     lay->addWidget(name);
 
@@ -594,8 +594,8 @@ QWidget* SettingsDialog::buildAboutPage() {
         row->addWidget(b);
         return b;
     };
-    mk(i18n::trs("GitHub 仓库", "GitHub"), "https://github.com/SiliconCoderJames/AgentHive");
-    mk(i18n::trs("问题反馈", "Issues"), "https://github.com/SiliconCoderJames/AgentHive/issues");
+    mk(i18n::trs("GitHub 仓库", "GitHub"), "https://github.com/SiliconCoderJames/MiderHive");
+    mk(i18n::trs("问题反馈", "Issues"), "https://github.com/SiliconCoderJames/MiderHive/issues");
     mk(i18n::trs("☕ 赞助", "Sponsor"), "https://www.buymeacoffee.com/zwj8jc5rrgp");
     row->addStretch(1);
     lay->addLayout(row);

@@ -17,27 +17,41 @@ namespace ah {
 namespace fs = std::filesystem;
 
 std::string defaultHomeDir() {
-    if (auto env = envOr("AGENTHIVE_HOME", "ZCODE_PLATFORM_HOME"); !env.empty()) return env;
+    if (auto env = envOr({"MIDERHIVE_HOME", "AGENTHIVE_HOME", "ZCODE_PLATFORM_HOME"}); !env.empty())
+        return env;
 #ifdef _WIN32
     if (const char* up = std::getenv("USERPROFILE"); up && *up) {
-        std::string home = std::string(up) + "\\.agenthive";
+        std::string home = std::string(up) + "\\.miderhive";
         // 旧品牌数据目录平滑迁移：一次性改名，保留全部数据
-        std::string legacy = std::string(up) + "\\.zcode-platform";
+        // （.agenthive 为上一代品牌，.zcode-platform 为更早的内部代号）
         std::error_code ec;
-        if (!fs::exists(home) && fs::exists(legacy))
-            fs::rename(legacy, home, ec);
+        if (!fs::exists(home)) {
+            for (const char* legacyName : {".agenthive", ".zcode-platform"}) {
+                std::string legacy = std::string(up) + "\\" + legacyName;
+                if (fs::exists(legacy)) {
+                    fs::rename(legacy, home, ec);
+                    return home;
+                }
+            }
+        }
         return home;
     }
 #endif
     if (const char* home = std::getenv("HOME"); home && *home) {
-        std::string homeDir = std::string(home) + "/.agenthive";
-        std::string legacy = std::string(home) + "/.zcode-platform";
+        std::string homeDir = std::string(home) + "/.miderhive";
         std::error_code ec;
-        if (!fs::exists(homeDir) && fs::exists(legacy))
-            fs::rename(legacy, homeDir, ec);
+        if (!fs::exists(homeDir)) {
+            for (const char* legacyName : {".agenthive", ".zcode-platform"}) {
+                std::string legacy = std::string(home) + "/" + legacyName;
+                if (fs::exists(legacy)) {
+                    fs::rename(legacy, homeDir, ec);
+                    return homeDir;
+                }
+            }
+        }
         return homeDir;
     }
-    return ".agenthive";
+    return ".miderhive";
 }
 
 Platform::Platform(std::string homeDir)
@@ -87,7 +101,8 @@ bool Platform::bootstrap(std::string& err) {
 
     // 主密钥：环境变量优先，其次运行期生成的文件；绝不写入源码
     std::string masterKey;
-    if (auto env = envOr("AGENTHIVE_MASTER_KEY", "ZCODE_PLATFORM_MASTER_KEY"); !env.empty()) {
+    if (auto env = envOr({"MIDERHIVE_MASTER_KEY", "AGENTHIVE_MASTER_KEY",
+                          "ZCODE_PLATFORM_MASTER_KEY"}); !env.empty()) {
         masterKey = env;
     } else {
         std::string keyPath = (fs::path(home_dir_) / "config" / "master.key").string();

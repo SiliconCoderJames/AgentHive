@@ -38,7 +38,7 @@ jobs:
       - name: Assert the GUI was actually built
         shell: pwsh
         run: |
-          $exe = "build\src\gui\Release\agenthive.exe"
+          $exe = "build\src\gui\Release\miderhive.exe"
           if (-not (Test-Path $exe)) { throw "GUI target missing: $exe (Qt6 not found?)" }
           $cli = @("build\src\cli\Release\agent-cli.exe", "build\src\cli\Release\platformd.exe")
           foreach ($c in $cli) { if (-not (Test-Path $c)) { throw "CLI target missing: $c" } }
@@ -50,12 +50,12 @@ jobs:
       - name: Integration feasibility check (39 assertions)
         shell: pwsh
         env:
-          AGENTHIVE_MASTER_KEY: ci-test-master-key-not-a-secret
+          MIDERHIVE_MASTER_KEY: ci-test-master-key-not-a-secret
         run: |
-          $dataHome = Join-Path $env:RUNNER_TEMP "agenthive-data"
+          $dataHome = Join-Path $env:RUNNER_TEMP "miderhive-data"
           New-Item -ItemType Directory -Force -Path $dataHome | Out-Null
-          $env:AGENTHIVE_HOME = $dataHome
-          $env:AGENTHIVE_PORT = "19090"
+          $env:MIDERHIVE_HOME = $dataHome
+          $env:MIDERHIVE_PORT = "19090"
           $p = Start-Process -FilePath "build\src\cli\Release\platformd.exe" -PassThru -NoNewWindow
           try {
             $ready = $false
@@ -68,7 +68,7 @@ jobs:
             if (-not $ready) { throw "platformd did not become healthy in 30s" }
             # bootstrap 预置的 zcode 管理者密钥在数据目录 config/agents.json
             $agents = Get-Content (Join-Path $dataHome "config\agents.json") | ConvertFrom-Json
-            $env:ZCODE_ZCODE_KEY = $agents.zcode
+            $env:MIDERHIVE_ZCODE_KEY = $agents.zcode
             python scripts/feasibility_check.py 19090
             if ($LASTEXITCODE -ne 0) { throw "feasibility check failed" }
           } finally {

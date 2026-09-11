@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Build the AgentHive Windows release artifacts: portable ZIP + MSI + SHA256SUMS.
+  Build the MiderHive Windows release artifacts: portable ZIP + MSI + SHA256SUMS.
 
 .DESCRIPTION
   Single entry point for local packaging and CI. Steps:
@@ -36,7 +36,7 @@ param(
     [string]$WixVersion = "6.0.2",
     # owner/repo used to build the download URLs inside latest.json (the in-app updater
     # consumes them); CI passes ${{ github.repository }} so forks stay correct.
-    [string]$Repo = "SiliconCoderJames/AgentHive",
+    [string]$Repo = "SiliconCoderJames/MiderHive",
     [switch]$SkipBuild,
     [switch]$PerMachine
 )
@@ -58,10 +58,10 @@ Write-Host "Release version: $Version (MSI: $verNumeric)"
 Step "1/7 configure + build"
 if (-not $SkipBuild) {
     # Pass the version as ONE quoted argument: PowerShell 5.1 truncates an unquoted
-    # -DAGENTHIVE_VERSION=1.0.0 down to "...=1", which would silently stamp the wrong
+    # -DMIDERHIVE_VERSION=1.0.0 down to "...=1", which would silently stamp the wrong
     # version into the UI, /api/health and the installer.
     cmake -S . -B $BuildDir -G $Generator -A x64 "-DCMAKE_PREFIX_PATH=$QtPrefix" `
-        "-DAGENTHIVE_VERSION=$Version" | Out-Host
+        "-DMIDERHIVE_VERSION=$Version" | Out-Host
     if ($LASTEXITCODE -ne 0) { throw "cmake configure failed" }
     cmake --build $BuildDir --config $Configuration | Out-Host
     if ($LASTEXITCODE -ne 0) { throw "build failed" }
@@ -78,7 +78,7 @@ Step "3/7 assert the staged build is runnable"
 # These are exactly the files whose absence used to make a hand-assembled package fail to
 # start on a clean machine. Fail loudly instead of publishing a broken artifact.
 $required = @(
-    "agenthive.exe",
+    "miderhive.exe",
     "agent-cli.exe",
     "platformd.exe",
     "Qt6Core.dll", "Qt6Gui.dll", "Qt6Widgets.dll", "Qt6Network.dll", "Qt6Svg.dll",
@@ -123,11 +123,11 @@ if (-not (Get-Command wix -ErrorAction SilentlyContinue)) {
     if ($LASTEXITCODE -ne 0) { throw "failed to install WiX $WixVersion" }
 }
 if ($PerMachine) { $scope = "perMachine"; $pm = 1 } else { $scope = "perUser"; $pm = 0 }
-$msi = Join-Path $OutDir "AgentHive-$verNumeric-x64.msi"
+$msi = Join-Path $OutDir "MiderHive-$verNumeric-x64.msi"
 # Adding an already-present extension reports a non-zero exit code; that is not a failure.
 wix extension add -g "WixToolset.Util.wixext/$WixVersion" 2>&1 | Out-Host
 if ($LASTEXITCODE -ne 0) { Write-Host "(extension already installed, continuing)" }
-wix build (Join-Path $OutDir "wix/AgentHive.wxs") (Join-Path $OutDir "wix/files.generated.wxs") `
+wix build (Join-Path $OutDir "wix/MiderHive.wxs") (Join-Path $OutDir "wix/files.generated.wxs") `
     -arch x64 -ext WixToolset.Util.wixext `
     -d Version="$verNumeric" -d Scope="$scope" -d PerMachine=$pm `
     -d IconFile="$root/src/gui/icon.ico" `
@@ -143,12 +143,12 @@ if ($LASTEXITCODE -ne 0) { throw "MSI failed ICE validation - see the errors abo
 Write-Host "  ICE validation passed"
 
 Step "6/7 build portable ZIP"
-$zipName = "AgentHive-$verNumeric-win64-portable.zip"
+$zipName = "MiderHive-$verNumeric-win64-portable.zip"
 $zipPath = Join-Path $OutDir $zipName
 if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
 # Top-level folder inside the zip so extracting does not scatter files.
-$staging = Join-Path $env:TEMP ("agenthive-zip-" + [guid]::NewGuid().ToString("N").Substring(0, 8))
-$inner = Join-Path $staging "AgentHive-$verNumeric"
+$staging = Join-Path $env:TEMP ("miderhive-zip-" + [guid]::NewGuid().ToString("N").Substring(0, 8))
+$inner = Join-Path $staging "MiderHive-$verNumeric"
 New-Item -ItemType Directory -Force -Path $inner | Out-Null
 Copy-Item -Path (Join-Path $StageDir "*") -Destination $inner -Recurse -Force
 Compress-Archive -Path $inner -DestinationPath $zipPath -CompressionLevel Optimal

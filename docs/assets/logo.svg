@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
-  <!-- AgentHive logo: dark rounded tile + amber honeycomb + blue entrance dot -->
+  <!-- MiderHive logo: dark rounded tile + amber honeycomb + blue entrance dot -->
   <rect x="8" y="8" width="240" height="240" rx="48" fill="#1e1e1e"/>
   <g fill="none" stroke="#f59e0b" stroke-width="10" stroke-linejoin="round" stroke-linecap="round">
     <!-- 顶格六边形 -->

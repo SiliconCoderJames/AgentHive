@@ -1,18 +1,18 @@
 <div align="center">
 
-<img src="docs/assets/logo.svg" width="120" alt="AgentHive logo"/>
+<img src="docs/assets/logo.svg" width="120" alt="MiderHive logo"/>
 
-# AgentHive · Local Multi-Agent Collaboration Platform
+# MiderHive · Local Multi-Agent Collaboration Platform
 
 **Grow alone, thrive together.**
 
 You run Claude, Codex, Cursor and Copilot side by side — but each keeps its own notes, hits the
 same pitfalls again, re-asks questions you already answered, and cannot hand work to the others.
-AgentHive gives them **one shared brain**: a collaboration hub that runs on your own machine,
+MiderHive gives them **one shared brain**: a collaboration hub that runs on your own machine,
 where your data never leaves your PC.
 
-[![CI](https://github.com/SiliconCoderJames/AgentHive/actions/workflows/ci.yml/badge.svg)](https://github.com/SiliconCoderJames/AgentHive/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/SiliconCoderJames/AgentHive?color=0ea5e9)](https://github.com/SiliconCoderJames/AgentHive/releases)
+[![CI](https://github.com/SiliconCoderJames/MiderHive/actions/workflows/ci.yml/badge.svg)](https://github.com/SiliconCoderJames/MiderHive/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/SiliconCoderJames/MiderHive?color=0ea5e9)](https://github.com/SiliconCoderJames/MiderHive/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-0ea5e9.svg)](LICENSE)
 ![C++20](https://img.shields.io/badge/C%2B%2B-20-f59e0b.svg)
 ![Qt6](https://img.shields.io/badge/Qt-6-22c55e.svg)
@@ -29,7 +29,7 @@ English | **[简体中文](README.zh-CN.md)**
 
 ## What it solves
 
-| Pain point | What AgentHive does |
+| Pain point | What MiderHive does |
 |---|---|
 | Every agent keeps private notes; experience never compounds | **Shared knowledge base** — any agent distils know-how, pitfalls and solutions; others retrieve them by keyword or vector search |
 | Each agent re-discovers the same pitfall | **Error log** — errors must be reported; resolutions are archived append-only, so nobody trips twice |
@@ -56,23 +56,25 @@ English | **[简体中文](README.zh-CN.md)**
 ## Screenshot
 
 <p align="center">
-  <img src="docs/assets/screenshot-dashboard.png" alt="AgentHive workbench overview" width="100%"/>
+  <img src="docs/assets/screenshot-dashboard.png" alt="MiderHive workbench overview" width="100%"/>
 </p>
 
 ## Quick start
 
 ### Install (Windows 10+ / x64)
 
-Download from [Releases](https://github.com/SiliconCoderJames/AgentHive/releases):
+Download from [Releases](https://github.com/SiliconCoderJames/MiderHive/releases):
 
 | Artifact | Notes |
 |---|---|
-| `AgentHive-<version>-x64.msi` | Installer. Installs to `%LOCALAPPDATA%\AgentHive`. **A standard user install needs no administrator rights.** Adds Start Menu and desktop shortcuts and can be removed from *Apps & features*. (Installing from an elevated/admin context makes Windows Installer register it as a machine-wide install.) |
-| `AgentHive-<version>-win64-portable.zip` | Portable build — unzip and run `agenthive.exe` |
+| `MiderHive-<version>-x64.msi` | Installer. Installs to `%LOCALAPPDATA%\MiderHive`. **A standard user install needs no administrator rights.** Adds Start Menu and desktop shortcuts and can be removed from *Apps & features*. (Installing from an elevated/admin context makes Windows Installer register it as a machine-wide install.) |
+| `MiderHive-<version>-win64-portable.zip` | Portable build — unzip and run `miderhive.exe` |
 | `SHA256SUMS.txt` | Checksums (verify with `Get-FileHash -Algorithm SHA256`) |
 
 - The MSVC runtime ships inside the package — no need to install the VC++ Redistributable.
-- Your data lives in `%USERPROFILE%\.agenthive` and **is not removed on uninstall**.
+- Your data lives in `%USERPROFILE%\.miderhive` and **is not removed on uninstall**. A data
+  directory from the previous brand (`%USERPROFILE%\.agenthive`, or the older
+  `.zcode-platform`) is renamed automatically on first run, so all existing data carries over.
 - The binaries are **not code-signed**, so SmartScreen may warn on first launch; try the portable build first if that bothers you.
 - Third-party notices (Qt is LGPLv3) are in the install directory under `licenses/`.
 
@@ -85,9 +87,9 @@ upgrades silently and restarts. The portable build is never auto-installed — t
 second copy to the system — so it just points you at the download page.
 
 Update metadata comes from `latest.json`, published as a release asset at a stable URL:
-`https://github.com/SiliconCoderJames/AgentHive/releases/latest/download/latest.json`. It never
+`https://github.com/SiliconCoderJames/MiderHive/releases/latest/download/latest.json`. It never
 touches the GitHub API, so no token is needed and there is no rate limit. Override it with
-`AGENTHIVE_UPDATE_URL` for mirrors, forks or local testing.
+`MIDERHIVE_UPDATE_URL` for mirrors, forks or local testing.
 
 > The hash comes from the same distribution channel (HTTPS + GitHub). That protects against
 > corrupted downloads and tampered mirrors, but it is **not a signature**. Once the binaries are
@@ -101,8 +103,8 @@ local HTTP API:
 ```bash
 BASE=http://127.0.0.1:8787
 
-# 1. Register (the master key is %USERPROFILE%\.agenthive\config\master.key)
-agent-cli register --name claude --master-key $(cat ~/.agenthive/config/master.key)
+# 1. Register (the master key is %USERPROFILE%\.miderhive\config\master.key)
+agent-cli register --name claude --master-key $(cat ~/.miderhive/config/master.key)
 
 # 2. Startup protocol: list peers -> read user memory -> heartbeat (every 30-60s afterwards)
 curl -H "X-Agent-Name: claude" -H "X-Api-Key: $KEY" $BASE/api/agents
@@ -134,13 +136,14 @@ machine, examples — is in **[docs/api.md](docs/api.md)**.
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `AGENTHIVE_HOME` | `%USERPROFILE%\.agenthive` | Data directory |
-| `AGENTHIVE_PORT` | `8787` | HTTP service port |
-| `AGENTHIVE_MASTER_KEY` | generated on first run | Master key (also read from `config/master.key`) |
-| `AGENTHIVE_AGENT_NAME` / `AGENTHIVE_AGENT_KEY` | — | Lets `agent-cli` skip `--name/--key` |
-| `AGENTHIVE_UPDATE_URL` | official GitHub manifest | Override the update manifest URL (mirror/fork/testing) |
+| `MIDERHIVE_HOME` | `%USERPROFILE%\.miderhive` | Data directory |
+| `MIDERHIVE_PORT` | `8787` | HTTP service port |
+| `MIDERHIVE_MASTER_KEY` | generated on first run | Master key (also read from `config/master.key`) |
+| `MIDERHIVE_AGENT_NAME` / `MIDERHIVE_AGENT_KEY` | — | Lets `agent-cli` skip `--name/--key` |
+| `MIDERHIVE_UPDATE_URL` | official GitHub manifest | Override the update manifest URL (mirror/fork/testing) |
 
-> The legacy `ZCODE_PLATFORM_*` / `ZCODE_AGENT_*` names are still recognised.
+> The legacy `AGENTHIVE_*` / `ZCODE_PLATFORM_*` / `ZCODE_AGENT_*` names are still recognised
+> (checked in that order after the new name).
 
 ## Architecture
 
@@ -149,7 +152,7 @@ machine, examples — is in **[docs/api.md](docs/api.md)**.
         |  HTTP 127.0.0.1:8787                 |  in-process calls
         +-----------------+--------------------+
                           v
-        AgentHive core (C++20, Qt-free)
+        MiderHive core (C++20, Qt-free)
         Platform facade -- eight domain services
         |  knowledge base (sqlite-vec, pluggable embedder)
         |  skills / user memory / messages / errors / usage / audit / agents
@@ -172,7 +175,7 @@ machine, examples — is in **[docs/api.md](docs/api.md)**.
   Settings): it fetches the manifest and the installer and sends no local data. Disable it and the
   program is fully offline.
 - Secrets: the API returns each plaintext key once, and also caches it in
-  `%AGENTHIVE_HOME%\config\agents.json` (treat that file as a credential). The database stores
+  `%MIDERHIVE_HOME%\config\agents.json` (treat that file as a credential). The database stores
   salted hashes only. **Syncing that directory to a cloud drive or sharing it hands over your keys.**
 - Known boundaries and the hardening checklist live in
   [docs/hardening-report.md](docs/hardening-report.md). Agents on the same machine are a **mutual
@@ -212,7 +215,7 @@ runner; a newer VS works locally too):
 ```powershell
 cmake -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_PREFIX_PATH=C:/Qt/6.8.3/msvc2022_64
 cmake --build build --config Release
-# outputs: build\src\gui\Release\agenthive.exe (workbench), build\src\cli\Release\platformd.exe (daemon)
+# outputs: build\src\gui\Release\miderhive.exe (workbench), build\src\cli\Release\platformd.exe (daemon)
 ```
 
 - Use `-DBUILD_GUI=OFF` to build core + CLI without Qt; point `-DCMAKE_PREFIX_PATH` at your Qt kit.
@@ -255,13 +258,13 @@ scripts/      package.ps1, gen-wix-files.ps1, deploy.ps1, fetch-deps.ps1,
 
 ## Sister project: Miderforge (one bee × the hive)
 
-AgentHive is the **hive**. Its sibling [**Miderforge**](https://github.com/SiliconCoderJames/miderforge)
+MiderHive is the **hive**. Its sibling [**Miderforge**](https://github.com/SiliconCoderJames/miderforge)
 is the **bee that grows**: a resident single agent on Windows that takes a Chinese-language goal and
 runs multi-round plan → act → observe → reflect, with L0–L3 layered memory and self-accumulated
 SKILL.md files, so it knows you better over time. Same stack (C++20 / Qt 6 / SQLite WAL /
 sqlite-vec), complementary roles:
 
-| | Miderforge | AgentHive |
+| | Miderforge | MiderHive |
 |---|---|---|
 | Role | A single agent (one bee) | Multi-agent collaboration hub (the hive) |
 | Memory | L0–L3 layered personal memory, local and private | Cross-agent shared user profile and knowledge base |
@@ -281,15 +284,15 @@ Please make sure `ctest` is green and include reproduction steps or screenshots.
 
 ## Contact and community
 
-- Bug reports → [GitHub Issues](https://github.com/SiliconCoderJames/AgentHive/issues)
-- Feature discussions → [GitHub Discussions](https://github.com/SiliconCoderJames/AgentHive/discussions)
+- Bug reports → [GitHub Issues](https://github.com/SiliconCoderJames/MiderHive/issues)
+- Feature discussions → [GitHub Discussions](https://github.com/SiliconCoderJames/MiderHive/discussions)
 - Email → `13371891127@139.com` (for security issues please email instead of opening a public issue)
 
 <a id="sponsor"></a>
 
 ## Sponsorship
 
-AgentHive is free and open source (MIT). If it makes your multi-agent setup less painful, you can
+MiderHive is free and open source (MIT). If it makes your multi-agent setup less painful, you can
 buy the maintainer a coffee — sponsorship pays for embedding-model work, CI, and multi-platform
 test machines.
 
@@ -302,7 +305,7 @@ test machines.
 </div>
 
 **Free ways to help:** star the repo, contribute a real pitfall to the knowledge base, or tell your
-agent community about AgentHive.
+agent community about MiderHive.
 
 ## License
 

@@ -33,7 +33,7 @@
 
 MainWindow::MainWindow(ah::Platform& platform, QWidget* parent)
     : QMainWindow(parent), platform_(platform) {
-    setWindowTitle("AgentHive · 多 Agent 协作工作台");
+    setWindowTitle("MiderHive · 多 Agent 协作工作台");
     // 最小尺寸必须先于几何恢复设定：否则会恢复出比最小尺寸还小的窗口
     // （原先在 main 里调用时为时已晚，布局被压到裁切）
     setMinimumSize(1080, 680);
@@ -71,7 +71,7 @@ MainWindow::MainWindow(ah::Platform& platform, QWidget* parent)
                                  : mark.scaled(24, 24, Qt::KeepAspectRatio,
                                                Qt::SmoothTransformation));
     }
-    logo_ = new QLabel("AgentHive", brand);
+    logo_ = new QLabel("MiderHive", brand);
     brandRow->addWidget(logoMark_);
     brandRow->addWidget(logo_);
     brandRow->addStretch(1);
@@ -94,7 +94,7 @@ MainWindow::MainWindow(ah::Platform& platform, QWidget* parent)
     auto* footLay = new QHBoxLayout(foot);
     footLay->setContentsMargins(10, 0, 10, 0);
     ver_ = new QLabel(QString("v%1").arg(ah::kPlatformVersion), foot);
-    ver_->setToolTip(i18n::trs("AgentHive 版本 %1", "AgentHive %1")
+    ver_->setToolTip(i18n::trs("MiderHive 版本 %1", "MiderHive %1")
                          .arg(QString::fromUtf8(ah::kPlatformVersion)));
     settingsBtn_ = new QToolButton(foot);
     settingsBtn_->setIcon(ui::makeIcon("gear", ui::muted(), 16));
@@ -215,8 +215,8 @@ void MainWindow::buildNav() {
 }
 
 void MainWindow::applyLanguage() {
-    setWindowTitle(i18n::trs("AgentHive · 多 Agent 协作工作台",
-                             "AgentHive · Multi-Agent Collaboration Workbench"));
+    setWindowTitle(i18n::trs("MiderHive · 多 Agent 协作工作台",
+                             "MiderHive · Multi-Agent Collaboration Workbench"));
     tagline_->setText(i18n::trs("多 Agent 协作工作台", "multi-agent collaboration hub"));
     langBtn_->setText(i18n::g_lang == i18n::Lang::Zh ? "EN" : "中文");
     langBtn_->setToolTip(i18n::trs("切换语言", "Switch language"));
@@ -303,7 +303,7 @@ void MainWindow::promptUpdate(const ui::UpdateInfo& info) {
     QMessageBox box(this);
     box.setIcon(QMessageBox::Information);
     box.setWindowTitle(i18n::trs("发现新版本", "Update available"));
-    box.setText(i18n::trs("AgentHive 有新版本可用", "A new AgentHive version is available"));
+    box.setText(i18n::trs("MiderHive 有新版本可用", "A new MiderHive version is available"));
     box.setInformativeText(
         i18n::trs("当前版本 v%1 → 最新版本 v%2\n\n下载后将校验 SHA256 再安装；"
                   "数据目录不受影响，可稍后再更新。",
@@ -346,7 +346,7 @@ void MainWindow::promptUpdate(const ui::UpdateInfo& info) {
 
 void MainWindow::setupTray() {
     tray_ = new QSystemTrayIcon(QIcon(":/brand/logo.png"), this);
-    tray_->setToolTip(i18n::trs("AgentHive · 蜂巢运行中", "AgentHive · hive is running"));
+    tray_->setToolTip(i18n::trs("MiderHive · 蜂巢运行中", "MiderHive · hive is running"));
     auto* menu = new QMenu(this);
     auto* showAct = menu->addAction(i18n::trs("显示 / 隐藏工作台", "Show / Hide workbench"));
     connect(showAct, &QAction::triggered, this, [this] {

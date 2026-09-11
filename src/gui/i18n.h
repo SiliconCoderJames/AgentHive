@@ -18,14 +18,16 @@ inline std::vector<std::function<void()>>& listeners() {
 }
 
 inline void load() {
-    QSettings s("agenthive", "agenthive");
-    g_lang = s.value("ui/lang", "zh").toString() == "en" ? Lang::En : Lang::Zh;
+    // 品牌更名后迁移到 ("miderhive","miderhive")；旧位置仍可读（只读兜底，不再写入）
+    QSettings fresh("miderhive", "miderhive");
+    QString lang = fresh.value("ui/lang").toString();
+    if (lang.isEmpty()) lang = QSettings("agenthive", "agenthive").value("ui/lang").toString();
+    g_lang = lang == "en" ? Lang::En : Lang::Zh;
 }
 
 inline void apply(Lang l) {
     g_lang = l;
-    QSettings s("agenthive", "agenthive");
-    s.setValue("ui/lang", l == Lang::En ? "en" : "zh");
+    QSettings("miderhive", "miderhive").setValue("ui/lang", l == Lang::En ? "en" : "zh");
     for (auto& f : listeners()) f();
 }
 

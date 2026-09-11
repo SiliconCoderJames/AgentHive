@@ -186,7 +186,7 @@ static void step(const char* s) {
 }
 
 static void test_platform_end_to_end() {
-    fs::path tmp = fs::temp_directory_path() / ("AgentHive_test_" + ah::randomHex(8));
+    fs::path tmp = fs::temp_directory_path() / ("MiderHive_test_" + ah::randomHex(8));
     fs::create_directories(tmp);
 
     {

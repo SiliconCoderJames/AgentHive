@@ -1,6 +1,6 @@
 #pragma once
 // 运行时可切换主题（配色参考主流 Agent harness）：
-//   hive    AgentHive 蜂巢 · 夜蓝 + 蜜金（默认）
+//   hive    MiderHive 蜂巢 · 夜蓝 + 蜜金（默认）
 //   claude  Claude 暖沙 · 暖灰 + 陶橙
 //   codex   Codex 石墨 · 纯黑灰 + 翡翠
 //   copilot GitHub Copilot 暗淡 · 蓝灰 + 钴蓝

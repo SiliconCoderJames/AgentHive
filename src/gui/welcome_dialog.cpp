@@ -16,7 +16,7 @@
 #include "theme.h"
 
 WelcomeDialog::WelcomeDialog(ah::Platform& platform, QWidget* parent) : QDialog(parent) {
-    setWindowTitle(i18n::trs("欢迎来到 AgentHive", "Welcome to AgentHive"));
+    setWindowTitle(i18n::trs("欢迎来到 MiderHive", "Welcome to MiderHive"));
     setWindowFlag(Qt::WindowContextHelpButtonHint, false);
     // 不锁死尺寸：字号调到 14px 或系统字体放大时，固定尺寸会把内容挤掉
     setMinimumSize(620, 540);
@@ -32,7 +32,7 @@ WelcomeDialog::WelcomeDialog(ah::Platform& platform, QWidget* parent) : QDialog(
     logo->setPixmap(pm.scaled(88, 88, Qt::KeepAspectRatio, Qt::SmoothTransformation));
     logo->setAlignment(Qt::AlignCenter);
     root->addWidget(logo);
-    auto* name = new QLabel("AgentHive", this);
+    auto* name = new QLabel("MiderHive", this);
     name->setAlignment(Qt::AlignCenter);
     name->setStyleSheet(ui::th("font-size:24px; font-weight:800; color:@text@;"));
     root->addWidget(name);

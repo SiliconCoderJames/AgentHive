@@ -88,6 +88,6 @@
 
 - 单元测试：**149 checks / 0 failures**（新增 4 项 HTTP 健壮性断言：`limit=abc`/`limit=-5`/tags 非字符串/budget 非数字 → 400）
 - ASan：**149 checks / 0 报告**（含本轮全部修复）
-- 集成验证：**39/39 通过**（feasibility_check.py，兼容 `AGENTHIVE_MASTER_KEY`）
+- 集成验证：**39/39 通过**（feasibility_check.py，兼容 `MIDERHIVE_MASTER_KEY` 及旧名）
 - 双进程并发：**60/60 版本唯一、无断层**
 - 浸泡：**20 分钟 / 94,914 ops / 0 错误**（79 ops/s，混合读写高频请求）

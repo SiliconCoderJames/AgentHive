@@ -27,7 +27,7 @@ namespace {
 // 用户报"没有任何提示"就无从查起，因此把过程写入数据目录下的日志文件。
 void trace(const QString& msg) {
     const QString dir =
-        QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + "/AgentHive";
+        QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + "/MiderHive";
     QDir().mkpath(dir);
     QFile f(dir + "/update-check.log");
     if (!f.open(QIODevice::Append | QIODevice::Text)) return;
@@ -48,12 +48,13 @@ namespace ui {
 
 namespace {
 
-constexpr const char* kRepoSlug = "SiliconCoderJames/AgentHive";
-constexpr const char* kReleasesPage = "https://github.com/SiliconCoderJames/AgentHive/releases";
+constexpr const char* kRepoSlug = "SiliconCoderJames/MiderHive";
+constexpr const char* kReleasesPage = "https://github.com/SiliconCoderJames/MiderHive/releases";
 
 // 清单地址：默认走 releases/latest 的固定资产 URL；可用环境变量覆盖（便于本地联调与 fork）
 QUrl manifestUrl() {
-    const std::string override = ah::envOr("AGENTHIVE_UPDATE_URL", "ZCODE_UPDATE_URL");
+    const std::string override =
+        ah::envOr({"MIDERHIVE_UPDATE_URL", "AGENTHIVE_UPDATE_URL", "ZCODE_UPDATE_URL"});
     if (!override.empty()) return QUrl(QString::fromStdString(override));
     return QUrl(QString("https://github.com/%1/releases/latest/download/latest.json")
                     .arg(QString::fromLatin1(kRepoSlug)));
@@ -62,7 +63,7 @@ QUrl manifestUrl() {
 QNetworkRequest makeRequest(const QUrl& url) {
     QNetworkRequest req(url);
     req.setHeader(QNetworkRequest::UserAgentHeader,
-                  QString("AgentHive/%1").arg(QString::fromLatin1(ah::kPlatformVersion)));
+                  QString("MiderHive/%1").arg(QString::fromLatin1(ah::kPlatformVersion)));
     req.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
                      QNetworkRequest::NoLessSafeRedirectPolicy);  // release 资产会 302 到 CDN
     req.setTransferTimeout(15000);
@@ -71,7 +72,7 @@ QNetworkRequest makeRequest(const QUrl& url) {
 
 QString tempMsiPath(const QString& version) {
     return QDir(QStandardPaths::writableLocation(QStandardPaths::TempLocation))
-        .filePath(QString("AgentHive-%1-x64.msi").arg(version));
+        .filePath(QString("MiderHive-%1-x64.msi").arg(version));
 }
 
 // 校验通过后剥掉"网络来源标记"：否则 msiexec 会因文件来自互联网再弹一次 SmartScreen
@@ -120,13 +121,15 @@ void UpdateChecker::skipVersion(const QString& version) {
 }
 
 bool UpdateChecker::isInstalledCopy() {
-    // 安装版固定落在 %LOCALAPPDATA%\AgentHive（GenericDataLocation 在 Windows 上即 %LOCALAPPDATA%），
-    // 其余位置（解压出来的便携版、开发时的 build 目录）都按便携版处理
+    // 安装版固定落在 %LOCALAPPDATA%\MiderHive（GenericDataLocation 在 Windows 上即 %LOCALAPPDATA%），
+    // 其余位置（解压出来的便携版、开发时的 build 目录）都按便携版处理。
+    // 兼容旧品牌安装目录：从 AgentHive 1.0.x 升级后首次运行前，exe 仍可能在旧目录里。
     const QString appDir = QDir::cleanPath(QCoreApplication::applicationDirPath());
     const QString localRoot = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation);
     if (localRoot.isEmpty()) return false;
-    const QString expected = QDir::cleanPath(localRoot + "/AgentHive");
-    return appDir.compare(expected, Qt::CaseInsensitive) == 0;
+    if (appDir.compare(QDir::cleanPath(localRoot + "/MiderHive"), Qt::CaseInsensitive) == 0)
+        return true;
+    return appDir.compare(QDir::cleanPath(localRoot + "/AgentHive"), Qt::CaseInsensitive) == 0;
 }
 
 void UpdateChecker::check() {
