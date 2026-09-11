@@ -15,6 +15,13 @@ import time
 import urllib.request
 import urllib.error
 
+# 输出含中文（场景名/断言说明）。Windows 控制台与 CI 的 stdout 默认是 ANSI 代码页
+# （如 cp1252/GBK），print 中文会直接 UnicodeEncodeError 崩掉——检查还没跑就挂了。
+# 强制 stdout/stderr 用 UTF-8，兼容 Python 3.7+；再老的解释器忽略之。
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+
 BASE = "http://127.0.0.1:%s" % (sys.argv[1] if len(sys.argv) > 1 else "19090")
 # 绕过系统代理，确保直连本机
 OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
