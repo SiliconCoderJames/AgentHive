@@ -15,7 +15,7 @@
 #include "i18n.h"
 #include "theme.h"
 
-WelcomeDialog::WelcomeDialog(zp::Platform& platform, QWidget* parent) : QDialog(parent) {
+WelcomeDialog::WelcomeDialog(ah::Platform& platform, QWidget* parent) : QDialog(parent) {
     setWindowTitle(i18n::trs("欢迎来到 AgentHive", "Welcome to AgentHive"));
     setWindowFlag(Qt::WindowContextHelpButtonHint, false);
     // 不锁死尺寸：字号调到 14px 或系统字体放大时，固定尺寸会把内容挤掉

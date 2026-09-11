@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-namespace zp {
+namespace ah {
 
 class Embedder {
 public:
@@ -29,4 +29,4 @@ private:
     int dim_;
 };
 
-}  // namespace zp
+}  // namespace ah

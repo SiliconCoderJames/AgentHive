@@ -12,7 +12,7 @@ class QComboBox;
 class WelcomeDialog : public QDialog {
     Q_OBJECT
 public:
-    explicit WelcomeDialog(zp::Platform& platform, QWidget* parent = nullptr);
+    explicit WelcomeDialog(ah::Platform& platform, QWidget* parent = nullptr);
 
 private:
     std::vector<ui::ThemeSwatch*> swatches_;

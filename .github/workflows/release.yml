@@ -88,7 +88,7 @@ jobs:
 
           ### 下载哪个
           * ``AgentHive-$ver-x64.msi`` —— 安装包（per-user，装到 ``%LOCALAPPDATA%\AgentHive``，**无需管理员权限**），带开始菜单与桌面快捷方式
-          * ``AgentHive-$ver-win64-portable.zip`` —— 免安装便携版，解压后运行 ``zworkbench.exe``
+          * ``AgentHive-$ver-win64-portable.zip`` —— 免安装便携版，解压后运行 ``agenthive.exe``
           * ``SHA256SUMS.txt`` —— 校验和
 
           ### 说明

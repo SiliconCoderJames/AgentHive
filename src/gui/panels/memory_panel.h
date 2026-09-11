@@ -12,7 +12,7 @@
 class MemoryPanel : public PanelBase {
     Q_OBJECT
 public:
-    explicit MemoryPanel(zp::Platform& platform, QWidget* parent = nullptr);
+    explicit MemoryPanel(ah::Platform& platform, QWidget* parent = nullptr);
     void refresh() override;
 
 private slots:
@@ -22,5 +22,5 @@ private slots:
 private:
     QLabel* headerLabel_ = nullptr;
     QVBoxLayout* sectionsLay_ = nullptr;
-    std::vector<zp::MemoryEntry> entries_;
+    std::vector<ah::MemoryEntry> entries_;
 };

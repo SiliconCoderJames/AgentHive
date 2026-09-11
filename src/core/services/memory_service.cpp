@@ -2,7 +2,7 @@
 
 #include "core/util.h"
 
-namespace zp {
+namespace ah {
 
 bool MemoryService::list(const std::string& sectionFilter, std::vector<MemoryEntry>& out,
                          std::string& err) {
@@ -126,4 +126,4 @@ bool MemoryService::history(const std::string& section, const std::string& key,
         err);
 }
 
-}  // namespace zp
+}  // namespace ah

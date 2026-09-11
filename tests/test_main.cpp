@@ -55,13 +55,13 @@ static std::string toText(const T& v) {
     } while (0)
 
 static void test_sha256() {
-    CHECK_EQ(zp::sha256Hex("abc"),
+    CHECK_EQ(ah::sha256Hex("abc"),
              "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
-    CHECK_EQ(zp::sha256Hex(""), "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+    CHECK_EQ(ah::sha256Hex(""), "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
 }
 
 static void test_week_start() {
-    std::string ws = zp::weekStartIso();  // YYYY-MM-DD
+    std::string ws = ah::weekStartIso();  // YYYY-MM-DD
     std::tm tm{};
     std::istringstream is(ws);
     is >> std::get_time(&tm, "%Y-%m-%d");
@@ -82,7 +82,7 @@ static void test_week_start() {
 }
 
 static void test_embedder() {
-    zp::NgramHashEmbedder emb(384);
+    ah::NgramHashEmbedder emb(384);
     auto a = emb.embed("CMake 项目使用 sqlite-vec 做向量检索");
     auto b = emb.embed("CMake 项目使用 sqlite-vec 做向量检索");
     CHECK_EQ(a.size(), 384u);
@@ -109,7 +109,7 @@ static void test_embedder() {
 }
 
 static void test_url_guard() {
-    using zp::net::isSafeOutboundUrl;
+    using ah::net::isSafeOutboundUrl;
     CHECK(!isSafeOutboundUrl("http://127.0.0.1:8080/x"));
     CHECK(!isSafeOutboundUrl("http://localhost/x"));
     CHECK(!isSafeOutboundUrl("http://foo.localhost/x"));
@@ -137,13 +137,13 @@ static void test_url_guard() {
 
 // 密钥比较必须是常量时间实现（std::string::operator== 会在首个不同字节短路）
 static void test_constant_time_equals() {
-    CHECK(zp::constantTimeEquals("", ""));
-    CHECK(zp::constantTimeEquals("abc", "abc"));
-    CHECK(!zp::constantTimeEquals("abc", "abd"));
-    CHECK(!zp::constantTimeEquals("abc", "abcd"));
-    CHECK(!zp::constantTimeEquals("", "a"));
-    CHECK(!zp::constantTimeEquals("0000000000", "1000000000"));  // 首字节差异
-    CHECK(!zp::constantTimeEquals("0000000000", "0000000001"));  // 末字节差异
+    CHECK(ah::constantTimeEquals("", ""));
+    CHECK(ah::constantTimeEquals("abc", "abc"));
+    CHECK(!ah::constantTimeEquals("abc", "abd"));
+    CHECK(!ah::constantTimeEquals("abc", "abcd"));
+    CHECK(!ah::constantTimeEquals("", "a"));
+    CHECK(!ah::constantTimeEquals("0000000000", "1000000000"));  // 首字节差异
+    CHECK(!ah::constantTimeEquals("0000000000", "0000000001"));  // 末字节差异
 }
 
 static std::string readFile(const std::string& path) {
@@ -160,12 +160,12 @@ static void step(const char* s) {
 }
 
 static void test_platform_end_to_end() {
-    fs::path tmp = fs::temp_directory_path() / ("zcode_platform_test_" + zp::randomHex(8));
+    fs::path tmp = fs::temp_directory_path() / ("AgentHive_test_" + ah::randomHex(8));
     fs::create_directories(tmp);
 
     {
         step("bootstrap");
-        zp::Platform p(tmp.string());
+        ah::Platform p(tmp.string());
         std::string err;
         CHECK(p.bootstrap(err));
 
@@ -188,7 +188,7 @@ static void test_platform_end_to_end() {
         // 心跳与在线状态
         step("heartbeat");
         p.heartbeat("hermes", "写单元测试");
-        std::vector<zp::AgentInfo> agents;
+        std::vector<ah::AgentInfo> agents;
         CHECK(p.listAgents(agents, err));
         bool hermesOnline = false;
         for (const auto& a : agents)
@@ -198,31 +198,31 @@ static void test_platform_end_to_end() {
 
         // 知识库：创建 + 关键词/语义搜索 + 版本只追加
         step("knowledge.create");
-        zp::KnowledgeEntry e1;
+        ah::KnowledgeEntry e1;
         CHECK(p.knowledgeCreate("hermes", "sqlite-vec 接入指南",
                                 "把 sqlite-vec 静态编译进进程，用 vec0 虚拟表做向量检索，配合 CMake FetchContent。",
                                 {"cmake", "向量"}, "技术文档", {}, "", e1, err));
-        zp::KnowledgeEntry e2;
+        ah::KnowledgeEntry e2;
         CHECK(p.knowledgeCreate("claude", "Qt 布局技巧",
                                 "QSplitter 加 QTableWidget 做左右分栏，定时器刷新面板。",
                                 {"qt"}, "技术文档", {}, "", e2, err));
 
-        std::vector<zp::KnowledgeHit> hits;
+        std::vector<ah::KnowledgeHit> hits;
         step("knowledge.search.semantic");
-        CHECK(p.knowledgeSearch("向量检索", zp::SearchMode::Semantic, 10, "", hits, err));
+        CHECK(p.knowledgeSearch("向量检索", ah::SearchMode::Semantic, 10, "", hits, err));
         CHECK(!hits.empty());
         CHECK_EQ(hits[0].entry.title, "sqlite-vec 接入指南");
 
-        std::vector<zp::KnowledgeHit> kws;
-        CHECK(p.knowledgeSearch("Qt", zp::SearchMode::Keyword, 10, "", kws, err));
+        std::vector<ah::KnowledgeHit> kws;
+        CHECK(p.knowledgeSearch("Qt", ah::SearchMode::Keyword, 10, "", kws, err));
         CHECK_EQ(kws.size(), 1u);
 
         // 追加版本：旧版本保留
-        zp::KnowledgeEntry e3;
+        ah::KnowledgeEntry e3;
         CHECK(p.knowledgeAddVersion("hermes", e1.uuid, "", "第二版内容：补充 Windows 下的编译选项说明。",
                                     {}, "", e3, err));
         CHECK_EQ(e3.version, 2);
-        std::vector<zp::KnowledgeEntry> versions;
+        std::vector<ah::KnowledgeEntry> versions;
         CHECK(p.knowledgeVersions(e1.uuid, versions, err));
         CHECK_EQ(versions.size(), 2u);
         CHECK_EQ(versions[1].version, 1);  // v1 内容原样
@@ -232,7 +232,7 @@ static void test_platform_end_to_end() {
         step("skills");
         std::string err3;
         CHECK(!p.skillInvoke("hermes", "ghost-skill", "{}", "", "success", 1, 0, 0, err3));
-        zp::SkillInfo sk;
+        ah::SkillInfo sk;
         CHECK(p.skillRegister("hermes", "code-review", "代码审查", "审查代码并给出意见",
                               "开发", "{\"type\":\"object\"}", sk, err));
         CHECK(p.skillInvoke("claude", "code-review", "{\"file\":\"a.cpp\"}", "通过", "success",
@@ -240,26 +240,26 @@ static void test_platform_end_to_end() {
 
         // 记忆：两次 set 生成两个版本；base_version 冲突被拒
         step("memory");
-        zp::MemoryEntry m1, m2;
+        ah::MemoryEntry m1, m2;
         CHECK(p.memorySet("hermes", "project", "current", "正在开发多 Agent 平台", 0, m1, err));
         CHECK_EQ(m1.version, 1);
         // 乐观并发：基于 v1 写入应冲突（最新已是 v1？不，此时最新是 v1，基于 v9 冲突）
         std::string conflictErr;
-        zp::MemoryEntry mc;
+        ah::MemoryEntry mc;
         CHECK(!p.memorySet("codex", "project", "current", "并发覆盖尝试", 9, mc, conflictErr));
         CHECK(conflictErr.rfind("version conflict", 0) == 0);
         CHECK(p.memorySet("claude", "project", "current", "正在开发多 Agent 平台（Qt 工作台）", 0, m2, err));
         CHECK_EQ(m2.version, 2);
-        std::vector<zp::MemoryEntry> hist;
+        std::vector<ah::MemoryEntry> hist;
         CHECK(p.memoryHistory("project", "current", hist, err));
         CHECK_EQ(hist.size(), 2u);
-        std::vector<zp::MemoryEntry> allMem;
+        std::vector<ah::MemoryEntry> allMem;
         CHECK(p.memoryList("", allMem, err));
         CHECK(!allMem.empty());
 
         // 消息：发送 + 状态流转
         step("messages");
-        zp::Message msg;
+        ah::Message msg;
         CHECK(p.messageSend("task", "claude", "hermes", "修个 bug", "知识搜索返回空，请排查", msg, err));
         CHECK_EQ(msg.status, "pending");
         CHECK(p.messageSetStatus("hermes", msg.uuid, "accepted", msg, err));
@@ -272,13 +272,13 @@ static void test_platform_end_to_end() {
 
         // 错误：上报 + 解决（说明追加）
         step("errors");
-        zp::ErrorReport er;
+        ah::ErrorReport er;
         CHECK(p.errorReport("hermes", "error", "search", "向量表未创建", "distance 查询报错", "", er, err));
         CHECK(p.errorResolve("hermes", er.uuid, "重建 vec 表后恢复", er, err));
         CHECK_EQ(er.status, "resolved");
         CHECK(er.resolution_notes.find("重建") != std::string::npos);
         // 非上报者不能解决
-        zp::ErrorReport er2;
+        ah::ErrorReport er2;
         CHECK(p.errorReport("claude", "warning", "gui", "布局警告", "占位", "", er2, err));
         std::string err5;
         CHECK(!p.errorResolve("hermes", er2.uuid, "越权", er2, err5));
@@ -288,7 +288,7 @@ static void test_platform_end_to_end() {
         // （此前技能调用已消耗 5000 Token；预算以 10 万为基准分段验证）
         step("usage");
         CHECK(p.usageSetBudget("user", 100000, err));
-        zp::UsageSummary sum;
+        ah::UsageSummary sum;
         CHECK(p.usageSummary(sum, err));
         CHECK_EQ(sum.total_tokens, static_cast<int64_t>(5000));
         CHECK_EQ(sum.alert_level, "none");
@@ -316,27 +316,27 @@ static void test_platform_end_to_end() {
         // 用量统计：带模型上报 → 逐日趋势（连续日期补 0）与按模型累计
         CHECK(p.usageReport("hermes", 1200, 300, "llm", "glm-5.3-flash", "ref-m1",
                             "idem-m1", dup, err));
-        std::vector<zp::UsageDailyPoint> daily;
+        std::vector<ah::UsageDailyPoint> daily;
         CHECK(p.usageDaily(7, daily, err));
         CHECK_EQ(daily.size(), static_cast<size_t>(7));
         CHECK(daily.front().day < daily.back().day);  // 旧 → 新排列
         int64_t dayTotal = 0;
         for (const auto& d : daily) dayTotal += d.tokens;
         CHECK(dayTotal >= 1500);  // 至少覆盖本次带模型的 1500
-        std::vector<zp::UsageModelRow> models;
+        std::vector<ah::UsageModelRow> models;
         CHECK(p.usageByModel(models, err));
         CHECK(models.size() >= 1);
         CHECK_EQ(models.front().model, std::string("glm-5.3-flash"));
         CHECK_EQ(models.front().tokens, static_cast<int64_t>(1500));
         // 超额（105.9%）：仅告警升级，不拦截技能调用（用量是观测不是限制）
-        std::vector<zp::SkillInvocation> invs;
+        std::vector<ah::SkillInvocation> invs;
         CHECK(p.skillInvoke("hermes", "code-review", "{}", "", "success", 1, 0, 0, err));
         CHECK(p.skillInvocations("code-review", 10, invs, err));
         CHECK(!invs.empty());  // 超额后调用仍被记录
 
         // 审计留痕
         step("audit");
-        std::vector<zp::AuditRecord> audit;
+        std::vector<ah::AuditRecord> audit;
         CHECK(p.auditList("", "", "", 500, audit, err));
         CHECK(!audit.empty());
         bool foundReg = false;
@@ -352,7 +352,7 @@ static void test_platform_end_to_end() {
         CHECK(!p.agentRemove("hermes", "droid", err));
         CHECK(!p.agentRemove("zcode", "zcode", err));
         CHECK(p.agentRemove("zcode", "droid", err));
-        std::vector<zp::AgentInfo> afterRemove;
+        std::vector<ah::AgentInfo> afterRemove;
         CHECK(p.listAgents(afterRemove, err));
         bool droidGone = true;
         for (const auto& a : afterRemove)
@@ -376,10 +376,10 @@ static void test_platform_end_to_end() {
         CHECK(p.registerAgent(masterKey, "roleprobe", "member", hKey, hErr));
 
         step("messages.visibility");
-        zp::Message pm;
+        ah::Message pm;
         CHECK(p.messageSend("task", "hermes", "claude", "私密任务", "只给 claude", pm, err));
         auto seen = [&](const std::string& viewer, const std::string& uuid, bool& found) {
-            std::vector<zp::Message> vis;
+            std::vector<ah::Message> vis;
             std::string e;
             found = false;
             if (!p.messageList("", "", "", "", 50, vis, e, viewer)) return false;
@@ -395,7 +395,7 @@ static void test_platform_end_to_end() {
         CHECK(seen("hermes", pm.uuid, f));     // 发件人
         CHECK(f);
         // 广播消息（recipient 为空）对所有人可见，不受 viewer 收敛影响
-        zp::Message bm;
+        ah::Message bm;
         CHECK(p.messageSend("note", "hermes", "", "广播", "全员可见", bm, err));
         CHECK(seen("roleprobe", bm.uuid, f));
         CHECK(f);
@@ -480,7 +480,7 @@ static void test_platform_end_to_end() {
         // ---- 加固项：长度校验 ----
         std::string longTitle(300, 'x');
         std::string vErr;
-        zp::KnowledgeEntry longEntry;
+        ah::KnowledgeEntry longEntry;
         CHECK(!p.knowledgeCreate("hermes", longTitle, "内容", {}, "", {}, "", longEntry, vErr));
         CHECK(vErr.find("too long") != std::string::npos);
 
@@ -488,17 +488,17 @@ static void test_platform_end_to_end() {
         std::string rmErr;
         CHECK(!p.knowledgeRemove("hermes", e1.uuid, rmErr));  // 非管理者被拒
         CHECK(p.knowledgeRemove("zcode", e1.uuid, rmErr));
-        std::vector<zp::KnowledgeEntry> gone;
+        std::vector<ah::KnowledgeEntry> gone;
         CHECK(p.knowledgeVersions(e1.uuid, gone, rmErr));
         CHECK(gone.empty());                                  // 版本全部移除
         CHECK(p.memoryRemove("zcode", "project", "current", rmErr));
-        std::vector<zp::MemoryEntry> memGone;
+        std::vector<ah::MemoryEntry> memGone;
         CHECK(p.memoryList("project", memGone, rmErr));
         CHECK(memGone.empty());
         CHECK(!p.memoryRemove("zcode", "project", "nonexistent", rmErr));
 
         // ---- 加固项：备份与恢复 ----
-        std::vector<zp::KnowledgeEntry> before;
+        std::vector<ah::KnowledgeEntry> before;
         CHECK(p.knowledgeList(100, "", before, rmErr));
         std::string backupPath;
         CHECK(p.backupCreate(backupPath, rmErr));
@@ -508,11 +508,11 @@ static void test_platform_end_to_end() {
         CHECK(backups.size() >= 1);
         // 删除全部知识条目后从备份恢复
         for (const auto& e : before) CHECK(p.knowledgeRemove("zcode", e.uuid, rmErr));
-        std::vector<zp::KnowledgeEntry> emptied;
+        std::vector<ah::KnowledgeEntry> emptied;
         CHECK(p.knowledgeList(100, "", emptied, rmErr));
         CHECK(emptied.empty());
         CHECK(p.backupRestore(backups[0], rmErr));
-        std::vector<zp::KnowledgeEntry> restored;
+        std::vector<ah::KnowledgeEntry> restored;
         CHECK(p.knowledgeList(100, "", restored, rmErr));
         CHECK_EQ(restored.size(), before.size());
         // 非法备份名被拒（路径穿越防护）
@@ -533,10 +533,10 @@ static void test_platform_end_to_end() {
 // 存量旧库升级：旧 schema（agents 无 salt、token_usage 无 idempotency_key）
 // 直接跑新版本 bootstrap 必须成功，旧格式密钥仍可认证。
 static void test_legacy_migration() {
-    fs::path tmp = fs::temp_directory_path() / ("zcode_legacy_" + zp::randomHex(6));
+    fs::path tmp = fs::temp_directory_path() / ("zcode_legacy_" + ah::randomHex(6));
     fs::create_directories(tmp);
     {
-        zp::Database raw;
+        ah::Database raw;
         std::string err;
         CHECK(raw.open((tmp / "platform.db").string(), err));
         const char* oldSchema =
@@ -548,14 +548,14 @@ static void test_legacy_migration() {
             " tokens_out INTEGER NOT NULL DEFAULT 0, call_type TEXT, reference_id TEXT,"
             " created_at TEXT NOT NULL);";
         CHECK(raw.execScript(oldSchema, err));
-        std::string legacyHash = zp::sha256Hex("legacykey");
+        std::string legacyHash = ah::sha256Hex("legacykey");
         CHECK(raw.execScript("INSERT INTO agents(name, role, api_key_hash, status, created_at,"
                              " updated_at) VALUES ('legacy','member','" +
                                  legacyHash + "','offline','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z');",
                              err));
         raw.close();
 
-        zp::Platform p(tmp.string());
+        ah::Platform p(tmp.string());
         bool bootOk = p.bootstrap(err);
         if (!bootOk) std::printf("  legacy bootstrap err: %s\n", err.c_str());
         CHECK(bootOk);  // 旧库升级：修复前此处报 no such column: idempotency_key

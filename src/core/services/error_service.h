@@ -6,7 +6,7 @@
 #include "core/db/database.h"
 #include "core/types.h"
 
-namespace zp {
+namespace ah {
 
 class ErrorService {
 public:
@@ -25,4 +25,4 @@ private:
     Database& db_;
 };
 
-}  // namespace zp
+}  // namespace ah

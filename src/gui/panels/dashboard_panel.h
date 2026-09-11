@@ -15,7 +15,7 @@
 class DashboardPanel : public PanelBase {
     Q_OBJECT
 public:
-    explicit DashboardPanel(zp::Platform& platform, QWidget* parent = nullptr);
+    explicit DashboardPanel(ah::Platform& platform, QWidget* parent = nullptr);
     void refresh() override;
 
 private:

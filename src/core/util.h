@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-namespace zp {
+namespace ah {
 
 // 读取环境变量：新名优先，旧名兜底（品牌更名 AgentHive 前的 ZCODE_* 仍生效）
 inline std::string envOr(const char* newName, const char* legacyName,
@@ -30,4 +30,4 @@ std::vector<uint32_t> utf8Codepoints(const std::string& s);
 std::string toLower(const std::string& s);
 std::string join(const std::vector<std::string>& v, const std::string& sep);
 
-}  // namespace zp
+}  // namespace ah

@@ -12,7 +12,7 @@
 #include "core/util.h"
 
 int main() {
-    zp::Platform platform(zp::defaultHomeDir());
+    ah::Platform platform(ah::defaultHomeDir());
     std::string err;
     if (!platform.bootstrap(err)) {
         std::cerr << "[platformd] bootstrap failed: " << err << "\n";
@@ -20,7 +20,7 @@ int main() {
     }
     int port = 8787;
     {
-        std::string portEnv = zp::envOr("AGENTHIVE_PORT", "ZCODE_PLATFORM_PORT");
+        std::string portEnv = ah::envOr("AGENTHIVE_PORT", "ZCODE_PLATFORM_PORT");
         if (!portEnv.empty()) port = std::atoi(portEnv.c_str());
     }
     if (!platform.startHttpServer(port, err)) {

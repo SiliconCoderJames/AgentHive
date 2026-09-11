@@ -2,7 +2,7 @@
 
 #include "core/util.h"
 
-namespace zp {
+namespace ah {
 
 bool MessageService::send(const std::string& kind, const std::string& sender,
                           const std::string& recipient, const std::string& subject,
@@ -149,4 +149,4 @@ bool MessageService::setStatus(const std::string& uuid, const std::string& newSt
     return get(uuid, out, err);
 }
 
-}  // namespace zp
+}  // namespace ah

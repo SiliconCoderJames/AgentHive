@@ -2,7 +2,7 @@
 
 #include "core/util.h"
 
-namespace zp {
+namespace ah {
 
 namespace {
 // 心跳超过 2 分钟视为离线
@@ -102,4 +102,4 @@ bool AgentService::nameExists(const std::string& name) {
     return found;
 }
 
-}  // namespace zp
+}  // namespace ah

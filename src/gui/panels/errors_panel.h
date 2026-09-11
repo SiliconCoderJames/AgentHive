@@ -15,7 +15,7 @@
 class ErrorsPanel : public PanelBase {
     Q_OBJECT
 public:
-    explicit ErrorsPanel(zp::Platform& platform, QWidget* parent = nullptr);
+    explicit ErrorsPanel(ah::Platform& platform, QWidget* parent = nullptr);
     void refresh() override;
     void focusFilter() override;
 
@@ -32,5 +32,5 @@ private:
     QLabel* infoLabel_ = nullptr;
     QLabel* emptyLabel_ = nullptr;
     QPushButton* resolveBtn_ = nullptr;
-    std::vector<zp::ErrorReport> errors_;
+    std::vector<ah::ErrorReport> errors_;
 };

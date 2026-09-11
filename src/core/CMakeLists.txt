@@ -1,4 +1,4 @@
-add_library(zplatform_core STATIC
+add_library(agenthive_core STATIC
     util.cpp
     db/database.cpp
     embed/embedder.cpp
@@ -13,14 +13,14 @@ add_library(zplatform_core STATIC
     platform.cpp
     http/server.cpp
 )
-target_include_directories(zplatform_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
+target_include_directories(agenthive_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
 # 与 sqlite3_static / sqlite_vec_static 一致：静态编译进进程，不走扩展加载机制
-target_compile_definitions(zplatform_core PUBLIC SQLITE_CORE)
+target_compile_definitions(agenthive_core PUBLIC SQLITE_CORE)
 if(MSVC)
     # getenv 等 CRT 安全告警（C4996）在本地单机场景为预期用法
-    target_compile_definitions(zplatform_core PUBLIC _CRT_SECURE_NO_WARNINGS)
+    target_compile_definitions(agenthive_core PUBLIC _CRT_SECURE_NO_WARNINGS)
 endif()
-target_link_libraries(zplatform_core PUBLIC
+target_link_libraries(agenthive_core PUBLIC
     sqlite3_static
     sqlite_vec_static
     nlohmann_json::nlohmann_json
@@ -31,7 +31,7 @@ target_link_libraries(zplatform_core PUBLIC
 file(READ ${CMAKE_CURRENT_SOURCE_DIR}/db/schema.sql SCHEMA_SQL_CONTENT)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/db/schema_sql.h.in
                ${CMAKE_CURRENT_BINARY_DIR}/generated/schema_sql.h @ONLY)
-target_include_directories(zplatform_core PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/generated)
+target_include_directories(agenthive_core PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/generated)
 
 # 版本号单一来源 → 生成 version.h（界面、/api/health、安装包共用）
 # 放在 generated/core/ 下：以 generated 为 include 根，代码里写 #include "core/version.h"，

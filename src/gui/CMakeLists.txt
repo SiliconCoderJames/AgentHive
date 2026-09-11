@@ -1,4 +1,4 @@
-add_executable(zworkbench WIN32
+add_executable(agenthive WIN32
     main.cpp
     mainwindow.cpp
     settings_dialog.cpp
@@ -12,12 +12,12 @@ add_executable(zworkbench WIN32
     panels/errors_panel.cpp
     panels/logs_panel.cpp
 )
-target_link_libraries(zworkbench PRIVATE zplatform_core Qt6::Widgets Qt6::Network Qt6::Svg)
-set_target_properties(zworkbench PROPERTIES AUTOMOC ON AUTORCC ON)
-qt_add_resources(zworkbench "theme"
+target_link_libraries(agenthive PRIVATE agenthive_core Qt6::Widgets Qt6::Network Qt6::Svg)
+set_target_properties(agenthive PROPERTIES AUTOMOC ON AUTORCC ON)
+qt_add_resources(agenthive "theme"
     PREFIX "/theme"
     FILES qss/dark.qss)
-qt_add_resources(zworkbench "brand"
+qt_add_resources(agenthive "brand"
     PREFIX "/brand"
     FILES ../../docs/assets/logo.png)
 
@@ -29,7 +29,7 @@ qt_add_resources(zworkbench "brand"
 # 不用 qt_generate_deploy_app_script 的原因：它按 Qt 的安装布局输出 bin/ 与 plugins/
 # 多级结构，还会带上 include/ 与 lib/cmake 等开发文件，不适合直接打包分发。
 if(WIN32)
-    install(TARGETS zworkbench RUNTIME DESTINATION . COMPONENT Runtime)
+    install(TARGETS agenthive RUNTIME DESTINATION . COMPONENT Runtime)
     get_target_property(_qmake_exe Qt6::qmake IMPORTED_LOCATION)
     get_filename_component(_qt_bin "${_qmake_exe}" DIRECTORY)
     find_program(WINDEPLOYQT_EXECUTABLE windeployqt HINTS "${_qt_bin}" REQUIRED)
@@ -58,7 +58,7 @@ if(WIN32)
             COMMAND \"${WINDEPLOYQT_EXECUTABLE}\"
                     --release --no-translations --no-opengl-sw --no-system-d3d-compiler
                     --dir \"\${CMAKE_INSTALL_PREFIX}\"
-                    \"\${CMAKE_INSTALL_PREFIX}/zworkbench.exe\"
+                    \"\${CMAKE_INSTALL_PREFIX}/agenthive.exe\"
             RESULT_VARIABLE _wdq_rc)
         if(NOT _wdq_rc EQUAL 0)
             message(FATAL_ERROR \"windeployqt 失败，退出码 \${_wdq_rc}\")

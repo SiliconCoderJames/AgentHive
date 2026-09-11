@@ -22,12 +22,12 @@ namespace {
 // 而第二个实例会因 8787 端口被占用弹出"HTTP 服务启动失败"的警告框。
 // 这里用本地 socket 做互斥：已有实例就把它唤到前台，然后本进程直接退出。 ----
 QString singleInstanceKey() {
-    std::string port = zp::envOr("AGENTHIVE_PORT", "ZCODE_PLATFORM_PORT");
+    std::string port = ah::envOr("AGENTHIVE_PORT", "ZCODE_PLATFORM_PORT");
     if (port.empty()) port = "8787";
     // 以数据目录 + 端口为键：同一份数据同时只允许一个工作台
-    const std::string home = zp::defaultHomeDir();
+    const std::string home = ah::defaultHomeDir();
     return QString("AgentHive-%1-%2")
-        .arg(QString::fromStdString(zp::sha256Hex(home + ":" + port)).left(16),
+        .arg(QString::fromStdString(ah::sha256Hex(home + ":" + port)).left(16),
              QString::fromStdString(port));
 }
 
@@ -102,7 +102,7 @@ int main(int argc, char** argv) {
     QLocalServer instanceGuard;
     instanceGuard.listen(instanceKey);
 
-    zp::Platform platform(zp::defaultHomeDir());
+    ah::Platform platform(ah::defaultHomeDir());
     std::string err;
     if (!platform.bootstrap(err)) {
         QMessageBox::critical(nullptr, "AgentHive 工作台",
@@ -113,7 +113,7 @@ int main(int argc, char** argv) {
     // 内置 HTTP 服务供 Agent 接入（仅绑定 127.0.0.1）
     int port = 8787;
     {
-        std::string portEnv = zp::envOr("AGENTHIVE_PORT", "ZCODE_PLATFORM_PORT");
+        std::string portEnv = ah::envOr("AGENTHIVE_PORT", "ZCODE_PLATFORM_PORT");
         if (!portEnv.empty()) port = std::atoi(portEnv.c_str());
     }
     std::string serr;

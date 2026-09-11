@@ -15,7 +15,7 @@
   ANSI, which corrupts non-ASCII comments and can break parsing.
 
 .PARAMETER StageDir
-  Directory produced by cmake --install (zworkbench.exe, Qt DLLs, plugin subdirs, licenses/).
+  Directory produced by cmake --install (agenthive.exe, Qt DLLs, plugin subdirs, licenses/).
 
 .PARAMETER OutFile
   Path of the .wxs file to write.
@@ -34,8 +34,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 $StageDir = (Resolve-Path $StageDir).Path
-if (-not (Test-Path (Join-Path $StageDir "zworkbench.exe"))) {
-    throw "stage dir has no zworkbench.exe: $StageDir (run cmake --install first)"
+if (-not (Test-Path (Join-Path $StageDir "agenthive.exe"))) {
+    throw "stage dir has no agenthive.exe: $StageDir (run cmake --install first)"
 }
 
 function XmlEsc([string]$s) {

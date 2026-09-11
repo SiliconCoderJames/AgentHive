@@ -30,7 +30,7 @@ jobs:
       - name: Assert the GUI was actually built
         shell: pwsh
         run: |
-          $exe = "build\src\gui\Release\zworkbench.exe"
+          $exe = "build\src\gui\Release\agenthive.exe"
           if (-not (Test-Path $exe)) { throw "GUI target missing: $exe (Qt6 not found?)" }
           $cli = @("build\src\cli\Release\agent-cli.exe", "build\src\cli\Release\platformd.exe")
           foreach ($c in $cli) { if (-not (Test-Path $c)) { throw "CLI target missing: $c" } }

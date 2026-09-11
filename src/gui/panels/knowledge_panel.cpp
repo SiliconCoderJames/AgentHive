@@ -20,7 +20,7 @@
 #include "../widgets.h"
 #include "core/util.h"
 
-KnowledgePanel::KnowledgePanel(zp::Platform& platform, QWidget* parent)
+KnowledgePanel::KnowledgePanel(ah::Platform& platform, QWidget* parent)
     : PanelBase(platform, parent) {
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(16, 16, 16, 16);
@@ -121,13 +121,13 @@ void KnowledgePanel::onSearch() {
     std::string tag = tagEdit_->text().trimmed().toStdString();
     std::string query = searchEdit_->text().trimmed().toStdString();
     if (query.empty()) {
-        std::vector<zp::KnowledgeEntry> entries;
+        std::vector<ah::KnowledgeEntry> entries;
         if (platform_.knowledgeList(200, tag, entries, err)) {
             for (auto& e : entries) hits_.push_back({std::move(e), 0.0});
         }
     } else {
-        zp::SearchMode mode =
-            semanticCheck_->isChecked() ? zp::SearchMode::Semantic : zp::SearchMode::Keyword;
+        ah::SearchMode mode =
+            semanticCheck_->isChecked() ? ah::SearchMode::Semantic : ah::SearchMode::Keyword;
         platform_.knowledgeSearch(query, mode, 50, tag, hits_, err);
     }
 
@@ -295,7 +295,7 @@ void KnowledgePanel::onNewEntry() {
     for (const auto& t : tags->text().split(',', Qt::SkipEmptyParts))
         tagList.push_back(t.trimmed().toStdString());
     std::string err;
-    zp::KnowledgeEntry out;
+    ah::KnowledgeEntry out;
     if (!platform_.knowledgeCreate("user", title->text().trimmed().toStdString(),
                                    content->toPlainText().toStdString(), tagList,
                                    category->text().trimmed().toStdString(), {}, "", out, err)) {
@@ -322,7 +322,7 @@ void KnowledgePanel::onAddVersion() {
     if (dlg.exec() != QDialog::Accepted) return;
 
     std::string err;
-    zp::KnowledgeEntry out;
+    ah::KnowledgeEntry out;
     if (!platform_.knowledgeAddVersion("user", currentUuid_, title->text().trimmed().toStdString(),
                                        content->toPlainText().toStdString(), {}, "", out, err)) {
         ui::Toast::show(this, QString("追加失败: %1").arg(QString::fromStdString(err)), false);

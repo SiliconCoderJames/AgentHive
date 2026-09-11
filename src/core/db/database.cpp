@@ -2,7 +2,7 @@
 
 #include <cstring>
 
-namespace zp {
+namespace ah {
 
 void Stmt::bind(int idx, const std::string& v) {
     sqlite3_bind_text(s_, idx, v.data(), static_cast<int>(v.size()), SQLITE_TRANSIENT);
@@ -92,4 +92,4 @@ bool Database::rollback() {
     return true;
 }
 
-}  // namespace zp
+}  // namespace ah

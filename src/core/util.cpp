@@ -7,7 +7,7 @@
 #include <random>
 #include <sstream>
 
-namespace zp {
+namespace ah {
 
 namespace {
 // ---- SHA-256 (FIPS 180-4) ----
@@ -218,4 +218,4 @@ std::string join(const std::vector<std::string>& v, const std::string& sep) {
     return s;
 }
 
-}  // namespace zp
+}  // namespace ah

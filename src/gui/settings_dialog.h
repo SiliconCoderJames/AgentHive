@@ -23,7 +23,7 @@ class QTableWidget;
 class SettingsDialog : public QDialog {
     Q_OBJECT
 public:
-    explicit SettingsDialog(zp::Platform& platform, QWidget* parent = nullptr);
+    explicit SettingsDialog(ah::Platform& platform, QWidget* parent = nullptr);
     ~SettingsDialog() override;
 
 protected:
@@ -42,7 +42,7 @@ private:
     void applyChrome();  // 主题变化后重涂导航与 th() 取色控件
     QLabel* thLabel(const QString& tmpl, QWidget* parent);
 
-    zp::Platform& platform_;
+    ah::Platform& platform_;
     QListWidget* nav_ = nullptr;
     QStackedWidget* stack_ = nullptr;
     std::vector<ui::ThemeSwatch*> swatches_;

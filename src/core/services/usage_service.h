@@ -8,7 +8,7 @@
 #include "core/db/database.h"
 #include "core/types.h"
 
-namespace zp {
+namespace ah {
 
 constexpr int64_t kDefaultWeeklyBudget = 10'000'000;  // 每周 1000 万 Token
 
@@ -34,4 +34,4 @@ private:
     Database& db_;
 };
 
-}  // namespace zp
+}  // namespace ah

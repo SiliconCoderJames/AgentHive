@@ -15,7 +15,7 @@
 class KnowledgePanel : public PanelBase {
     Q_OBJECT
 public:
-    explicit KnowledgePanel(zp::Platform& platform, QWidget* parent = nullptr);
+    explicit KnowledgePanel(ah::Platform& platform, QWidget* parent = nullptr);
     void refresh() override;
     void focusFilter() override;
 
@@ -38,7 +38,7 @@ private:
     QLabel* metaLabel_ = nullptr;
     QComboBox* versionCombo_ = nullptr;
     QPushButton* addVersionBtn_ = nullptr;
-    std::vector<zp::KnowledgeHit> hits_;
-    std::vector<zp::KnowledgeEntry> versions_;
+    std::vector<ah::KnowledgeHit> hits_;
+    std::vector<ah::KnowledgeEntry> versions_;
     std::string currentUuid_;
 };

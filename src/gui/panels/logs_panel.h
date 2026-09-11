@@ -12,7 +12,7 @@
 class LogsPanel : public PanelBase {
     Q_OBJECT
 public:
-    explicit LogsPanel(zp::Platform& platform, QWidget* parent = nullptr);
+    explicit LogsPanel(ah::Platform& platform, QWidget* parent = nullptr);
     void refresh() override;
     void focusFilter() override;
 
@@ -22,5 +22,5 @@ private:
     QLineEdit* filterEdit_ = nullptr;
     QLabel* countLabel_ = nullptr;
     QTreeWidget* tree_ = nullptr;
-    std::vector<zp::AuditRecord> records_;
+    std::vector<ah::AuditRecord> records_;
 };

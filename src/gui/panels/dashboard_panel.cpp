@@ -7,7 +7,7 @@
 #include "../gui_util.h"
 #include "../i18n.h"
 
-DashboardPanel::DashboardPanel(zp::Platform& platform, QWidget* parent)
+DashboardPanel::DashboardPanel(ah::Platform& platform, QWidget* parent)
     : PanelBase(platform, parent) {
     auto* root = new QVBoxLayout(this);
     root->setContentsMargins(16, 16, 16, 16);
@@ -106,7 +106,7 @@ void DashboardPanel::refresh() {
     std::string err;
 
     // 预算环形图 + 用量柱状图
-    zp::UsageSummary sum;
+    ah::UsageSummary sum;
     if (platform_.usageSummary(sum, err)) {
         ring_->setValues(sum.total_tokens, sum.budget, i18n::trs("剩余 %1", "left %1")
                                                           .arg(formatNum(sum.budget - sum.total_tokens)));
@@ -119,7 +119,7 @@ void DashboardPanel::refresh() {
     }
 
     // Agent 状态卡片网格（列数随可用宽度自适应；卡片池复用避免闪烁）
-    std::vector<zp::AgentInfo> agents;
+    std::vector<ah::AgentInfo> agents;
     if (platform_.listAgents(agents, err)) {
         size_t need = agents.size();
         while (agentCards_.size() < need)
@@ -145,7 +145,7 @@ void DashboardPanel::refresh() {
     }
 
     // 逐日趋势 + 模型用量（数据变化才重绘，避免 3s 刷新反复扫掠动画）
-    std::vector<zp::UsageDailyPoint> dailyPts;
+    std::vector<ah::UsageDailyPoint> dailyPts;
     if (platform_.usageDaily(14, dailyPts, err)) {
         QVector<QPair<QString, qint64>> es;
         for (const auto& d : dailyPts)
@@ -155,7 +155,7 @@ void DashboardPanel::refresh() {
             trendChart_->setEntries(es);
         }
     }
-    std::vector<zp::UsageModelRow> modelRows;
+    std::vector<ah::UsageModelRow> modelRows;
     if (platform_.usageByModel(modelRows, err)) {
         QVector<QPair<QString, qint64>> es;
         for (size_t i = 0; i < modelRows.size() && i < 8; ++i)
@@ -186,7 +186,7 @@ void DashboardPanel::refresh() {
             "critical", i18n::trs("Token 用量已超出本周预算！",
                                   "Token usage exceeded this week's budget!"),
             this));
-    std::vector<zp::ErrorReport> openErrors;
+    std::vector<ah::ErrorReport> openErrors;
     platform_.errorList("open", "", 10, openErrors, err);
     for (const auto& e : openErrors) {
         const QString when = relTime(QString::fromStdString(e.created_at));
@@ -207,7 +207,7 @@ void DashboardPanel::refresh() {
     emptyAlerts_->setVisible(alertCards_.empty());
 
     // 事件流时间线（最近 15 条审计）
-    std::vector<zp::AuditRecord> records;
+    std::vector<ah::AuditRecord> records;
     if (platform_.auditList("", "", "", 15, records, err)) {
         // 动作 → 与侧栏同源的矢量图标种类（替代 emoji：跨平台形状一致、随主题着色）
         auto iconKind = [](const std::string& a, const std::string& t) -> const char* {

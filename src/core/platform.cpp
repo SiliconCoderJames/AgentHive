@@ -12,7 +12,7 @@
 #include "core/util.h"
 #include "schema_sql.h"
 
-namespace zp {
+namespace ah {
 
 namespace fs = std::filesystem;
 
@@ -764,4 +764,4 @@ bool Platform::httpRunning() const {
     return http_ && http_->running();
 }
 
-}  // namespace zp
+}  // namespace ah

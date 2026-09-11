@@ -6,7 +6,7 @@
 #include <functional>
 #include <string>
 
-namespace zp {
+namespace ah {
 
 class Stmt {
 public:
@@ -64,4 +64,4 @@ private:
     int64_t last_insert_id_ = 0;
 };
 
-}  // namespace zp
+}  // namespace ah

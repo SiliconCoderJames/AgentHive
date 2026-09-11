@@ -74,7 +74,7 @@ Step "3/7 assert the staged build is runnable"
 # These are exactly the files whose absence used to make a hand-assembled package fail to
 # start on a clean machine. Fail loudly instead of publishing a broken artifact.
 $required = @(
-    "zworkbench.exe",
+    "agenthive.exe",
     "agent-cli.exe",
     "platformd.exe",
     "Qt6Core.dll", "Qt6Gui.dll", "Qt6Widgets.dll", "Qt6Network.dll", "Qt6Svg.dll",

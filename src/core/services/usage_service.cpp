@@ -5,7 +5,7 @@
 
 #include "core/util.h"
 
-namespace zp {
+namespace ah {
 
 bool UsageService::report(const std::string& agent, int64_t tokensIn, int64_t tokensOut,
                           const std::string& callType, const std::string& model,
@@ -128,4 +128,4 @@ bool UsageService::summary(UsageSummary& out, std::string& err) {
     return true;
 }
 
-}  // namespace zp
+}  // namespace ah

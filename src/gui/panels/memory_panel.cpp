@@ -24,7 +24,7 @@ const std::vector<std::pair<QString, QString>> kSections{
 };
 }  // namespace
 
-MemoryPanel::MemoryPanel(zp::Platform& platform, QWidget* parent)
+MemoryPanel::MemoryPanel(ah::Platform& platform, QWidget* parent)
     : PanelBase(platform, parent) {
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(16, 16, 16, 16);
@@ -81,7 +81,7 @@ void MemoryPanel::refresh() {
         delete it;
     }
     for (const auto& [title, section] : kSections) {
-        std::vector<zp::MemoryEntry> group;
+        std::vector<ah::MemoryEntry> group;
         for (const auto& m : entries_)
             if (m.section == section.toStdString()) group.push_back(m);
 
@@ -142,7 +142,7 @@ void MemoryPanel::onEdit() {
     const std::string sectionName = section->currentData().toString().toStdString();
     const std::string keyName = key->text().trimmed().toStdString();
     int baseVersion = 0;
-    std::vector<zp::MemoryEntry> existing;
+    std::vector<ah::MemoryEntry> existing;
     std::string probeErr;
     if (!keyName.empty() && platform_.memoryList(sectionName, existing, probeErr)) {
         for (const auto& m : existing)
@@ -150,7 +150,7 @@ void MemoryPanel::onEdit() {
     }
 
     std::string err;
-    zp::MemoryEntry out;
+    ah::MemoryEntry out;
     if (!platform_.memorySet("user", sectionName, keyName, value->toPlainText().toStdString(),
                              baseVersion, out, err)) {
         ui::Toast::show(this, QString("保存失败: %1").arg(QString::fromStdString(err)), false);
@@ -175,7 +175,7 @@ void MemoryPanel::onShowHistory() {
     form->addRow(buttons);
     if (dlg.exec() != QDialog::Accepted) return;
 
-    std::vector<zp::MemoryEntry> history;
+    std::vector<ah::MemoryEntry> history;
     std::string err;
     if (!platform_.memoryHistory(section->currentData().toString().toStdString(),
                                  key->text().trimmed().toStdString(), history, err) ||

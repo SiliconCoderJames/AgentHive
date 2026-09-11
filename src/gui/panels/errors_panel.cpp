@@ -15,7 +15,7 @@
 #include "../i18n.h"
 #include "../widgets.h"
 
-ErrorsPanel::ErrorsPanel(zp::Platform& platform, QWidget* parent)
+ErrorsPanel::ErrorsPanel(ah::Platform& platform, QWidget* parent)
     : PanelBase(platform, parent) {
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(16, 16, 16, 16);
@@ -161,7 +161,7 @@ void ErrorsPanel::onResolve() {
     l->addWidget(buttons);
     if (dlg.exec() != QDialog::Accepted) return;
 
-    zp::ErrorReport out;
+    ah::ErrorReport out;
     std::string err;
     if (!platform_.errorResolve("user", e.uuid, notes->toPlainText().toStdString(), out, err)) {
         ui::Toast::show(this, QString("解决失败: %1").arg(QString::fromStdString(err)), false);

@@ -2,7 +2,7 @@
 
 #include "core/util.h"
 
-namespace zp {
+namespace ah {
 
 bool ErrorService::report(const std::string& reporter, const std::string& severity,
                           const std::string& source, const std::string& title,
@@ -117,4 +117,4 @@ bool ErrorService::resolve(const std::string& uuid, const std::string& actor, co
     return get(uuid, out, err);
 }
 
-}  // namespace zp
+}  // namespace ah

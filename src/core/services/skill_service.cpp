@@ -2,7 +2,7 @@
 
 #include "core/util.h"
 
-namespace zp {
+namespace ah {
 
 bool SkillService::registerSkill(const std::string& name, const std::string& displayName,
                                  const std::string& description, const std::string& category,
@@ -143,4 +143,4 @@ bool SkillService::listInvocations(const std::string& skillName, int limit,
         err);
 }
 
-}  // namespace zp
+}  // namespace ah

@@ -22,7 +22,7 @@ class QSystemTrayIcon;
 class MainWindow : public QMainWindow {
     Q_OBJECT
 public:
-    explicit MainWindow(zp::Platform& platform, QWidget* parent = nullptr);
+    explicit MainWindow(ah::Platform& platform, QWidget* parent = nullptr);
 
 protected:
     void closeEvent(QCloseEvent*) override;  // 关闭即隐藏到托盘，服务常驻
@@ -44,11 +44,11 @@ private:
     void setupTray();    // 系统托盘：蜂巢常驻 + 显示/退出
     void openSettings(); // ⚙ 设置对话框（复用同一实例，关闭即删）
 
-    zp::Platform& platform_;
+    ah::Platform& platform_;
     QListWidget* nav_ = nullptr;
     QStackedWidget* stack_ = nullptr;
     std::vector<PanelBase*> panels_;
-    std::vector<std::function<PanelBase*(zp::Platform&, QWidget*)>> panelFactories_;
+    std::vector<std::function<PanelBase*(ah::Platform&, QWidget*)>> panelFactories_;
     QWidget* side_ = nullptr;
     QFrame* brandLine_ = nullptr;
     QLabel* logoMark_ = nullptr;  // 品牌图标（仓库 logo.png，缺失时回退矢量蜂巢）

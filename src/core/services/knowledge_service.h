@@ -7,7 +7,7 @@
 #include "core/embed/embedder.h"
 #include "core/types.h"
 
-namespace zp {
+namespace ah {
 
 class KnowledgeService {
 public:
@@ -41,4 +41,4 @@ private:
     int vec_dim_;
 };
 
-}  // namespace zp
+}  // namespace ah

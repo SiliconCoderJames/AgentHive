@@ -48,7 +48,7 @@ QString avatar(const QString& sender) {
 }
 }  // namespace
 
-MessagesPanel::MessagesPanel(zp::Platform& platform, QWidget* parent)
+MessagesPanel::MessagesPanel(ah::Platform& platform, QWidget* parent)
     : PanelBase(platform, parent) {
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(16, 16, 16, 16);
@@ -201,7 +201,7 @@ void MessagesPanel::renderChat() {
 
 void MessagesPanel::updateActions() {
     bool has = !selectedUuid_.empty();
-    const zp::Message* cur = nullptr;
+    const ah::Message* cur = nullptr;
     for (const auto& m : messages_)
         if (m.uuid == selectedUuid_) cur = &m;
     if (has && cur) {
@@ -229,7 +229,7 @@ void MessagesPanel::onCompose() {
     kind->addItems({"note", "question", "task"});
     auto* recipient = new QComboBox(&dlg);
     recipient->addItem(i18n::trs("（广播给所有 Agent）", "(broadcast to all agents)"), "");
-    std::vector<zp::AgentInfo> agents;
+    std::vector<ah::AgentInfo> agents;
     std::string err;
     if (platform_.listAgents(agents, err))
         for (const auto& a : agents)
@@ -246,7 +246,7 @@ void MessagesPanel::onCompose() {
     form->addRow(buttons);
     if (dlg.exec() != QDialog::Accepted) return;
 
-    zp::Message out;
+    ah::Message out;
     if (!platform_.messageSend(kind->currentText().toStdString(), "user",
                                recipient->currentData().toString().toStdString(),
                                subject->text().trimmed().toStdString(),
@@ -259,7 +259,7 @@ void MessagesPanel::onCompose() {
 }
 
 void MessagesPanel::onReply() {
-    const zp::Message* cur = nullptr;
+    const ah::Message* cur = nullptr;
     for (const auto& m : messages_)
         if (m.uuid == selectedUuid_) cur = &m;
     if (!cur) return;
@@ -274,7 +274,7 @@ void MessagesPanel::onReply() {
     l->addWidget(buttons);
     if (dlg.exec() != QDialog::Accepted) return;
 
-    zp::Message out;
+    ah::Message out;
     std::string err;
     if (!platform_.messageReply("user", cur->uuid, body->toPlainText().toStdString(), out, err)) {
         ui::Toast::show(this, QString("回复失败: %1").arg(QString::fromStdString(err)), false);
@@ -285,11 +285,11 @@ void MessagesPanel::onReply() {
 }
 
 void MessagesPanel::onStatus(const QString& status) {
-    const zp::Message* cur = nullptr;
+    const ah::Message* cur = nullptr;
     for (const auto& m : messages_)
         if (m.uuid == selectedUuid_) cur = &m;
     if (!cur) return;
-    zp::Message out;
+    ah::Message out;
     std::string err;
     if (!platform_.messageSetStatus("user", cur->uuid, status.toStdString(), out, err)) {
         ui::Toast::show(this, QString("状态变更失败: %1").arg(QString::fromStdString(err)), false);

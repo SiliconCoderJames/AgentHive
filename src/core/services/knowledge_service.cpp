@@ -6,7 +6,7 @@
 
 #include "core/util.h"
 
-namespace zp {
+namespace ah {
 
 namespace {
 std::string vecToBytes(const std::vector<float>& v) {
@@ -323,4 +323,4 @@ bool KnowledgeService::searchSemantic(const std::vector<float>& queryVec, int li
     return true;
 }
 
-}  // namespace zp
+}  // namespace ah

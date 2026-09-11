@@ -8,12 +8,12 @@
 
 #include "../i18n.h"
 #include "../theme.h"
-// 经 zplatform_core 的 PUBLIC include 路径（src/）解析
+// 经 agenthive_core 的 PUBLIC include 路径（src/）解析
 #include "core/platform.h"
 
 class PanelBase : public QWidget {
 public:
-    explicit PanelBase(zp::Platform& platform, QWidget* parent = nullptr)
+    explicit PanelBase(ah::Platform& platform, QWidget* parent = nullptr)
         : QWidget(parent), platform_(platform) {}
     virtual void refresh() = 0;
     // Ctrl+F：把焦点交给本面板的即时过滤框；无过滤框的面板不用覆写
@@ -55,7 +55,7 @@ protected:
         layout->addSpacing(10);
     }
 
-    zp::Platform& platform_;
+    ah::Platform& platform_;
 
 private:
     QLabel* headerTitle_ = nullptr;

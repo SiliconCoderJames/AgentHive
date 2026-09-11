@@ -11,7 +11,7 @@
 #include "core/platform.h"
 #include "core/util.h"
 
-namespace zp {
+namespace ah {
 
 using nlohmann::json;
 
@@ -845,4 +845,4 @@ void HttpServer::setupRoutes() {
     });
 }
 
-}  // namespace zp
+}  // namespace ah

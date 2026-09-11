@@ -20,7 +20,7 @@
 #include "../i18n.h"
 #include "../widgets.h"
 
-SkillsPanel::SkillsPanel(zp::Platform& platform, QWidget* parent)
+SkillsPanel::SkillsPanel(ah::Platform& platform, QWidget* parent)
     : PanelBase(platform, parent) {
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(16, 16, 16, 16);
@@ -86,7 +86,7 @@ void SkillsPanel::focusFilter() {
 void SkillsPanel::refresh() {
     // 填充筛选下拉（保留当前选择）
     std::string err;
-    std::vector<zp::SkillInfo> all;
+    std::vector<ah::SkillInfo> all;
     platform_.skillList("", "", all, err);
     std::set<std::string> categories, owners;
     for (const auto& s : all) {
@@ -113,7 +113,7 @@ void SkillsPanel::refresh() {
     platform_.skillList(cat, owner, skills_, err);
 
     // 使用热度：统计每个技能的调用次数
-    std::vector<zp::SkillInvocation> allInv;
+    std::vector<ah::SkillInvocation> allInv;
     platform_.skillInvocations("", 10000, allInv, err);
     std::map<std::string, int> heat;
     for (const auto& i : allInv) ++heat[i.skill_name];
@@ -213,7 +213,7 @@ void SkillsPanel::onRegister() {
     if (dlg.exec() != QDialog::Accepted) return;
 
     std::string err;
-    zp::SkillInfo out;
+    ah::SkillInfo out;
     if (!platform_.skillRegister("user", name->text().trimmed().toStdString(),
                                  display->text().trimmed().toStdString(),
                                  desc->toPlainText().toStdString(),

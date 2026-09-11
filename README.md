@@ -70,7 +70,7 @@ DeepSeek、Gemini CLI……以及你自己写的任何脚本。只要能发 HTTP
 | 产物 | 说明 |
 |---|---|
 | `AgentHive-<版本>-x64.msi` | 安装包。装到 `%LOCALAPPDATA%\AgentHive`，**per-user、无需管理员权限**，带开始菜单与桌面快捷方式，可在"应用和功能"里卸载 |
-| `AgentHive-<版本>-win64-portable.zip` | 免安装便携版，解压后直接运行 `zworkbench.exe` |
+| `AgentHive-<版本>-win64-portable.zip` | 免安装便携版，解压后直接运行 `agenthive.exe` |
 | `SHA256SUMS.txt` | 校验和 |
 
 - 需要 **Windows 10 或更高版本**；MSVC 运行库已随包分发，目标机无需预装。
@@ -110,7 +110,7 @@ cmake --build build --config Release
 ### 运行
 
 ```text
-build\src\gui\Release\zworkbench.exe     # 可视化工作台（内置 HTTP 服务，双击即用）
+build\src\gui\Release\agenthive.exe     # 可视化工作台（内置 HTTP 服务，双击即用）
 build\src\cli\Release\platformd.exe      # 无界面守护进程
 ```
 

@@ -55,7 +55,7 @@ int cmpVersion(const QString& a, const QString& b) {
 }
 }  // namespace
 
-SettingsDialog::SettingsDialog(zp::Platform& platform, QWidget* parent)
+SettingsDialog::SettingsDialog(ah::Platform& platform, QWidget* parent)
     : QDialog(parent), platform_(platform) {
     setWindowTitle(i18n::trs("设置", "Settings"));
     setWindowFlag(Qt::WindowContextHelpButtonHint, false);
@@ -264,7 +264,7 @@ QWidget* SettingsDialog::buildBackupPage() {
                                                "Run maintenance (audit rotation + cleanup)"), page);
     connect(maintBtn, &QPushButton::clicked, this, [this] {
         std::string stats, err;
-        if (platform_.maintenanceRun(zp::kManagerName, stats, err)) {
+        if (platform_.maintenanceRun(ah::kManagerName, stats, err)) {
             ui::Toast::show(this, i18n::trs("维护完成", "Maintenance done"));
         } else {
             ui::Toast::show(this, i18n::trs("维护失败：", "Maintenance failed: ") +
@@ -350,7 +350,7 @@ QWidget* SettingsDialog::buildAgentsPage() {
             return;
         }
         QString name = agentsTable_->item(row, 0)->text();
-        if (name == QString::fromLatin1(zp::kManagerName)) {
+        if (name == QString::fromLatin1(ah::kManagerName)) {
             ui::Toast::show(this, i18n::trs("管理者不可移除", "The manager cannot be removed"),
                             false);
             return;
@@ -364,7 +364,7 @@ QWidget* SettingsDialog::buildAgentsPage() {
                 QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
             return;
         std::string err;
-        if (platform_.agentRemove(zp::kManagerName, name.toStdString(), err)) {
+        if (platform_.agentRemove(ah::kManagerName, name.toStdString(), err)) {
             ui::Toast::show(this, i18n::trs("已移除 ✓", "Removed ✓"));
             refreshAgents();
         } else {
@@ -401,7 +401,7 @@ void SettingsDialog::refreshBackupList() {
 
 void SettingsDialog::refreshAgents() {
     if (!agentsTable_) return;
-    std::vector<zp::AgentInfo> agents;
+    std::vector<ah::AgentInfo> agents;
     std::string err;
     if (!platform_.listAgents(agents, err)) return;
     agentsTable_->setRowCount(static_cast<int>(agents.size()));
@@ -518,7 +518,7 @@ QWidget* SettingsDialog::buildAboutPage() {
 
     auto* ver = thLabel("font-size:11px; color:@muted@;", page);
     ver->setText(QString("v%1  ·  %2")
-                     .arg(zp::kPlatformVersion)
+                     .arg(ah::kPlatformVersion)
                      .arg(i18n::trs("本地优先 · 数据不出本机", "local-first · data stays local")));
     ver->setAlignment(Qt::AlignCenter);
     lay->addWidget(ver);
@@ -576,7 +576,7 @@ QWidget* SettingsDialog::buildUpdatePage() {
 
     auto* cur = thLabel("font-size:13px; font-weight:600; color:@text@;", page);
     cur->setText(QString(i18n::trs("当前版本", "Current version")) +
-                 QString("  v%1").arg(zp::kPlatformVersion));
+                 QString("  v%1").arg(ah::kPlatformVersion));
     lay->addWidget(cur);
 
     auto* row = new QHBoxLayout();
@@ -597,7 +597,7 @@ QWidget* SettingsDialog::buildUpdatePage() {
             const QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
             QString tag = doc.object().value("tag_name").toString();
             if (tag.startsWith('v')) tag = tag.mid(1);
-            const QString curV = QString::fromLatin1(zp::kPlatformVersion);
+            const QString curV = QString::fromLatin1(ah::kPlatformVersion);
             if (tag.isEmpty()) {
                 latest_->setText(i18n::trs("未解析到最新版本信息。",
                                            "Could not parse release info."));

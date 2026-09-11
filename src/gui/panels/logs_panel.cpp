@@ -10,7 +10,7 @@
 #include "../i18n.h"
 #include "../widgets.h"
 
-LogsPanel::LogsPanel(zp::Platform& platform, QWidget* parent)
+LogsPanel::LogsPanel(ah::Platform& platform, QWidget* parent)
     : PanelBase(platform, parent) {
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(16, 16, 16, 16);
@@ -67,7 +67,7 @@ void LogsPanel::focusFilter() {
 
 void LogsPanel::refresh() {
     // 身份下拉（含全部身份 + user + 各 Agent）
-    std::vector<zp::AgentInfo> agents;
+    std::vector<ah::AgentInfo> agents;
     std::string err;
     platform_.listAgents(agents, err);
     QString cur = agentCombo_->currentText();

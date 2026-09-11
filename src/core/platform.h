@@ -18,7 +18,7 @@
 #include "core/services/usage_service.h"
 #include "core/types.h"
 
-namespace zp {
+namespace ah {
 
 class HttpServer;
 
@@ -180,4 +180,4 @@ private:
     mutable std::recursive_mutex mutex_;
 };
 
-}  // namespace zp
+}  // namespace ah

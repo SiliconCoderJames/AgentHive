@@ -4,7 +4,7 @@
 
 #include "core/util.h"
 
-namespace zp {
+namespace ah {
 
 namespace {
 // 词间分隔符：把空白折叠成单一码点参与哈希，阻断跨词 n-gram 碰撞
@@ -62,4 +62,4 @@ std::vector<float> NgramHashEmbedder::embed(const std::string& text) {
     return vec;
 }
 
-}  // namespace zp
+}  // namespace ah

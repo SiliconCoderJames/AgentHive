@@ -13,7 +13,7 @@
 class SkillsPanel : public PanelBase {
     Q_OBJECT
 public:
-    explicit SkillsPanel(zp::Platform& platform, QWidget* parent = nullptr);
+    explicit SkillsPanel(ah::Platform& platform, QWidget* parent = nullptr);
     void refresh() override;
     void focusFilter() override;
 
@@ -27,5 +27,5 @@ private:
     QLineEdit* filterEdit_ = nullptr;
     QTableWidget* table_ = nullptr;
     QTextBrowser* detail_ = nullptr;
-    std::vector<zp::SkillInfo> skills_;
+    std::vector<ah::SkillInfo> skills_;
 };

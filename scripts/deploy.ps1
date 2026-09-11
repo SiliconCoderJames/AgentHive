@@ -21,13 +21,13 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 
 $src = $null
-if ($FromStage -or (Test-Path (Join-Path $root "_stage\zworkbench.exe"))) {
+if ($FromStage -or (Test-Path (Join-Path $root "_stage\agenthive.exe"))) {
     $src = Join-Path $root "_stage"
 } else {
     $src = Join-Path $root (Join-Path $BuildDir "src\gui\Release")
 }
-if (-not (Test-Path (Join-Path $src "zworkbench.exe"))) {
-    Write-Error "zworkbench.exe not found in $src`n  build first: cmake --build $BuildDir --config Release`n  or install the stage dir: cmake --install $BuildDir --config Release --prefix _stage --component Runtime"
+if (-not (Test-Path (Join-Path $src "agenthive.exe"))) {
+    Write-Error "agenthive.exe not found in $src`n  build first: cmake --build $BuildDir --config Release`n  or install the stage dir: cmake --install $BuildDir --config Release --prefix _stage --component Runtime"
     exit 1
 }
 Write-Host "SRC=$src"
@@ -43,9 +43,9 @@ $desktop = [Environment]::GetFolderPath("Desktop")
 $lnkPath = Join-Path $desktop "AgentHive.lnk"
 $ws = New-Object -ComObject WScript.Shell
 $lnk = $ws.CreateShortcut($lnkPath)
-$lnk.TargetPath = Join-Path $dest "zworkbench.exe"
+$lnk.TargetPath = Join-Path $dest "agenthive.exe"
 $lnk.WorkingDirectory = $dest
-$lnk.IconLocation = (Join-Path $dest "zworkbench.exe") + ",0"
+$lnk.IconLocation = (Join-Path $dest "agenthive.exe") + ",0"
 $lnk.Description = "AgentHive - local-first collaboration hub for AI agents"
 $lnk.Save()
 foreach ($old in @("ZCode Platform.lnk", "ZCode 协作平台.lnk")) {

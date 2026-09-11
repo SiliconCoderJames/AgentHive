@@ -2,7 +2,7 @@
 
 #include "core/util.h"
 
-namespace zp {
+namespace ah {
 
 bool AuditService::log(const std::string& actor, const std::string& action, const std::string& target,
                        const std::string& detailJson, std::string& err) {
@@ -50,4 +50,4 @@ bool AuditService::list(const std::string& actorFilter, const std::string& actio
         err);
 }
 
-}  // namespace zp
+}  // namespace ah

@@ -85,7 +85,7 @@ Args parseArgs(int argc, char** argv) {
 
 
 std::string readMasterKeyFromDisk() {
-    std::ifstream in(zp::defaultHomeDir() + "/config/master.key");
+    std::ifstream in(ah::defaultHomeDir() + "/config/master.key");
     std::string k;
     if (in) std::getline(in, k);
     return k;
@@ -98,14 +98,14 @@ struct Client {
     std::string masterKey;
 
     explicit Client(const Args& a)
-        : http("http://127.0.0.1:" + zp::envOr("AGENTHIVE_PORT", "ZCODE_PLATFORM_PORT", "8787")),
+        : http("http://127.0.0.1:" + ah::envOr("AGENTHIVE_PORT", "ZCODE_PLATFORM_PORT", "8787")),
           name(a.gopts.count("name") ? a.gopts.at("name")
-                                     : zp::envOr("AGENTHIVE_AGENT_NAME", "ZCODE_AGENT_NAME")),
+                                     : ah::envOr("AGENTHIVE_AGENT_NAME", "ZCODE_AGENT_NAME")),
           key(a.gopts.count("key") ? a.gopts.at("key")
-                                   : zp::envOr("AGENTHIVE_AGENT_KEY", "ZCODE_AGENT_KEY")),
+                                   : ah::envOr("AGENTHIVE_AGENT_KEY", "ZCODE_AGENT_KEY")),
           masterKey(a.gopts.count("master-key")
                         ? a.gopts.at("master-key")
-                        : zp::envOr("AGENTHIVE_MASTER_KEY", "ZCODE_PLATFORM_MASTER_KEY",
+                        : ah::envOr("AGENTHIVE_MASTER_KEY", "ZCODE_PLATFORM_MASTER_KEY",
                                     readMasterKeyFromDisk())) {}
 
     json call(const std::string& method, const std::string& path, const json* body,

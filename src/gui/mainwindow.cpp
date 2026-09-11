@@ -27,7 +27,7 @@
 #include "theme.h"
 #include "welcome_dialog.h"
 
-MainWindow::MainWindow(zp::Platform& platform, QWidget* parent)
+MainWindow::MainWindow(ah::Platform& platform, QWidget* parent)
     : QMainWindow(parent), platform_(platform) {
     setWindowTitle("AgentHive · 多 Agent 协作工作台");
     // 最小尺寸必须先于几何恢复设定：否则会恢复出比最小尺寸还小的窗口
@@ -89,9 +89,9 @@ MainWindow::MainWindow(zp::Platform& platform, QWidget* parent)
     auto* foot = new QWidget(side_);
     auto* footLay = new QHBoxLayout(foot);
     footLay->setContentsMargins(10, 0, 10, 0);
-    ver_ = new QLabel(QString("v%1").arg(zp::kPlatformVersion), foot);
+    ver_ = new QLabel(QString("v%1").arg(ah::kPlatformVersion), foot);
     ver_->setToolTip(i18n::trs("AgentHive 版本 %1", "AgentHive %1")
-                         .arg(QString::fromUtf8(zp::kPlatformVersion)));
+                         .arg(QString::fromUtf8(ah::kPlatformVersion)));
     settingsBtn_ = new QToolButton(foot);
     settingsBtn_->setIcon(ui::makeIcon("gear", ui::muted(), 16));
     settingsBtn_->setToolTip(i18n::trs("设置", "Settings"));
@@ -109,13 +109,13 @@ MainWindow::MainWindow(zp::Platform& platform, QWidget* parent)
     layout->addWidget(stack_, 1);
 
     panelFactories_ = {
-        [](zp::Platform& pl, QWidget* parent) { return static_cast<PanelBase*>(new DashboardPanel(pl, parent)); },
-        [](zp::Platform& pl, QWidget* parent) { return static_cast<PanelBase*>(new KnowledgePanel(pl, parent)); },
-        [](zp::Platform& pl, QWidget* parent) { return static_cast<PanelBase*>(new SkillsPanel(pl, parent)); },
-        [](zp::Platform& pl, QWidget* parent) { return static_cast<PanelBase*>(new MemoryPanel(pl, parent)); },
-        [](zp::Platform& pl, QWidget* parent) { return static_cast<PanelBase*>(new MessagesPanel(pl, parent)); },
-        [](zp::Platform& pl, QWidget* parent) { return static_cast<PanelBase*>(new ErrorsPanel(pl, parent)); },
-        [](zp::Platform& pl, QWidget* parent) { return static_cast<PanelBase*>(new LogsPanel(pl, parent)); },
+        [](ah::Platform& pl, QWidget* parent) { return static_cast<PanelBase*>(new DashboardPanel(pl, parent)); },
+        [](ah::Platform& pl, QWidget* parent) { return static_cast<PanelBase*>(new KnowledgePanel(pl, parent)); },
+        [](ah::Platform& pl, QWidget* parent) { return static_cast<PanelBase*>(new SkillsPanel(pl, parent)); },
+        [](ah::Platform& pl, QWidget* parent) { return static_cast<PanelBase*>(new MemoryPanel(pl, parent)); },
+        [](ah::Platform& pl, QWidget* parent) { return static_cast<PanelBase*>(new MessagesPanel(pl, parent)); },
+        [](ah::Platform& pl, QWidget* parent) { return static_cast<PanelBase*>(new ErrorsPanel(pl, parent)); },
+        [](ah::Platform& pl, QWidget* parent) { return static_cast<PanelBase*>(new LogsPanel(pl, parent)); },
     };
     rebuildPanels();
 
@@ -372,7 +372,7 @@ void MainWindow::onRefresh() {
 
 void MainWindow::updateStatusBar() {
     std::string err;
-    zp::UsageSummary sum;
+    ah::UsageSummary sum;
     // 服务在线指示灯：HTTP 服务随进程常驻，绿点常亮即后端可用
     statusServer_->setText(QString("<span style='color:%1;'>●</span> HTTP: "
                                    "http://127.0.0.1:%2 · %3 %4")
@@ -395,7 +395,7 @@ void MainWindow::updateStatusBar() {
                 .arg(formatNum(sum.budget - sum.total_tokens)));
     }
     // 导航徽标：未解决错误数附加在「错误报告」项上（图标随计数换色，不再用 emoji 前缀）
-    std::vector<zp::ErrorReport> openErrors;
+    std::vector<ah::ErrorReport> openErrors;
     if (platform_.errorList("open", "", 99, openErrors, err)) {
         openErrors_ = static_cast<int>(openErrors.size());
         // 偏好开启时，新增未解决错误弹提醒（首次采样不提醒）

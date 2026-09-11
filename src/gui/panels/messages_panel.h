@@ -14,7 +14,7 @@
 class MessagesPanel : public PanelBase {
     Q_OBJECT
 public:
-    explicit MessagesPanel(zp::Platform& platform, QWidget* parent = nullptr);
+    explicit MessagesPanel(ah::Platform& platform, QWidget* parent = nullptr);
     void refresh() override;
     bool eventFilter(QObject* obj, QEvent* e) override;  // 双击气泡 = 回复
 
@@ -36,6 +36,6 @@ private:
     QPushButton* acceptBtn_ = nullptr;
     QPushButton* doneBtn_ = nullptr;
     QPushButton* declineBtn_ = nullptr;
-    std::vector<zp::Message> messages_;
+    std::vector<ah::Message> messages_;
     std::string selectedUuid_;
 };
