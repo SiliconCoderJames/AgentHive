@@ -49,12 +49,15 @@ interval, and take backups.
 
 ## Verify your download
 
+Every artifact is built by GitHub Actions from the tagged commit, and the checksums are published
+alongside them in `SHA256SUMS.txt`:
+
 ```powershell
 Get-FileHash .\AgentHive-1.0.0-x64.msi             -Algorithm SHA256
 Get-FileHash .\AgentHive-1.0.0-win64-portable.zip  -Algorithm SHA256
-# Compare against SHA256SUMS.txt:
-# 85d6fb5f71eb8063e4583308d8368df83aa7c62970f7d186e35747984f025e1a  AgentHive-1.0.0-x64.msi
-# dd5af0a845c7f7a895ba51fa59d0afa6bd68b51712e28a1bbfc0e25927ac7ecf  AgentHive-1.0.0-win64-portable.zip
+# Then compare with the values in SHA256SUMS.txt (or run:
+#   Get-Content .\SHA256SUMS.txt
+# and check the two hashes match).
 ```
 
 ## What's in this release (first stable version)

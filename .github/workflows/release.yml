@@ -103,11 +103,18 @@ jobs:
           See ``release/RELEASE_NOTES-$ver.md`` for the full notes.
           "@
           }
+          # Tags containing '-' (e.g. v1.0.1-rc1) are published as pre-releases
+          $pre = @()
+          if ($ver -match '-') { $pre = @('--prerelease') }
+
           # 已存在同标签的 Release 时直接补充资产，避免重复创建失败
           gh release view $tag 2>$null
           if ($LASTEXITCODE -eq 0) {
             gh release upload $tag $msi $zip $sums --clobber
-            gh release edit $tag --notes $notes
+            gh release edit $tag --notes $notes @pre
           } else {
-            gh release create $tag $msi $zip $sums --title "AgentHive $ver" --notes $notes
+            # --target 让新建的标签指向本次实际构建的 commit（workflow_dispatch 手动触发时
+            # 标签还不存在，不加会把标签打到默认分支头上，产物与 commit 对不上）
+            gh release create $tag $msi $zip $sums `
+              --title "AgentHive $ver" --notes $notes --target $env:GITHUB_SHA @pre
           }

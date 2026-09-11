@@ -41,6 +41,13 @@ powershell -ExecutionPolicy Bypass -File scripts\package.ps1 -Version 1.0.0
 git tag v1.0.0 && git push origin v1.0.0
 ```
 
+发布正文优先读取 `release/RELEASE_NOTES-<版本>.md`（找不到才用内置兜底文案），
+所以"手动发"与"CI 发"看到同一份说明；版本号含 `-`（如 `v1.0.1-rc1`）会自动标记为预发布。
+
+> **以 CI 产物为准**：标签推上去后 CI 会重新出包，并用 `--clobber` 覆盖 Release 里的同名资产。
+> 因此不要把手动构建的 MSI/ZIP 传进同一个 Release —— 否则会出现"资产哈希与说明里的校验和对不上"。
+> 让 CI 出包的好处是产物可追溯到具体 commit（`gh release create` 带 `--target $GITHUB_SHA`）。
+
 ## 版本号只有一个来源
 
 `CMakeLists.txt` 的 `project(... VERSION ...)` → 生成 `core/version.h` → 界面侧栏、`/api/health`、
