@@ -81,32 +81,25 @@ jobs:
           foreach ($f in @($msi, $zip, $sums)) {
             if (-not (Test-Path $f)) { throw "missing artifact: $f" }
           }
-          $notes = @"
+          # Release notes live in the repo so a manual release and a CI release show the same
+          # text: release/RELEASE_NOTES-<ver>.md (fallback below when the file is absent).
+          $notesFile = "release/RELEASE_NOTES-$ver.md"
+          if (Test-Path $notesFile) {
+            $notes = Get-Content $notesFile -Raw
+            Write-Host "using release notes from $notesFile"
+          } else {
+            $notes = @"
           ## AgentHive $ver
 
-          Windows x64 本地多 Agent 协作工作台。
-
-          ### 下载哪个
-          * ``AgentHive-$ver-x64.msi`` —— 安装包（per-user，装到 ``%LOCALAPPDATA%\AgentHive``，**无需管理员权限**），带开始菜单与桌面快捷方式
-          * ``AgentHive-$ver-win64-portable.zip`` —— 免安装便携版，解压后运行 ``agenthive.exe``
-          * ``SHA256SUMS.txt`` —— 校验和
-
-          ### 说明
-          * 需要 **Windows 10 或更高版本**；MSVC 运行库已随包分发，目标机无需预装。
-          * 用户数据保存在 ``%USERPROFILE%\.agenthive``，**卸载不会删除**。
-          * 本产物**尚未代码签名**，首次运行可能出现 SmartScreen"未知发布者"提示。
-          * 第三方组件与 Qt（LGPLv3）许可见安装目录 ``licenses/``。
-
-          校验下载文件：
-
-          ```powershell
-          Get-FileHash .\AgentHive-$ver-x64.msi -Algorithm SHA256
-          ```
+          Windows x64 本地多 Agent 协作工作台。产物未签名，首次运行可能有 SmartScreen 提示；
+          用户数据在 ``%USERPROFILE%\.agenthive``，卸载不会删除。
           "@
+          }
           # 已存在同标签的 Release 时直接补充资产，避免重复创建失败
           gh release view $tag 2>$null
           if ($LASTEXITCODE -eq 0) {
             gh release upload $tag $msi $zip $sums --clobber
+            gh release edit $tag --notes $notes
           } else {
             gh release create $tag $msi $zip $sums --title "AgentHive $ver" --notes $notes
           }

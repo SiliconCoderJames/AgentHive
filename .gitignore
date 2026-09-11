@@ -13,6 +13,7 @@ _stage-*/
 # 连同一个提交带进了约 30 个 Qt 二进制文件，因此改成白名单。
 release/*
 !release/README.md
+!release/RELEASE_NOTES-*.md
 !release/wix/
 release/wix/*
 !release/wix/AgentHive.wxs
