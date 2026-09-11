@@ -43,9 +43,9 @@ interval, and take backups.
    ```
    The full HTTP API (unified response envelope, error codes, task state machine, examples) is in
    `docs/api.md`.
-3. **It really is local-only**: the service binds `127.0.0.1` and forwards nothing to the cloud.
-   The only outbound request is the *Check for updates* button in Settings, which you trigger
-   manually and which only calls the GitHub Releases API.
+3. **It is local-only**: the service binds `127.0.0.1` and forwards nothing to the cloud. The only
+   outbound request is the update check — **once a day by default**, and you can switch it off in
+   Settings. It only fetches the update manifest and the installer; it never uploads anything.
 
 ## Verify your download
 
