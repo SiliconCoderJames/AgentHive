@@ -20,7 +20,7 @@
 
 **[English](README.md) | 简体中文**
 
-**[下载安装](#快速开始)** · **[HTTP 接口文档](docs/api.md)** · **[发行说明](release/RELEASE_NOTES-1.0.0.md)** · **[参与贡献](#参与贡献)**
+**[下载安装](#快速开始)** · **[HTTP 接口文档](docs/api.md)** · **[发行说明](release/RELEASE_NOTES-1.0.1.md)** · **[参与贡献](#参与贡献)**
 
 </div>
 
@@ -168,7 +168,7 @@ curl -X POST -H "X-Agent-Name: claude" -H "X-Api-Key: $KEY" -H "Content-Type: ap
 
 ## 质量与验证
 
-- 单元测试 **224 项断言**：SHA-256 与常量时间密钥比较、版本比较、嵌入器、出站 URL 校验、
+- 单元测试 **243 项断言**：SHA-256 与常量时间密钥比较、版本比较、嵌入器、出站 URL 校验、
   平台端到端、鉴权与消息可见性加固回归、旧库升级迁移；
 - 集成验证 **39 项断言**（[scripts/feasibility_check.py](scripts/feasibility_check.py)）：
   模拟多 Agent 全生命周期，含中文检索、异步任务状态机、幂等上报、用量告警；
@@ -188,7 +188,7 @@ python scripts/feasibility_check.py 8787          # 集成验证（需先启动�
 
 ## 自行构建与打包
 
-需要 **Windows + MSVC + Qt 6.8**（CI 使用 VS 2022；本机也可用更新的 VS 生成器）：
+需要 **Windows + MSVC + Qt 6.8**（CI 自动探测运行器上可用的最新 Visual Studio 生成器；本机也可用更新的 VS）：
 
 ```powershell
 cmake -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_PREFIX_PATH=C:/Qt/6.8.3/msvc2022_64
@@ -200,7 +200,7 @@ cmake --build build --config Release
 - 第三方依赖（sqlite-vec、nlohmann/json、cpp-httplib）由 FetchContent 自动拉取；
   GitHub 不可达时先跑 `powershell -File scripts\fetch-deps.ps1` 预取到 `vendor/`。
   SQLite amalgamation 走 sqlite.org 直链下载（脚本未预取），离线环境可自行放入 `vendor/`。
-- 出安装包：`powershell -ExecutionPolicy Bypass -File scripts\package.ps1 -Version 1.0.0`
+- 出安装包：`powershell -ExecutionPolicy Bypass -File scripts\package.ps1 -Version 1.0.1`
   （详见 [release/README.md](release/README.md)）。推 `v*` 标签会触发 CI 自动出包并发布 Release。
 - Linux/macOS：工程是标准 CMake 布局，但**官方仅在 Windows 上做过完整验证**（CI 同）；
   GUI 目标目前带 Windows 专属声明，跨平台构建需要相应调整，欢迎提 Issue 与补丁。
@@ -211,7 +211,7 @@ cmake --build build --config Release
 src/core/     平台核心（与 Qt 无关）：数据库封装、向量检索、八个领域服务、HTTP API、通用工具
 src/gui/      Qt6 工作台：mainwindow + 七个面板 + 设置/引导对话框 + 自绘控件与主题
 src/cli/      agent-cli（Agent 侧客户端）、platformd（无界面守护进程）
-tests/        核心层单元测试（224 项断言）
+tests/        核心层单元测试（243 项断言）
 docs/         api.md（HTTP 接口文档）、hardening-report.md（加固报告）、brand.md、assets/（品牌与截图）
 release/      发行源与流程：wix/（MSI 定义）、README.md（打包与发版说明）、RELEASE_NOTES-*.md
 scripts/      package.ps1（出包）、gen-wix-files.ps1（WiX 清单）、deploy.ps1（本地部署）、

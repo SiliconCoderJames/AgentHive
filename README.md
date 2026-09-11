@@ -21,7 +21,7 @@ where your data never leaves your PC.
 
 English | **[简体中文](README.zh-CN.md)**
 
-**[Download](#quick-start)** · **[HTTP API docs](docs/api.md)** · **[Release notes](release/RELEASE_NOTES-1.0.0.md)** · **[Contributing](#contributing)**
+**[Download](#quick-start)** · **[HTTP API docs](docs/api.md)** · **[Release notes](release/RELEASE_NOTES-1.0.1.md)** · **[Contributing](#contributing)**
 
 </div>
 
@@ -180,7 +180,7 @@ machine, examples — is in **[docs/api.md](docs/api.md)**.
 
 ## Quality and verification
 
-- **224 unit-test assertions**: SHA-256 and constant-time key comparison, version comparison,
+- **243 unit-test assertions**: SHA-256 and constant-time key comparison, version comparison,
   embedder, outbound URL guard, platform end-to-end, auth and message-visibility hardening
   regressions, legacy database migration;
 - **39 integration assertions** ([scripts/feasibility_check.py](scripts/feasibility_check.py)):
@@ -206,7 +206,8 @@ python scripts/feasibility_check.py 8787          # integration (workbench must 
 
 ## Build and package it yourself
 
-Requires **Windows + MSVC + Qt 6.8** (CI uses VS 2022; a newer VS generator works locally too):
+Requires **Windows + MSVC + Qt 6.8** (CI auto-detects the newest Visual Studio generator on the
+runner; a newer VS works locally too):
 
 ```powershell
 cmake -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_PREFIX_PATH=C:/Qt/6.8.3/msvc2022_64
@@ -220,7 +221,7 @@ cmake --build build --config Release
   prefetch them into `vendor/`. The SQLite amalgamation is downloaded straight from sqlite.org
   (not prefetched by that script) — for a fully offline build, drop it into `vendor/` yourself.
 - Build the installer set with
-  `powershell -ExecutionPolicy Bypass -File scripts\package.ps1 -Version 1.0.0`
+  `powershell -ExecutionPolicy Bypass -File scripts\package.ps1 -Version 1.0.1`
   (see [release/README.md](release/README.md)). Pushing a `v*` tag makes CI build and publish a release.
 - Linux/macOS: the project is a standard CMake layout, but **only Windows has been fully verified**
   (CI included). The GUI target carries a Windows-only declaration today, so cross-platform builds
@@ -232,7 +233,7 @@ cmake --build build --config Release
 src/core/     Qt-free core: database wrapper, vector search, eight domain services, HTTP API, utils
 src/gui/      Qt6 workbench: main window + seven panels + settings/welcome dialogs + custom widgets
 src/cli/      agent-cli (agent-side client) and platformd (headless daemon)
-tests/        Core unit tests (224 assertions)
+tests/        Core unit tests (243 assertions)
 docs/         api.md, hardening-report.md, brand.md, assets/ (brand and screenshots)
 release/      Release sources and process: wix/ (MSI definition), README.md, RELEASE_NOTES-*.md
 scripts/      package.ps1, gen-wix-files.ps1, deploy.ps1, fetch-deps.ps1,
