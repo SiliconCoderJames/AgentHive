@@ -114,6 +114,33 @@ bool Platform::bootstrap(std::string& err) {
                    nlohmann::json{{"role", "zcode"}}.dump(), err);
     }
 
+    // 明文密钥缓存文件的可观测性：库中已有管理者行，但文件缺失/不含该条目，说明明文已
+    // 不可恢复（库中只有加盐哈希）。必须显式记入审计——否则用户只看到"Agent 一直离线"
+    // 却没有任何线索。恢复途径：重新生成密钥（/api/agents/rotate 或界面上的"重新生成密钥"）。
+    {
+        std::string keyPath = (fs::path(home_dir_) / "config" / "agents.json").string();
+        bool managerKeyCached = false;
+        {
+            std::ifstream in(keyPath);
+            if (in) {
+                nlohmann::json j;
+                in >> j;
+                if (j.is_object() && j.contains(kManagerName) && j[kManagerName].is_string() &&
+                    !j[kManagerName].get<std::string>().empty())
+                    managerKeyCached = true;
+            }
+        }
+        if (!managerKeyCached) {
+            std::string auditErr;
+            audit_.log("system", "system.keyfile_missing", kManagerName,
+                       nlohmann::json{{"path", keyPath},
+                                      {"recover", "POST /api/agents/rotate"},
+                                      {"hint", "plaintext keys are not recoverable from the database"}}
+                           .dump(),
+                       auditErr);
+        }
+    }
+
     // 数据增长维护：审计轮转 + 已解决错误清理（每次启动执行）
     std::string stats;
     maintenanceRun("system", stats, err);
@@ -138,23 +165,45 @@ void Platform::shutdown() {
 
 bool Platform::persistAgentKey(const std::string& name, const std::string& apiKey,
                                std::string& err) {
-    (void)err;  // 尽力而为语义：失败不阻塞注册（密钥哈希已入库，可重新注册获取）
-    // 密钥明文仅存于运行期生成的数据目录配置文件，供 Agent 侧命令行取用
+    // 密钥明文只存于此文件（数据库仅有加盐哈希，明文不可恢复），供 Agent 侧命令行取用。
+    // 因此这里必须如实返回失败：此前结尾是 `return out.good() || true`——恒为 true，
+    // 目录缺失/磁盘错误被静默吞掉，现场表现就是"注册过却永远离线"且毫无线索。
     std::string path = (fs::path(home_dir_) / "config" / "agents.json").string();
+    std::error_code ec;
+    fs::create_directories(fs::path(home_dir_) / "config", ec);
     nlohmann::json j;
     {
         std::ifstream in(path);
-        if (in) { in >> j; in.close(); }
+        if (in) {
+            in >> j;
+            if (in.fail() && !in.eof()) { err = "agents.json is not valid JSON: " + path; return false; }
+            in.close();
+        }
     }
     if (!j.is_object()) j = nlohmann::json::object();
     if (apiKey.empty())
         j.erase(name);  // 空密钥 = 移除该条目（agentRemove 用）
     else
         j[name] = apiKey;
-    std::ofstream out(path, std::ios::trunc);
-    out << j.dump(2) << "\n";
-    out.close();
-    return out.good() || true;  // 尽力而为，不阻塞注册
+    // 先写临时文件再原子替换：中途失败不会留下半截文件（那等于再次丢失明文）
+    const std::string tmp = path + ".tmp";
+    {
+        std::ofstream out(tmp, std::ios::trunc);
+        if (!out) { err = "cannot write " + tmp; return false; }
+        out << j.dump(2) << "\n";
+        out.flush();
+        if (!out.good()) { err = "write failed: " + tmp; out.close(); return false; }
+        out.close();
+    }
+    fs::rename(tmp, path, ec);
+    if (ec) {
+        // Windows 的 rename 不覆盖既有文件：退化为先删再改名
+        std::error_code ec2;
+        fs::remove(path, ec2);
+        fs::rename(tmp, path, ec);
+        if (ec) { err = "cannot replace " + path + ": " + ec.message(); return false; }
+    }
+    return true;
 }
 
 bool Platform::authenticate(const std::string& agent, const std::string& apiKey) const {
@@ -208,9 +257,13 @@ bool Platform::registerAgent(const std::string& masterKey, const std::string& na
     std::string salt = randomHex(16);
     if (!agents_.registerAgent(name, actualRole, salt, sha256Hex(salt + outApiKey), err))
         return false;
-    persistAgentKey(name, outApiKey, err);
+    std::string persistErr;
+    std::string auditErr;
+    if (!persistAgentKey(name, outApiKey, persistErr))
+        audit_.log("system", "system.keyfile_write_failed", name,
+                   nlohmann::json{{"error", persistErr}}.dump(), auditErr);
     audit_.log("master", "agent.register", name,
-               nlohmann::json{{"role", actualRole}}.dump(), err);
+               nlohmann::json{{"role", actualRole}}.dump(), auditErr);
     return true;
 }
 
@@ -224,6 +277,26 @@ bool Platform::agentRemove(const std::string& actor, const std::string& name, st
     std::string persistErr;
     (void)persistAgentKey(name, "", persistErr);
     audit_.log(actor, "agent.remove", name, nlohmann::json{{"removed", name}}.dump(), err);
+    return true;
+}
+
+bool Platform::agentRotateKey(const std::string& actor, const std::string& name,
+                              std::string& outApiKey, std::string& err) {
+    std::lock_guard lock(mutex_);
+    if (!isManager(actor)) { err = "only zcode can rotate agent keys"; return false; }
+    if (!agents_.nameExists(name)) { err = "agent not found: " + name; return false; }
+    outApiKey = randomHex(32);
+    std::string salt = randomHex(16);
+    if (!agents_.rotateKey(name, salt, sha256Hex(salt + outApiKey), err)) return false;
+    // 明文落盘供 Agent 侧取用。写失败不回滚轮换：新密钥已经返回给调用方，
+    // 回滚反而会让新旧密钥同时失效。失败记入审计，便于排查"密钥文件写不进去"。
+    std::string persistErr;
+    std::string auditErr;
+    if (!persistAgentKey(name, outApiKey, persistErr))
+        audit_.log("system", "system.keyfile_write_failed", name,
+                   nlohmann::json{{"error", persistErr}}.dump(), auditErr);
+    audit_.log(actor, "agent.rotate_key", name, nlohmann::json{{"rotated", name}}.dump(),
+               auditErr);
     return true;
 }
 

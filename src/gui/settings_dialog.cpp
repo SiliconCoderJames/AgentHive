@@ -358,14 +358,59 @@ QWidget* SettingsDialog::buildAgentsPage() {
                                       QString::fromStdString(err), false);
         }
     });
+    auto* rotateBtn = new QPushButton(i18n::trs("重新生成密钥", "Rotate API key"), page);
+    connect(rotateBtn, &QPushButton::clicked, this, [this] {
+        int row = agentsTable_->currentRow();
+        if (row < 0) {
+            ui::Toast::show(this, i18n::trs("请先选择一个 Agent", "Select an agent first"), false);
+            return;
+        }
+        const QString name = agentsTable_->item(row, 0)->text();
+        if (QMessageBox::question(
+                this, i18n::trs("重新生成密钥", "Rotate API key"),
+                i18n::trs("将为「%1」签发新密钥，旧密钥立即失效（该 Agent 必须改用新密钥，否则会掉线）。\n"
+                          "数据库只保存加盐哈希，明文密钥丢失后无法找回，重新生成是唯一的恢复途径。继续？",
+                          "A new key will be issued for \"%1\"; the old one stops working at once "
+                          "(that agent must switch to the new key or it goes offline).\n"
+                          "The database stores only a salted hash, so a lost key cannot be "
+                          "recovered — re-issuing is the only way back. Continue?")
+                    .arg(name),
+                QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
+            return;
+        std::string err, apiKey;
+        if (!platform_.agentRotateKey(ah::kManagerName, name.toStdString(), apiKey, err)) {
+            ui::Toast::show(this, i18n::trs("重新生成失败：", "Rotate failed: ") +
+                                      QString::fromStdString(err),
+                            false);
+            return;
+        }
+        const QString key = QString::fromStdString(apiKey);
+        QApplication::clipboard()->setText(key);
+        QMessageBox box(this);
+        box.setWindowTitle(i18n::trs("新密钥（仅显示一次）", "New key (shown once)"));
+        box.setIcon(QMessageBox::Information);
+        box.setText(i18n::trs("「%1」的新密钥已生成，并已复制到剪贴板：", "New key for \"%1\" (copied to clipboard):")
+                        .arg(name));
+        box.setInformativeText(
+            key + "\n\n" +
+            i18n::trs("请立刻填入该 Agent 端并重启它；此密钥不会再次展示。",
+                      "Paste it into that agent now and restart it; this key is never shown again."));
+        box.setStandardButtons(QMessageBox::Ok);
+        box.exec();
+        ui::Toast::show(this, i18n::trs("新密钥已签发 ✓", "New key issued ✓"));
+        refreshAgents();
+    });
     row->addWidget(refreshBtn);
+    row->addWidget(rotateBtn);
     row->addWidget(removeBtn);
     row->addStretch(1);
     lay->addLayout(row);
 
     auto* hint = thLabel("font-size:11px; color:@muted@;", page);
-    hint->setText(i18n::trs("移除后该 Agent 的 API Key 立即失效（操作记入审计日志）。",
-                            "Removing an agent invalidates its API key (audited)."));
+    hint->setText(i18n::trs("移除后该 Agent 的 API Key 立即失效（操作记入审计日志）。"
+                            "密钥明文只在首次签发时展示，丢失后用「重新生成密钥」恢复。",
+                            "Removing an agent invalidates its API key (audited). A key is shown only "
+                            "when it is issued; if it is lost, use \"Rotate API key\" to recover."));
     lay->addWidget(hint);
     return page;
 }

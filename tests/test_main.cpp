@@ -599,6 +599,23 @@ static void test_legacy_migration() {
         if (!reg) std::printf("  legacy register err: %s\n", err.c_str());
         CHECK(reg);
         CHECK(p.authenticate("newagent", key));             // 新 Agent 走加盐格式
+        // 密钥轮换：旧密钥立即失效、新密钥生效，且明文缓存文件同步更新
+        // （数据库只存加盐哈希，明文不可恢复，轮换是唯一恢复途径）
+        std::string rotated;
+        std::string rotErr;
+        CHECK(p.agentRotateKey("zcode", "newagent", rotated, rotErr));
+        CHECK(!rotated.empty());
+        CHECK(rotated != key);
+        CHECK(!p.authenticate("newagent", key));            // 旧密钥失效
+        CHECK(p.authenticate("newagent", rotated));         // 新密钥生效
+        std::string keyFile = readFile((tmp / "config" / "agents.json").string());
+        CHECK(keyFile.find(rotated) != std::string::npos);
+        CHECK(keyFile.find(key) == std::string::npos);      // 旧明文不再残留
+        // 轮换权限：非管理者被拒；不存在的 Agent 被拒
+        std::string denied;
+        CHECK(!p.agentRotateKey("newagent", "newagent", denied, rotErr));
+        CHECK(denied.empty());
+        CHECK(!p.agentRotateKey("zcode", "ghost", denied, rotErr));
         p.shutdown();
     }
     std::error_code ec;

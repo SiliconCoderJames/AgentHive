@@ -50,6 +50,10 @@ public:
     bool listAgents(std::vector<AgentInfo>& out, std::string& err);
     // 管理性移除（仅管理者；管理者自身不可删）；密钥随之失效，记入审计
     bool agentRemove(const std::string& actor, const std::string& name, std::string& err);
+    // 重新生成某 Agent 的 API Key（管理者权限）。数据库只存加盐哈希，明文不可恢复，
+    // 因此密钥丢失/泄露时这是唯一恢复与轮换途径；新明文同时写入 config/agents.json 并返回一次。
+    bool agentRotateKey(const std::string& actor, const std::string& name, std::string& outApiKey,
+                        std::string& err);
 
     // ---- 知识库 ----
     bool knowledgeCreate(const std::string& author, const std::string& title,

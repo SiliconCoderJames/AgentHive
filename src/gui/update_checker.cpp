@@ -14,11 +14,28 @@
 #include <QProcess>
 #include <QSettings>
 #include <QStandardPaths>
+#include <QTextStream>
 
 #include "core/types.h"   // ah::kPlatformVersion
 #include "core/util.h"
 #include "core/version_util.h"
 #include "i18n.h"
+
+namespace {
+
+// GUI 子系统是 WIN32 可执行文件，没有可用的 stderr：更新检查失败时若只靠弹窗，
+// 用户报"没有任何提示"就无从查起，因此把过程写入数据目录下的日志文件。
+void trace(const QString& msg) {
+    const QString dir =
+        QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + "/AgentHive";
+    QDir().mkpath(dir);
+    QFile f(dir + "/update-check.log");
+    if (!f.open(QIODevice::Append | QIODevice::Text)) return;
+    QTextStream ts(&f);
+    ts << QDateTime::currentDateTimeUtc().toString(Qt::ISODate) << ' ' << msg << '\n';
+}
+
+}  // namespace
 
 #ifdef _WIN32
 #  ifndef WIN32_LEAN_AND_MEAN

@@ -238,6 +238,25 @@ void HttpServer::setupRoutes() {
         send(res, ok(json{{"removed", name}}));
     });
 
+    // ---- API Key 重新生成（主密钥；密钥丢失/泄露时唯一的恢复与轮换途径）----
+    srv.Post("/api/agents/rotate", [&](const httplib::Request& req, httplib::Response& res) {
+        if (!checkMaster(req, p, res)) return;
+        auto body = json::parse(req.body, nullptr, false);
+        if (body.is_discarded() || !body.is_object() || !body.contains("name") ||
+            !body["name"].is_string()) {
+            send(res, fail(400, "name must be a string"));
+            return;
+        }
+        std::string err, apiKey;
+        const std::string name = body["name"].get<std::string>();
+        if (!p.agentRotateKey(kManagerName, name, apiKey, err)) {
+            send(res, fail(400, err));
+            return;
+        }
+        // 新密钥明文只返回这一次
+        send(res, ok(json{{"name", name}, {"api_key", apiKey}}));
+    });
+
     srv.Post("/api/agents/heartbeat", [&](const httplib::Request& req, httplib::Response& res) {
         std::string actor;
         if (!checkAgent(req, p, actor, res)) return;

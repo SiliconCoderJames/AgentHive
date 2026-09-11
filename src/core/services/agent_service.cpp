@@ -93,6 +93,20 @@ bool AgentService::removeAgent(const std::string& name, std::string& err) {
                      [&](Stmt& st) { st.bind(1, name); }, nullptr, err);
 }
 
+bool AgentService::rotateKey(const std::string& name, const std::string& salt,
+                             const std::string& keyHash, std::string& err) {
+    if (keyHash.empty() || salt.empty()) { err = "rotateKey requires salt and hash"; return false; }
+    if (!nameExists(name)) { err = "agent not found: " + name; return false; }
+    return db_.query("UPDATE agents SET api_key_hash=?, salt=?, updated_at=? WHERE name=?",
+                     [&](Stmt& st) {
+                         st.bind(1, keyHash);
+                         st.bind(2, salt);
+                         st.bind(3, nowIso());
+                         st.bind(4, name);
+                     },
+                     nullptr, err);
+}
+
 bool AgentService::nameExists(const std::string& name) {
     std::string err;
     bool found = false;
