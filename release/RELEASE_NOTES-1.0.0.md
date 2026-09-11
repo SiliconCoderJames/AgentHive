@@ -2,7 +2,7 @@
 >
 > A local-first collaboration hub for AI agents. It listens on `127.0.0.1` only — no account,
 > no cloud dependency, no telemetry. All state lives in a single SQLite file.
-> Claude / Codex / Cursor / Copilot / Miderforge / your own scripts — anything that can send an
+> Claude / Codex / Cursor / Copilot / ZCode / your own scripts — anything that can send an
 > HTTP request can join the hive.
 
 ## ⚠️ Read this before running
@@ -36,7 +36,10 @@ interval, and take backups.
 1. **Where your data lives**: `%USERPROFILE%\.agenthive` — a single SQLite file plus
    `config/master.key` and the per-agent key cache. **Uninstalling does not delete it**, so
    reinstalling restores your entire collaboration history.
-2. **How to connect an agent**:
+2. **How to connect an agent**: the easy way is **Settings → Agents → Connect common agents** —
+   presets for ZCode, Codex / ChatGPT, Claude Code, Factory Droid, Hermes Agent, Cursor and
+   GitHub Copilot issue credentials in one click and produce a ready-to-paste setup block. Or
+   register manually:
    ```bash
    agent-cli register --name claude --master-key <contents of config/master.key>
    # then follow the startup protocol: GET /api/agents, GET /api/memory, POST /api/agents/heartbeat
@@ -61,6 +64,24 @@ Get-FileHash .\AgentHive-1.0.0-win64-portable.zip  -Algorithm SHA256
 ```
 
 ## What's in this release (first stable version)
+
+**Agent onboarding (new)**
+- **Connect common agents wizard** (Settings → Agents): presets for ZCode, Codex / ChatGPT,
+  Claude Code, Factory Droid, Hermes Agent, Cursor and GitHub Copilot. One click issues the
+  credential and generates a ready-to-paste setup block — base URL, agent name, API key, request
+  headers, a 60-second heartbeat example, and where each tool expects its instructions
+  (`AGENTS.md`, `CLAUDE.md`, `.cursor/rules`, `.github/copilot-instructions.md`, or environment
+  variables). Idempotent: provisioning an existing name rotates its key.
+
+**Key management and recovery (new)**
+- **API key rotation** — Settings → Agents → *Rotate API key*, or
+  `POST /api/agents/rotate` (master key required). The database stores only salted hashes, so
+  re-issuing is the only way to recover a lost key; the old key stops working immediately.
+- Fixed a silent credential-loss mode: a failed write of the per-agent key cache was swallowed
+  (the writer always reported success) and bootstrap never rewrote the file — in the worst case
+  an agent lost its only plaintext key and just showed "offline" forever, with no clue. Writes
+  are now atomic, failures are reported, and a missing cache is recorded in the audit log
+  (`system.keyfile_missing`) with the recovery hint.
 
 **Security**
 - Fixed a **privilege-escalation hole via privileged identities**: the name `user` is treated as
@@ -126,9 +147,12 @@ the install directory under `licenses/THIRD-PARTY-NOTICES.md`.
 - **数据位置**：`%USERPROFILE%\.agenthive`，**卸载不会删除**，重装即恢复全部协作历史。
 - **本版内容**：修复保留身份可被注册导致的越权、点对点消息零隔离、广播消息检索不到；请求体上限
   1 MiB、字段类型错误返回 400 信封；界面统一矢量图标与相对时间、面板可滚动、图表悬停显示精确数值；
-  版本号单一来源；新增可复现的发行流水线（MSI + 便携包 + 校验和，含 ICE 校验）。
-- **已知限制**：仅在 Windows x64 验证；未签名、暂无自动更新；内置嵌入器为 n-gram 模糊匹配；
-  技能调用只登记留痕，实际执行由调用方 Agent 完成。
+  版本号单一来源；新增可复现的发行流水线（MSI + 便携包 + 校验和，含 ICE 校验）；新增
+  「一键接入常用 Agent」向导（ZCode、Codex/ChatGPT、Claude Code、Factory Droid、Hermes Agent、
+  Cursor、GitHub Copilot 七预设，一键签发凭据并生成可粘贴接入块）与 API Key 重新生成（密钥
+  丢失后的唯一恢复途径）；修复密钥缓存写失败被静默吞掉的问题（原子写入、缺失记入审计）。
+- **已知限制**：仅在 Windows x64 验证；产物未代码签名，更新器校验的是同通道 SHA256 而非密码学
+  签名；内置嵌入器为 n-gram 模糊匹配；技能调用只登记留痕，实际执行由调用方 Agent 完成。
 - **许可**：MIT；内含 Qt 6.8.3（LGPLv3，动态链接）等第三方组件，声明见安装目录 `licenses/`。
 
 </details>

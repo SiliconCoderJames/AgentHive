@@ -42,11 +42,16 @@ jobs:
       - name: Package (build, stage, self-check, MSI + ICE, ZIP, checksums)
         shell: pwsh
         run: |
-          # -QtPrefix 指向 install-qt-action 安装的 Qt；生成器用 runner 上存在的 VS 2022
+          # windows-latest 不再保证预装 VS 2022：运行时探测可用的最新 VS 生成器
+          $gen = (cmake --help | Select-String 'Visual Studio \d+ 20\d\d' |
+            Select-Object -Last 1).Matches[0].Value
+          if (-not $gen) { throw 'no Visual Studio generator detected on runner' }
+          Write-Host "using generator: $gen"
+          # -QtPrefix 指向 install-qt-action 安装的 Qt
           powershell -ExecutionPolicy Bypass -File scripts\package.ps1 `
             -Version "${{ steps.ver.outputs.version }}" `
             -QtPrefix "$env:QT_ROOT_DIR" `
-            -Generator "Visual Studio 17 2022"
+            -Generator "$gen"
 
       - name: Unit tests
         shell: pwsh
