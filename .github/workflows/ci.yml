@@ -25,7 +25,18 @@ jobs:
       - name: Build (core + cli + gui)
         run: cmake --build build --config Release
 
-      - name: Unit tests (143 assertions)
+      # Qt6 是 QUIET 查找、缺失时只 WARNING 并跳过 GUI 目标，构建仍然会"成功"。
+      # 这里显式断言 GUI 真的产出了，否则 CI 全绿但工作台其实没编出来。
+      - name: Assert the GUI was actually built
+        shell: pwsh
+        run: |
+          $exe = "build\src\gui\Release\zworkbench.exe"
+          if (-not (Test-Path $exe)) { throw "GUI target missing: $exe (Qt6 not found?)" }
+          $cli = @("build\src\cli\Release\agent-cli.exe", "build\src\cli\Release\platformd.exe")
+          foreach ($c in $cli) { if (-not (Test-Path $c)) { throw "CLI target missing: $c" } }
+          Write-Host "build outputs verified"
+
+      - name: Unit tests
         run: ctest --test-dir build -C Release --output-on-failure
 
       - name: Integration feasibility check (39 assertions)

@@ -3,6 +3,19 @@ build/
 build-*/
 out/
 data/
+# 打包暂存目录（cmake --install 的产物，ZIP 与 MSI 都从它取材）
+_stage/
+_stage-*/
+
+# ---- 发行目录：只入库"发行源与流程"，其余一律忽略 ----
+# 用白名单方式排除：产物（msi/zip）、生成的 WiX 清单、以及任何解压/临时残留目录。
+# 早先用 release/*.msi 这类"黑名单"写法时，一个误留在 release/ 下的解压目录被 git add -A
+# 连同一个提交带进了约 30 个 Qt 二进制文件，因此改成白名单。
+release/*
+!release/README.md
+!release/wix/
+release/wix/*
+!release/wix/AgentHive.wxs
 
 # ---- 第三方依赖（FetchContent 缓存，scripts/fetch-deps.ps1 可重建）----
 vendor/

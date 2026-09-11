@@ -33,35 +33,35 @@ if(WIN32)
     get_target_property(_qmake_exe Qt6::qmake IMPORTED_LOCATION)
     get_filename_component(_qt_bin "${_qmake_exe}" DIRECTORY)
     find_program(WINDEPLOYQT_EXECUTABLE windeployqt HINTS "${_qt_bin}" REQUIRED)
-    # --compiler-runtime : MSVC 运行库按"应用本地部署"随包分发，目标机无需预装 VC++ Redist
+
+    # MSVC 运行库：用 CMake 官方机制定位可再分发文件（不依赖 VCToolsRedistDir 环境变量，
+    # 那个变量只在 VS 开发者环境里才有）。SKIP 掉 CMake 自带的 install 规则，
+    # 改由我们挂到 Runtime 组件上，保证 `cmake --install --component Runtime` 一次装齐。
+    set(CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_SKIP ON)
+    include(InstallRequiredSystemLibraries)
+    if(CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS)
+        install(FILES ${CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS}
+                DESTINATION . COMPONENT Runtime)
+        list(LENGTH CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS _crt_n)
+        message(STATUS "MSVC runtime to ship: ${_crt_n} file(s)")
+    else()
+        message(WARNING
+            "CMake 未能定位 MSVC 可再分发运行库：目标机将需要预装 VC++ Redistributable。"
+            "发行打包前请确认暂存目录里存在 vcruntime140.dll。")
+    endif()
+
     # --no-translations  : 界面文案走自研 i18n，不用 Qt .qm
-    # --no-opengl-sw/--no-system-d3d-compiler : Widgets 光栅渲染用不到，可省近 20MB
+    # --no-opengl-sw / --no-system-d3d-compiler : Widgets 光栅渲染用不到，可省近 20MB
     install(CODE "
         message(STATUS \"windeployqt -> \${CMAKE_INSTALL_PREFIX}\")
         execute_process(
             COMMAND \"${WINDEPLOYQT_EXECUTABLE}\"
-                    --release --compiler-runtime --no-translations
-                    --no-opengl-sw --no-system-d3d-compiler
+                    --release --no-translations --no-opengl-sw --no-system-d3d-compiler
                     --dir \"\${CMAKE_INSTALL_PREFIX}\"
                     \"\${CMAKE_INSTALL_PREFIX}/zworkbench.exe\"
             RESULT_VARIABLE _wdq_rc)
         if(NOT _wdq_rc EQUAL 0)
             message(FATAL_ERROR \"windeployqt 失败，退出码 \${_wdq_rc}\")
-        endif()
-        # windeployqt --compiler-runtime 只在能找到 VC 可再分发文件时才拷贝；
-        # 这里补一次兜底：从 VCToolsRedistDir 取，取不到就明确提示（发行流水线会据此报错）
-        if(NOT EXISTS \"\${CMAKE_INSTALL_PREFIX}/vcruntime140.dll\"
-           AND DEFINED ENV{VCToolsRedistDir})
-            file(GLOB _crt
-                 \"\$ENV{VCToolsRedistDir}/x64/Microsoft.VC*.CRT/*.dll\")
-            foreach(_f \${_crt})
-                file(COPY \"\${_f}\" DESTINATION \"\${CMAKE_INSTALL_PREFIX}\")
-            endforeach()
-        endif()
-        if(NOT EXISTS \"\${CMAKE_INSTALL_PREFIX}/vcruntime140.dll\")
-            message(WARNING
-                \"未随包带上 MSVC 运行库（vcruntime140.dll）：目标机需要预装 VC++ Redistributable，\"
-                \"或设置 VCToolsRedistDir 后重新 install。发行打包请确保该文件存在。\")
         endif()
     " COMPONENT Runtime)
 endif()

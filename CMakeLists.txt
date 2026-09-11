@@ -3,12 +3,18 @@ project(zcode_platform VERSION 1.0.0 LANGUAGES C CXX)
 
 # ---- 版本号：默认取 project(VERSION)，发布流水线用 -DAGENTHIVE_VERSION=v1.2.3 覆盖 ----
 set(AGENTHIVE_VERSION "${PROJECT_VERSION}" CACHE STRING "发布版本（可带 v 前缀与预发布后缀）")
-# 允许 "v1.2.3" 与 "1.2.3-rc1"：MSI 的 ProductVersion 必须是纯 x.y.z 数字形式
-string(REGEX REPLACE "^v" "" _ver_raw "${AGENTHIVE_VERSION}")
-string(REGEX MATCH "^[0-9]+\\.[0-9]+\\.[0-9]+" AGENTHIVE_VERSION_NUMERIC "${_ver_raw}")
-if(NOT AGENTHIVE_VERSION_NUMERIC)
-    set(AGENTHIVE_VERSION_NUMERIC "${PROJECT_VERSION}")
+# 传参校验：PowerShell 5.1 会把未加引号的 -DAGENTHIVE_VERSION=1.0.0 截断成 "...=1"，
+# 于是静默产出一个错误版本号（界面/API/安装包全错）。这类失败模式最难发现，
+# 因此这里宁可 configure 直接失败，并给出正确写法。
+if(NOT AGENTHIVE_VERSION MATCHES "^v?[0-9]+\\.[0-9]+\\.[0-9]+")
+    message(FATAL_ERROR
+        "AGENTHIVE_VERSION 必须是 v?主.次.修订 形式，当前收到 '${AGENTHIVE_VERSION}'。\n"
+        "提示：PowerShell 5.1 会截断未加引号的 -DAGENTHIVE_VERSION=1.0.0，"
+        "请写成 \"-DAGENTHIVE_VERSION=1.0.0\"（整体加引号），或直接用 scripts/package.ps1。")
 endif()
+string(REGEX REPLACE "^v" "" _ver_raw "${AGENTHIVE_VERSION}")
+# 允许 "1.2.3-rc1"：MSI 的 ProductVersion 必须是纯 x.y.z 数字形式
+string(REGEX MATCH "^[0-9]+\\.[0-9]+\\.[0-9]+" AGENTHIVE_VERSION_NUMERIC "${_ver_raw}")
 string(REPLACE "." ";" _ver_parts "${AGENTHIVE_VERSION_NUMERIC}")
 list(GET _ver_parts 0 AGENTHIVE_VERSION_MAJOR)
 list(GET _ver_parts 1 AGENTHIVE_VERSION_MINOR)

@@ -1,13 +1,36 @@
-﻿# Deploy the workbench to %LOCALAPPDATA%\AgentHive and create a desktop
-# shortcut. Survives repo/build directory cleanup.
-# Usage: powershell -ExecutionPolicy Bypass -File scripts\deploy.ps1
+# Deploy the workbench to %LOCALAPPDATA%\AgentHive and create a desktop shortcut.
+# Survives repo/build directory cleanup.
+#
+# NOTE: for releases prefer the MSI (release/AgentHive-<ver>-x64.msi), which installs to the
+# same directory and also registers an uninstaller. This script remains for a quick
+# local deployment straight from a build tree.
+#
+# Usage:
+#   powershell -ExecutionPolicy Bypass -File scripts\deploy.ps1
+#   powershell -ExecutionPolicy Bypass -File scripts\deploy.ps1 -BuildDir build/msvc-release
+#
+# Source priority: an installed stage dir (_stage, produced by scripts/package.ps1) if present,
+# otherwise <BuildDir>\src\gui\Release. Previously this path was hardcoded to build\full, which
+# the documented build command (cmake -B build) never produces.
+param(
+    [string]$BuildDir = "build/full",
+    [switch]$FromStage
+)
+
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
-$src  = Join-Path $root "build\full\src\gui\Release"
+
+$src = $null
+if ($FromStage -or (Test-Path (Join-Path $root "_stage\zworkbench.exe"))) {
+    $src = Join-Path $root "_stage"
+} else {
+    $src = Join-Path $root (Join-Path $BuildDir "src\gui\Release")
+}
 if (-not (Test-Path (Join-Path $src "zworkbench.exe"))) {
-    Write-Error "zworkbench.exe not found -- build first: cmake --build build/full --config Release"
+    Write-Error "zworkbench.exe not found in $src`n  build first: cmake --build $BuildDir --config Release`n  or install the stage dir: cmake --install $BuildDir --config Release --prefix _stage --component Runtime"
     exit 1
 }
+Write-Host "SRC=$src"
 
 $dest = Join-Path $env:LOCALAPPDATA "AgentHive"
 New-Item -ItemType Directory -Force -Path $dest | Out-Null

@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  AgentHive · Windows 安装包（WiX v4+）
+
+  设计取舍：
+  * Scope="perUser"：装到 %LOCALAPPDATA%\AgentHive，与 scripts/deploy.ps1 的既有约定一致，
+    安装无需管理员权限（不弹 UAC）。需要企业批量下发（GPO/SCCM）时用 -dPerMachine=1 切到
+    全机安装：wix build -dPerMachine=1 ...
+  * 用户数据 %USERPROFILE%\.agenthive **不在本包管理范围内**，卸载时不会被删除。
+  * 文件清单由构建产物目录自动收获（Files 扩展），无需维护组件 GUID 列表。
+  * 版本号由构建流水线传入：wix build -dVersion=1.0.0 ...
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+
+  <?define ProductName = "AgentHive" ?>
+  <?define ProductFullName = "AgentHive 多 Agent 协作工作台" ?>
+  <?define ExeName = "zworkbench.exe" ?>
+
+  <Package Name="$(var.ProductFullName)"
+           Manufacturer="AgentHive"
+           Version="$(var.Version)"
+           UpgradeCode="7F3C2A64-9B1E-4E0D-9A6E-2C5B8D41F7A3"
+           Scope="$(var.Scope)"
+           InstallerVersion="500"
+           Language="2052"
+           Codepage="65001">
+
+    <SummaryInformation Description="$(var.ProductFullName) $(var.Version) 安装程序"
+                        Manufacturer="AgentHive" />
+
+    <!-- 升级：同 UpgradeCode 的旧版本先移除再装（避免文件残留） -->
+    <MajorUpgrade DowngradeErrorMessage="已安装更高版本的 AgentHive，请先卸载后再装此版本。" />
+    <MediaTemplate EmbedCab="yes" />
+
+    <!-- 应用与卸载入口图标 -->
+    <Icon Id="AppIcon" SourceFile="$(var.IconFile)" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon" />
+    <Property Id="ARPNOMODIFY" Value="1" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/SiliconCoderJames/AgentHive" />
+
+    <!-- 系统版本要求（Qt 6.8 / C++20 需要 Windows 10+）。
+         这里不用 VersionNT：Windows Installer 会把本包的 VersionNT 从 603 一路降级到 500
+         （旧式包兼容逻辑），导致 "VersionNT >= 1000" 在 Windows 11 上判失败、安装 1603。
+         改用注册表探测 CurrentMajorVersionNumber（Win10 起才有），并且只在确实探测到
+         低于 10 时才拦截——探测不到就放行，避免误杀。 -->
+    <Property Id="WINMAJORVERSION">
+      <!-- 只判定"该值是否存在"，不做数值比较：
+           CurrentMajorVersionNumber 自 Windows 10 起才存在，Win7/8.1 上取不到。
+           数值比较在这里既不可靠（DWORD 经 RegistrySearch 读出来是 "#10"，
+           ICE03 会判为非法条件字符串）也没必要，存在性就是最好的判别依据。 -->
+      <RegistrySearch Id="WinMajorVersion" Type="raw" Root="HKLM"
+                      Key="SOFTWARE\Microsoft\Windows NT\CurrentVersion"
+                      Name="CurrentMajorVersionNumber" />
+    </Property>
+    <Launch Condition="Installed OR WINMAJORVERSION"
+            Message="AgentHive 需要 Windows 10 或更高版本（Qt 6.8 与 C++20 的要求）。" />
+
+    <!-- 安装期间若工作台正在运行：提示并自动关闭，避免文件占用导致安装失败 -->
+    <util:CloseApplication Id="CloseWorkbench"
+                           Target="$(var.ExeName)"
+                           CloseMessage="yes"
+                           PromptToContinue="no"
+                           RebootPrompt="no"
+                           Description="AgentHive 工作台正在运行，安装程序将先关闭它。" />
+
+    <Feature Id="Main" Title="$(var.ProductFullName)" Level="1"
+             Description="AgentHive 工作台、命令行客户端与 Qt 运行时">
+      <!-- 文件清单由 scripts/gen-wix-files.ps1 从安装暂存目录生成：
+           随 Qt 版本变化的 DLL 与插件目录无需人工维护 -->
+      <ComponentGroupRef Id="AppFiles" />
+      <ComponentRef Id="StartMenuShortcut" />
+      <ComponentRef Id="DesktopShortcut" />
+    </Feature>
+  </Package>
+
+  <!-- 安装目录：perUser = %LOCALAPPDATA%\AgentHive；perMachine = %ProgramFiles%\AgentHive -->
+  <?if $(var.PerMachine) = 1 ?>
+  <Fragment>
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="$(var.ProductName)" />
+    </StandardDirectory>
+  </Fragment>
+  <?else?>
+  <Fragment>
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="INSTALLFOLDER" Name="$(var.ProductName)" />
+    </StandardDirectory>
+  </Fragment>
+  <?endif?>
+
+  <Fragment>
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="AppMenuFolder" Name="$(var.ProductName)" />
+    </StandardDirectory>
+    <StandardDirectory Id="DesktopFolder" />
+  </Fragment>
+
+  <!-- 开始菜单快捷方式 -->
+  <Fragment>
+    <Component Id="StartMenuShortcut" Directory="AppMenuFolder" Guid="*">
+      <Shortcut Id="StartMenuSC"
+                Name="$(var.ProductFullName)"
+                Description="本地优先的多 Agent 协作工作台"
+                Target="[INSTALLFOLDER]$(var.ExeName)"
+                WorkingDirectory="INSTALLFOLDER"
+                Icon="AppIcon" />
+      <RemoveFolder Id="RemoveAppMenuFolder" Directory="AppMenuFolder" On="uninstall" />
+      <RegistryValue Root="HKCU" Key="Software\AgentHive" Name="startmenu" Type="integer"
+                     Value="1" KeyPath="yes" />
+    </Component>
+  </Fragment>
+
+  <!-- 桌面快捷方式 -->
+  <Fragment>
+    <Component Id="DesktopShortcut" Directory="DesktopFolder" Guid="*">
+      <Shortcut Id="DesktopSC"
+                Name="$(var.ProductFullName)"
+                Description="本地优先的多 Agent 协作工作台"
+                Target="[INSTALLFOLDER]$(var.ExeName)"
+                WorkingDirectory="INSTALLFOLDER"
+                Icon="AppIcon" />
+      <RegistryValue Root="HKCU" Key="Software\AgentHive" Name="desktop" Type="integer"
+                     Value="1" KeyPath="yes" />
+    </Component>
+  </Fragment>
+
+</Wix>

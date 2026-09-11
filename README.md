@@ -63,12 +63,36 @@ DeepSeek、Gemini CLI……以及你自己写的任何脚本。只要能发 HTTP
 
 ## 快速开始
 
+### 安装（普通用户）
+
+到 [Releases](https://github.com/SiliconCoderJames/AgentHive/releases) 下载：
+
+| 产物 | 说明 |
+|---|---|
+| `AgentHive-<版本>-x64.msi` | 安装包。装到 `%LOCALAPPDATA%\AgentHive`，**per-user、无需管理员权限**，带开始菜单与桌面快捷方式，可在"应用和功能"里卸载 |
+| `AgentHive-<版本>-win64-portable.zip` | 免安装便携版，解压后直接运行 `zworkbench.exe` |
+| `SHA256SUMS.txt` | 校验和 |
+
+- 需要 **Windows 10 或更高版本**；MSVC 运行库已随包分发，目标机无需预装。
+- 用户数据在 `%USERPROFILE%\.agenthive`，**卸载不会删除**。
+- 当前产物**未代码签名**，首次运行可能出现 SmartScreen"未知发布者"提示。
+- 安装目录 `licenses/` 内含第三方组件许可（Qt 为 LGPLv3）。
+
 ### 获取源码
 
 ```bash
 git clone https://github.com/SiliconCoderJames/AgentHive.git
 cd AgentHive
 ```
+
+### 自行出安装包
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\package.ps1 -Version 1.0.0
+```
+
+一次产出 MSI + 便携 ZIP + 校验和（含可运行性自检与 MSI 的 ICE 校验）。推 `v*` 标签会触发
+`.github/workflows/release.yml` 自动出包并发布 Release。详见 [release/README.md](release/README.md)。
 
 ### 构建（Windows + MSVC + Qt6）
 

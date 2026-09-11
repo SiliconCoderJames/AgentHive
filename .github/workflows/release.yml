@@ -1,0 +1,112 @@
+name: Release
+
+# 推 v* 标签即出包；也可在 Actions 页面手动触发并指定版本号。
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号（如 1.0.0，可带 v 前缀）'
+        required: true
+        default: '1.0.0'
+
+permissions:
+  contents: write   # 创建 Release 并上传资产
+
+jobs:
+  windows-release:
+    name: Build + package + publish (Windows x64)
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Qt 6.8.3
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          arch: win64_msvc2022_64
+          cache: true
+
+      - name: Resolve version
+        id: ver
+        shell: pwsh
+        run: |
+          $v = if ('${{ github.event_name }}' -eq 'workflow_dispatch') { '${{ inputs.version }}' } else { '${{ github.ref_name }}' }
+          if ([string]::IsNullOrWhiteSpace($v)) { throw 'cannot resolve version' }
+          "version=$v" >> $env:GITHUB_OUTPUT
+          Write-Host "release version: $v"
+
+      - name: Package (build, stage, self-check, MSI + ICE, ZIP, checksums)
+        shell: pwsh
+        run: |
+          # -QtPrefix 指向 install-qt-action 安装的 Qt；生成器用 runner 上存在的 VS 2022
+          powershell -ExecutionPolicy Bypass -File scripts\package.ps1 `
+            -Version "${{ steps.ver.outputs.version }}" `
+            -QtPrefix "$env:QT_ROOT_DIR" `
+            -Generator "Visual Studio 17 2022"
+
+      - name: Unit tests
+        shell: pwsh
+        run: |
+          ctest --test-dir build/full -C Release --output-on-failure
+          if ($LASTEXITCODE -ne 0) { throw "unit tests failed - not publishing" }
+
+      - name: Show artifacts
+        shell: pwsh
+        run: Get-ChildItem release -File | Select-Object Name, @{n='MB';e={[math]::Round($_.Length/1MB,2)}} | Format-Table -AutoSize
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: AgentHive-windows-x64
+          path: |
+            release/*.msi
+            release/*.zip
+            release/SHA256SUMS.txt
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $ver = "${{ steps.ver.outputs.version }}" -replace '^v', ''
+          $tag = "v$ver"
+          $msi = "release/AgentHive-$ver-x64.msi"
+          $zip = "release/AgentHive-$ver-win64-portable.zip"
+          $sums = "release/SHA256SUMS.txt"
+          foreach ($f in @($msi, $zip, $sums)) {
+            if (-not (Test-Path $f)) { throw "missing artifact: $f" }
+          }
+          $notes = @"
+          ## AgentHive $ver
+
+          Windows x64 本地多 Agent 协作工作台。
+
+          ### 下载哪个
+          * ``AgentHive-$ver-x64.msi`` —— 安装包（per-user，装到 ``%LOCALAPPDATA%\AgentHive``，**无需管理员权限**），带开始菜单与桌面快捷方式
+          * ``AgentHive-$ver-win64-portable.zip`` —— 免安装便携版，解压后运行 ``zworkbench.exe``
+          * ``SHA256SUMS.txt`` —— 校验和
+
+          ### 说明
+          * 需要 **Windows 10 或更高版本**；MSVC 运行库已随包分发，目标机无需预装。
+          * 用户数据保存在 ``%USERPROFILE%\.agenthive``，**卸载不会删除**。
+          * 本产物**尚未代码签名**，首次运行可能出现 SmartScreen"未知发布者"提示。
+          * 第三方组件与 Qt（LGPLv3）许可见安装目录 ``licenses/``。
+
+          校验下载文件：
+
+          ```powershell
+          Get-FileHash .\AgentHive-$ver-x64.msi -Algorithm SHA256
+          ```
+          "@
+          # 已存在同标签的 Release 时直接补充资产，避免重复创建失败
+          gh release view $tag 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag $msi $zip $sums --clobber
+          } else {
+            gh release create $tag $msi $zip $sums --title "AgentHive $ver" --notes $notes
+          }
