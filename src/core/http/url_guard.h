@@ -16,18 +16,23 @@ inline bool ipv4InRange(uint32_t ip, uint8_t a, uint8_t b, uint8_t c, uint8_t d,
 
 inline bool parseIpv4(const std::string& s, uint32_t& out) {
     unsigned parts[4];
-    int n = 0, cur = 0;
-    bool hasDigit = false;
-    // 追加 '.' 统一处理：每个点提交一段；连续点或空段在此被拒
-    for (char ch : s + '.') {
-        if (ch >= '0' && ch <= '9') { cur = cur * 10 + (ch - '0'); hasDigit = true; if (cur > 255) return false; }
-        else if (ch == '.') {
-            if (!hasDigit || n >= 4) return false;
-            parts[n++] = static_cast<unsigned>(cur);
-            cur = 0; hasDigit = false;
-        } else return false;
+    int n = 0;
+    size_t start = 0;
+    for (size_t i = 0; i <= s.size(); ++i) {
+        if (i != s.size() && s[i] != '.') continue;
+        const size_t len = i - start;
+        if (len == 0 || len > 3) return false;          // 空段 / 过长的段
+        if (len > 1 && s[start] == '0') return false;   // 前导零：0177 会被系统按八进制解析
+        unsigned v = 0;
+        for (size_t k = start; k < i; ++k) {
+            if (s[k] < '0' || s[k] > '9') return false;
+            v = v * 10 + static_cast<unsigned>(s[k] - '0');
+        }
+        if (v > 255) return false;
+        if (n >= 4) return false;                       // 多于四段
+        parts[n++] = v;
+        start = i + 1;
     }
-    // 末尾追加的点已提交第 4 段，此时 hasDigit 必为 false；只校验段数
     if (n != 4) return false;
     out = (parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3];
     return true;
@@ -90,6 +95,19 @@ inline bool isSafeOutboundUrl(const std::string& url) {
 
     uint32_t v4 = 0;
     if (parseIpv4(host, v4)) return !isPrivateIpv4(v4);
+    // 非规范的 IPv4 写法会被系统解析器（inet_addr / getaddrinfo）当成真实地址，
+    // 但上面的"四段十进制"解析认不出来：127.1、0177.0.0.1、0x7f.1、2130706433
+    // 都指向 127.0.0.1。凡是"含数字且只由数字/点/十六进制字符组成"的 host 一律拒绝。
+    // 注意：本校验只处理字面地址、不做 DNS 解析——解析到内网的域名仍会放行，
+    // 因此这层过滤不能替代真正的出站网络策略。
+    bool digit = false, numeric = true;
+    for (char ch : host) {
+        const bool isDigit = ch >= '0' && ch <= '9';
+        digit |= isDigit;
+        const bool isHex = isDigit || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F');
+        if (!isHex && ch != '.' && ch != 'x' && ch != 'X') { numeric = false; break; }
+    }
+    if (digit && numeric) return false;
     if (host.find(':') != std::string::npos) return !isPrivateIpv6(host);
 
     std::string h;

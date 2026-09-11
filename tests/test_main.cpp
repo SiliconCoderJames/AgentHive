@@ -125,6 +125,25 @@ static void test_url_guard() {
     CHECK(!isSafeOutboundUrl("http://user@example.com/"));
     CHECK(isSafeOutboundUrl("https://example.com/page"));
     CHECK(isSafeOutboundUrl("http://93.184.216.34:8080/x"));
+    // 非规范 IPv4 写法：系统解析器会认成真实地址，字面解析认不出来 —— 必须拒绝
+    CHECK(!isSafeOutboundUrl("http://127.1/"));
+    CHECK(!isSafeOutboundUrl("http://0177.0.0.1/"));
+    CHECK(!isSafeOutboundUrl("http://0x7f.0.0.1/"));
+    CHECK(!isSafeOutboundUrl("http://2130706433/"));
+    // 正常域名不能误伤（含数字但含非十六进制字符）
+    CHECK(isSafeOutboundUrl("https://api.github.com/x"));
+    CHECK(isSafeOutboundUrl("http://abc.de/x"));
+}
+
+// 密钥比较必须是常量时间实现（std::string::operator== 会在首个不同字节短路）
+static void test_constant_time_equals() {
+    CHECK(zp::constantTimeEquals("", ""));
+    CHECK(zp::constantTimeEquals("abc", "abc"));
+    CHECK(!zp::constantTimeEquals("abc", "abd"));
+    CHECK(!zp::constantTimeEquals("abc", "abcd"));
+    CHECK(!zp::constantTimeEquals("", "a"));
+    CHECK(!zp::constantTimeEquals("0000000000", "1000000000"));  // 首字节差异
+    CHECK(!zp::constantTimeEquals("0000000000", "0000000001"));  // 末字节差异
 }
 
 static std::string readFile(const std::string& path) {
@@ -341,6 +360,46 @@ static void test_platform_end_to_end() {
         CHECK(droidGone);
         CHECK(!p.authenticate("droid", droidKey));  // 凭据随之失效
 
+        // ---- 加固项：保留身份 / role 白名单 / 点对点消息读隔离 ----
+        step("hardening.identity");
+        std::string hErr, hKey;
+        // "user" 在鉴权里被当作人类用户（可解决任何错误、流转任何任务状态），
+        // 若可被注册，任何持有主密钥的 Agent 都能冒充，且审计会记错主体
+        CHECK(!p.registerAgent(masterKey, "user", "member", hKey, hErr));
+        CHECK(hErr.find("reserved") != std::string::npos);
+        CHECK(!p.registerAgent(masterKey, "zcode", "member", hKey, hErr));
+        CHECK(!p.registerAgent(masterKey, "system", "member", hKey, hErr));
+        // 角色白名单：此前 role 原样入库，可以自封任意角色（含管理者角色）
+        CHECK(!p.registerAgent(masterKey, "roleprobe", "root", hKey, hErr));
+        CHECK(hErr.find("invalid role") != std::string::npos);
+        CHECK(!p.registerAgent(masterKey, "roleprobe", "zcode", hKey, hErr));
+        CHECK(p.registerAgent(masterKey, "roleprobe", "member", hKey, hErr));
+
+        step("messages.visibility");
+        zp::Message pm;
+        CHECK(p.messageSend("task", "hermes", "claude", "私密任务", "只给 claude", pm, err));
+        auto seen = [&](const std::string& viewer, const std::string& uuid, bool& found) {
+            std::vector<zp::Message> vis;
+            std::string e;
+            found = false;
+            if (!p.messageList("", "", "", "", 50, vis, e, viewer)) return false;
+            for (const auto& m : vis)
+                if (m.uuid == uuid) found = true;
+            return true;
+        };
+        bool f = false;
+        CHECK(seen("roleprobe", pm.uuid, f));  // 无关 Agent
+        CHECK(!f);
+        CHECK(seen("claude", pm.uuid, f));     // 收件人
+        CHECK(f);
+        CHECK(seen("hermes", pm.uuid, f));     // 发件人
+        CHECK(f);
+        // 广播消息（recipient 为空）对所有人可见，不受 viewer 收敛影响
+        zp::Message bm;
+        CHECK(p.messageSend("note", "hermes", "", "广播", "全员可见", bm, err));
+        CHECK(seen("roleprobe", bm.uuid, f));
+        CHECK(f);
+
         // HTTP API 冒烟：启动服务，Agent 客户端访问
         step("http.start");
         int port = 0;
@@ -530,6 +589,7 @@ int main() {
     run("week_start", test_week_start);
     run("embedder", test_embedder);
     run("url_guard", test_url_guard);
+    run("constant_time", test_constant_time_equals);
     run("platform_e2e", test_platform_end_to_end);
     run("legacy_migration", test_legacy_migration);
 

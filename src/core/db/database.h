@@ -19,6 +19,8 @@ public:
     void bind(int idx, int64_t v);
     void bind(int idx, double v);
     void bindBlob(int idx, const void* data, size_t n);
+    // 显式绑定 NULL（如"广播消息"的 recipient：schema 约定 NULL = 广播给所有人）
+    void bindNull(int idx) { sqlite3_bind_null(s_, idx); }
     int step();                    // SQLITE_ROW / SQLITE_DONE / 错误码
     void reset();
     std::string text(int col) const;

@@ -163,16 +163,25 @@ bool Platform::authenticate(const std::string& agent, const std::string& apiKey)
     std::string salt, stored;
     if (!agents_.credentialOf(agent, salt, stored, err)) return false;
     if (stored.empty()) return false;
-    // 盐为空 = 旧格式哈希；非空 = sha256(salt + 明钥)
-    return stored == sha256Hex(salt.empty() ? apiKey : salt + apiKey);
+    // 盐为空 = 旧格式哈希；非空 = sha256(salt + 明钥)。常量时间比较，避免计时侧信道
+    return constantTimeEquals(stored, sha256Hex(salt.empty() ? apiKey : salt + apiKey));
 }
 
 bool Platform::authenticateMaster(const std::string& masterKey) const {
     std::lock_guard lock(mutex_);
-    return !master_key_hash_.empty() && master_key_hash_ == sha256Hex(masterKey);
+    return !master_key_hash_.empty() && constantTimeEquals(master_key_hash_, sha256Hex(masterKey));
 }
 
 bool Platform::isManager(const std::string& name) const { return name == kManagerName; }
+
+// 保留身份：这些名字在鉴权里被当作特权主体（"user" = 人类用户，"zcode" = 管理者，
+// "system" = 平台自身），必须禁止注册占用。否则任何持有主密钥的 Agent 只要注册一个
+// 叫 "user" 的账号，就能以"用户"身份解决他人错误、流转他人任务状态，而且审计日志会
+// 把操作记成人类用户做的——恰好打穿"全程可追溯"这条核心承诺。
+bool Platform::isReservedName(const std::string& name) {
+    const std::string n = toLower(name);
+    return n == kManagerName || n == "user" || n == "system" || n == "master";
+}
 
 bool Platform::registerAgent(const std::string& masterKey, const std::string& name,
                              const std::string& role, std::string& outApiKey, std::string& err) {
@@ -182,9 +191,19 @@ bool Platform::registerAgent(const std::string& masterKey, const std::string& na
         err = "invalid agent name (1..64 chars, no whitespace)";
         return false;
     }
+    // 保留名不可注册（否则可冒充人类用户/管理者，且审计会记错主体）
+    if (isReservedName(name)) {
+        err = "reserved agent name: " + name;
+        return false;
+    }
+    // 角色白名单：此前 role 原样入库、且从不参与鉴权，等于可以自封任意角色。
+    // 管理者的 zcode 角色只由 bootstrap 内部写入，不通过注册接口下发。
+    std::string actualRole = role.empty() ? std::string(kDefaultRole) : role;
+    if (actualRole != kDefaultRole) {
+        err = "invalid role (only '" + std::string(kDefaultRole) + "' may be registered)";
+        return false;
+    }
     if (agents_.nameExists(name)) { err = "agent already registered: " + name; return false; }
-    std::string actualRole = name == kManagerName ? std::string(kManagerName) : role;
-    if (actualRole.empty()) actualRole = kDefaultRole;
     outApiKey = randomHex(32);
     std::string salt = randomHex(16);
     if (!agents_.registerAgent(name, actualRole, salt, sha256Hex(salt + outApiKey), err))
@@ -479,9 +498,10 @@ bool Platform::messageSend(const std::string& kind, const std::string& sender,
 
 bool Platform::messageList(const std::string& recipientFilter, const std::string& kindFilter,
                            const std::string& statusFilter, const std::string& sinceIso, int limit,
-                           std::vector<Message>& out, std::string& err) {
+                           std::vector<Message>& out, std::string& err, const std::string& viewer) {
     std::lock_guard lock(mutex_);
-    return messages_.list(recipientFilter, kindFilter, statusFilter, sinceIso, limit, out, err);
+    return messages_.list(recipientFilter, kindFilter, statusFilter, sinceIso, limit, out, err,
+                          viewer);
 }
 
 bool Platform::messageGet(const std::string& uuid, Message& out, std::string& err) {
@@ -661,7 +681,10 @@ bool Platform::backupCreate(std::string& outPath, std::string& err) {
         escaped += ch;
         if (ch == '\'') escaped += '\'';
     }
-    return db_.execScript("VACUUM INTO '" + escaped + "';", err);
+    if (!db_.execScript("VACUUM INTO '" + escaped + "';", err)) return false;
+    // 备份是一次完整的数据库落盘，属于必须留痕的管理操作（此前漏记）
+    audit_.log("zcode", "system.backup", name, nlohmann::json{{"file", name}}.dump(), err);
+    return true;
 }
 
 bool Platform::backupList(std::vector<std::string>& out, std::string& err) {

@@ -12,20 +12,26 @@ DeepSeek 或任意能发 HTTP 请求的程序 —— 均以相同方式接入。
 { "code": 0, "message": "ok", "data": { ... } }
 ```
 
-  `code == 0` 成功；非 0 为 HTTP 状态码（400 参数错误 / 401 认证失败 / 403 越权 /
-  404 不存在 / 500 内部错误），`message` 为人类可读错误说明。
+  `code == 0` 成功；非 0 为 HTTP 状态码（400 参数错误 / 401 认证失败 / 403 主密钥无效 /
+  404 不存在 / 409 版本冲突 / 413 请求体过大 / 500 内部错误），`message` 为人类可读说明。
+  请求体上限 **1 MiB**（超出返回 413）；字段类型不符（如 `title` 传数字）返回 **400 + 同一信封**，
+  不会出现非 JSON 的裸 500。
 - 时间统一为 UTC ISO8601（`2026-09-07T05:00:00Z`）；周起点为**周一 UTC 00:00**（`YYYY-MM-DD`）。
-- 除 `POST /api/agents/register` 与 `PUT /api/usage/budget`（主密钥）外，
-  所有接口都需要请求头：
+- 除 `GET /api/health`（无需认证）与下列 9 个主密钥接口外，所有接口都需要请求头：
 
 ```
 X-Agent-Name: <Agent 名称>
 X-Api-Key:    <注册时下发的一次性明文密钥>
 ```
 
-- 管理接口（注册 Agent、改预算）需要请求头 `X-Master-Key`。
-- 协作规则落地：内容**只追加、不覆盖**（知识/记忆以版本演进，无删除接口）；
-  每次操作写 `audit_log`（身份 + 时间 + 动作 + 对象）；技能**先注册后调用**；
+- 需要 `X-Master-Key` 的接口（共 9 个）：`POST /api/agents/register`、`POST /api/agents/remove`、
+  `PUT /api/usage/budget`、`POST /api/maintenance`、`POST /api/system/backup`、
+  `GET /api/system/backups`、`POST /api/system/restore`、`DELETE /api/knowledge/{uuid}`、
+  `DELETE /api/memory`。
+- 身份为**保留名**：`user`（人类用户）、`zcode`（管理者）、`system`（平台）不可注册占用；
+  注册接口只接受 `role: "member"`。
+- 协作规则落地：内容**只追加、不覆盖**（知识/记忆以版本演进）；每次写操作写 `audit_log`
+  （身份 + 时间 + 动作 + 对象，轮转保留 30 天 / 10 万条）；技能**先注册后调用**；
   报错必须上报（`POST /api/errors`），不得静默忽略。
 
 ## 2. Agent 启动协议（强制）
@@ -60,7 +66,7 @@ X-Api-Key:    <注册时下发的一次性明文密钥>
 | 技能 | POST | `/api/skills/{name}/invoke` | 调用技能（记 Token + 审计） |
 | 技能 | GET | `/api/skills/{name}/invocations` | 调用记录 |
 | 消息 | POST | `/api/messages` | 留言 / 提问 / 指派任务 |
-| 消息 | GET | `/api/messages` | 收件箱 |
+| 消息 | GET | `/api/messages` | 按可见性收敛的收件箱（见 §4.5） |
 | 消息 | POST | `/api/messages/{uuid}/reply` | 回复 |
 | 消息 | POST | `/api/messages/{uuid}/status` | 状态流转 |
 | 错误 | POST | `/api/errors` | 上报错误（必须） |
@@ -196,6 +202,16 @@ API Key 立即失效、操作记入审计；管理者自身（`zcode`）不可�
 ```json
 { "kind": "task", "recipient": "hermes", "subject": "修个 bug", "body": "……" }
 ```
+
+**GET /api/messages** —— 收件箱，按**可见性收敛**返回：
+
+| 调用者 | 可见范围 |
+|---|---|
+| 普通 Agent | 广播（`recipient` 为 `null`）+ 发给自己的 + 自己发出的 |
+| 管理者 `zcode` | 全部 |
+
+  可选查询参数：`recipient`、`kind`、`status`、`since`（ISO 时间，取该时刻之后）、`limit`。
+  说明：点对点消息只对收发双方可见，此前"任意 Agent 可读全部点对点消息"的行为已收紧。
 
 **POST /api/messages/{uuid}/status** —— 状态机（非法流转返回 400）：
 

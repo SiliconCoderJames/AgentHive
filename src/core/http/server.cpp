@@ -106,6 +106,30 @@ HttpServer::~HttpServer() { stop(); }
 
 bool HttpServer::start(int port, std::string& err) {
     if (running_) return true;
+    // ---- 传输层加固：默认构造的 httplib::Server 请求体上限是 SIZE_MAX，
+    // 且没有读写超时。此前 body 会先被完整读入内存并 json::parse，之后才轮到
+    // Platform 层做长度校验，等于给了本机进程一个内存放大面。 ----
+    impl_->srv.set_payload_max_length(1024 * 1024);          // 1 MiB
+    impl_->srv.set_read_timeout(15, 0);
+    impl_->srv.set_write_timeout(15, 0);
+    impl_->srv.set_idle_interval(0, 100000);                 // 100ms，保证 stop() 能及时返回
+    // 未捕获异常统一转成平台信封：否则 httplib 会返回裸 500 且响应体不是 JSON，
+    // 客户端无法按统一约定解析（JSON 类型不匹配属于请求方问题，按 400 回报）。
+    impl_->srv.set_exception_handler([](const httplib::Request&, httplib::Response& res,
+                                        std::exception_ptr ep) {
+        std::string msg = "internal error";
+        int code = 500;
+        try {
+            if (ep) std::rethrow_exception(ep);
+        } catch (const nlohmann::json::exception& e) {
+            msg = std::string("invalid field type or malformed JSON: ") + e.what();
+            code = 400;
+        } catch (const std::exception& e) {
+            msg = e.what();
+        } catch (...) {
+        }
+        send(res, fail(code, msg));
+    });
     setupRoutes();
     if (!impl_->srv.bind_to_port("127.0.0.1", port, 0)) {
         err = "failed to bind 127.0.0.1:" + std::to_string(port);
@@ -537,7 +561,9 @@ void HttpServer::setupRoutes() {
         if (!parseLimit(req, res, 100, limit)) return;
         std::vector<Message> msgs;
         std::string err;
-        if (!p.messageList(recipient, kind, status, since, limit, msgs, err)) {
+        // 可见性：非管理者只能看到广播 + 发给自己的 + 自己发出的（否则人人可读点对点消息）
+        const std::string viewer = p.isManager(actor) ? std::string() : actor;
+        if (!p.messageList(recipient, kind, status, since, limit, msgs, err, viewer)) {
             send(res, fail(500, err));
             return;
         }

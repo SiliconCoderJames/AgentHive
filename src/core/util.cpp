@@ -103,6 +103,19 @@ std::string sha256Hex(const std::string& data) {
     return hexEncode(out, 32);
 }
 
+bool constantTimeEquals(const std::string& a, const std::string& b) {
+    // 长度差异先折进结果，再对 max(len) 逐字节异或累加：
+    // 不提前 return，比较步数不随内容变化（std::string::operator== 会在首个不同字节短路）
+    unsigned diff = static_cast<unsigned>(a.size() ^ b.size());
+    const size_t n = a.size() > b.size() ? a.size() : b.size();
+    for (size_t i = 0; i < n; ++i) {
+        const unsigned char ca = i < a.size() ? static_cast<unsigned char>(a[i]) : 0;
+        const unsigned char cb = i < b.size() ? static_cast<unsigned char>(b[i]) : 0;
+        diff |= static_cast<unsigned>(ca ^ cb);
+    }
+    return diff == 0;
+}
+
 std::string randomHex(int bytes) {
     std::string s(bytes * 2, '0');
     for (int i = 0; i < bytes; ++i) {

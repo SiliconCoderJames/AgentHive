@@ -42,6 +42,8 @@ public:
     bool registerAgent(const std::string& masterKey, const std::string& name, const std::string& role,
                        std::string& outApiKey, std::string& err);
     bool isManager(const std::string& name) const;
+    // 保留身份（user/zcode/system/master）：在鉴权里是特权主体，禁止注册占用
+    static bool isReservedName(const std::string& name);
 
     // ---- Agent ----
     void heartbeat(const std::string& name, const std::string& currentTask);
@@ -98,9 +100,12 @@ public:
     bool messageSend(const std::string& kind, const std::string& sender,
                      const std::string& recipient, const std::string& subject,
                      const std::string& body, Message& out, std::string& err);
+    // viewer 非空时按可见性收敛：只返回广播 + 发给 viewer + viewer 自己发出的消息
+    // （viewer 为空 = 进程内 GUI/管理视角，可见全部）。此前 HTTP 层不传任何约束，
+    // 任意 Agent 都能读到别人的点对点消息。
     bool messageList(const std::string& recipientFilter, const std::string& kindFilter,
                      const std::string& statusFilter, const std::string& sinceIso, int limit,
-                     std::vector<Message>& out, std::string& err);
+                     std::vector<Message>& out, std::string& err, const std::string& viewer = {});
     bool messageGet(const std::string& uuid, Message& out, std::string& err);
     bool messageReply(const std::string& sender, const std::string& parentUuid,
                       const std::string& body, Message& out, std::string& err);
@@ -117,7 +122,7 @@ public:
                       ErrorReport& out, std::string& err);
 
     // ---- Token 用量 ----
-    // 超过周预算时拒绝（返回 false，err 前缀 "weekly token budget exceeded"）
+    // 纯观测：只统计与分级告警，不因超预算拒绝调用（历史注释曾写"超过即拒绝"，已废弃）
     bool usageReport(const std::string& agent, int64_t tokensIn, int64_t tokensOut,
                      const std::string& callType, const std::string& model,
                      const std::string& referenceId, const std::string& idempotencyKey,

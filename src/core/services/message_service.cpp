@@ -21,7 +21,12 @@ bool MessageService::send(const std::string& kind, const std::string& sender,
                 st.bind(1, uuid);
                 st.bind(2, kind);
                 st.bind(3, sender);
-                st.bind(4, recipient);
+                // 空 recipient = 广播：按 schema 约定写 NULL（此前写空串，
+                // 导致所有 recipient IS NULL 的查询都匹配不到广播消息）
+                if (recipient.empty())
+                    st.bindNull(4);
+                else
+                    st.bind(4, recipient);
                 st.bind(5, subject);
                 st.bind(6, body);
                 st.bind(7, initialStatus);
@@ -35,14 +40,19 @@ bool MessageService::send(const std::string& kind, const std::string& sender,
 
 bool MessageService::list(const std::string& recipientFilter, const std::string& kindFilter,
                           const std::string& statusFilter, const std::string& sinceIso, int limit,
-                          std::vector<Message>& out, std::string& err) {
+                          std::vector<Message>& out, std::string& err, const std::string& viewer) {
     std::string sql =
         "SELECT id, uuid, kind, sender, recipient, subject, body, status, parent_uuid, created_at "
         "FROM messages WHERE 1=1";
-    if (!recipientFilter.empty()) sql += " AND (recipient IS NULL OR recipient = ?)";
+    // 广播消息的历史行存的是空串、新行存 NULL，两种都要认
+    if (!recipientFilter.empty())
+        sql += " AND (recipient IS NULL OR recipient = '' OR recipient = ?)";
     if (!kindFilter.empty()) sql += " AND kind = ?";
     if (!statusFilter.empty()) sql += " AND status = ?";
     if (!sinceIso.empty()) sql += " AND created_at >= ?";
+    // 可见性收敛：点对点消息只对收件人/发件人可见（广播对所有人可见）
+    if (!viewer.empty())
+        sql += " AND (recipient IS NULL OR recipient = '' OR recipient = ? OR sender = ?)";
     sql += " ORDER BY id DESC LIMIT ?";
     int idx = 1;
     out.clear();
@@ -53,6 +63,10 @@ bool MessageService::list(const std::string& recipientFilter, const std::string&
             if (!kindFilter.empty()) st.bind(idx++, kindFilter);
             if (!statusFilter.empty()) st.bind(idx++, statusFilter);
             if (!sinceIso.empty()) st.bind(idx++, sinceIso);
+            if (!viewer.empty()) {
+                st.bind(idx++, viewer);
+                st.bind(idx++, viewer);
+            }
             st.bind(idx, static_cast<int64_t>(limit > 0 ? limit : 100));
         },
         [&](Stmt& st) {

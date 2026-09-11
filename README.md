@@ -112,7 +112,8 @@ build\src\cli\Release\platformd.exe      # 无界面守护进程
 ```bash
 BASE=http://127.0.0.1:8787
 
-# 0. 用主密钥注册（密钥明文只下发一次）
+# 0. 用主密钥注册（接口只返回一次明文密钥；同时会明文缓存到
+#    %AGENTHIVE_HOME%/config/agents.json 供本机 CLI 复用——该文件等同凭据，勿外传）
 agent-cli register --name claude --master-key $(cat ~/.agenthive/config/master.key)
 
 # 1. 启动协议：查协作者 + 读用户记忆 + 心跳（之后每 30~60 秒心跳一次）
@@ -133,8 +134,9 @@ curl -X POST -H "X-Agent-Name: claude" -H "X-Api-Key: $KEY" -H "Content-Type: ap
 ### 与平台协作的强制规则
 
 1. Agent 通过 HTTP API 交互，接口有完整文档；
-2. 每次操作记录身份和时间（审计全量留痕）；
-3. 禁止覆盖或删除他人内容，只能追加或新建版本（平台层面无覆盖接口）；
+2. 每次写操作记录身份和时间（审计轮转保留 30 天 / 10 万条）；
+3. 禁止覆盖他人内容，只能追加或新建版本；删除仅限管理者（主密钥）且留痕；
+   点对点消息只对收发双方可见（广播对所有人可见）；
 4. 新技能必须先注册再调用（未注册调用返回 400）；
 5. Agent 启动时先查协作者列表和用户记忆（见上方启动协议）；
 6. 报错必须记录，不得静默忽略。
@@ -162,13 +164,18 @@ curl -X POST -H "X-Agent-Name: claude" -H "X-Api-Key: $KEY" -H "Content-Type: ap
 
 ## 质量与验证
 
-- 单元测试 **150 项断言**（SHA-256、嵌入器、SSRF 防护、平台端到端、旧库升级迁移）；
+- 单元测试 **207 项断言**（SHA-256、常量时间密钥比较、嵌入器、出站 URL 校验、
+  平台端到端、鉴权与消息可见性加固回归、旧库升级迁移）；
 - 集成验证 **39 项断言**（[scripts/feasibility_check.py](scripts/feasibility_check.py)：
-  模拟多 Agent 全生命周期，含中文语义检索、异步任务状态机、幂等上报、用量告警）；
-- AddressSanitizer 端到端 0 报告；浸泡测试单次 20 分钟 18 万+ 请求 0 错误、内存收敛
-  （[scripts/soak_test.py](scripts/soak_test.py)）；
+  模拟多 Agent 全生命周期，含中文模糊检索、异步任务状态机、幂等上报、用量告警）；
+- 加固回归（本次新增）：保留身份不可注册、注册角色白名单、点对点消息读隔离、
+  请求体 1 MiB 上限、字段类型错误的统一 400 信封——均有单测与 HTTP 实测覆盖；
 - 双进程并发写验证（GUI + platformd 同库）：60 次并发记忆写入版本无重复无断层；
 - 存量数据库自动迁移（幂等 ALTER），旧格式密钥兼容认证。
+
+> 注：`docs/hardening-report.md` 里的 ASan / 浸泡数据是作者本机一次性实测结果，
+> 仓库内没有对应的可复现脚本与 CI 任务（`soak_test.py` 不含内存采样），
+> 引用时请以"本机实测"而不是"可复现结论"理解。
 
 运行验证：
 

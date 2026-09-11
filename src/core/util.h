@@ -17,6 +17,9 @@ inline std::string envOr(const char* newName, const char* legacyName,
 }
 
 std::string sha256Hex(const std::string& data);
+// 常量时间字符串比较：用于校验密钥。std::string::operator== 逐字节短路返回，
+// 比较耗时随"前多少字节相同"变化，理论上可被计时侧信道利用。
+bool constantTimeEquals(const std::string& a, const std::string& b);
 std::string randomHex(int bytes);
 std::string uuid4();                      // 8-4-4-4-12 形式
 std::string nowIso();                     // UTC ISO8601，如 2026-09-07T05:00:00Z
