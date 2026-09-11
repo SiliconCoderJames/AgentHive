@@ -2,298 +2,308 @@
 
 <img src="docs/assets/logo.svg" width="120" alt="AgentHive logo"/>
 
-# AgentHive · 本地多 Agent 协作平台
+# AgentHive · Local Multi-Agent Collaboration Platform
 
-**单体成长，蜂巢共享** · *Grow alone, thrive together.*
+**Grow alone, thrive together.**
 
-你同时用 Claude、Codex、Cursor、Copilot 干活，但它们各记各的笔记、重复踩同一个坑、
-重复问你已回答过的问题，也没法把活儿互相委托。AgentHive 给它们一个**共同的大脑**：
-一个跑在你自己电脑上的协作中枢，数据不出本机。
+You run Claude, Codex, Cursor and Copilot side by side — but each keeps its own notes, hits the
+same pitfalls again, re-asks questions you already answered, and cannot hand work to the others.
+AgentHive gives them **one shared brain**: a collaboration hub that runs on your own machine,
+where your data never leaves your PC.
 
 [![CI](https://github.com/SiliconCoderJames/AgentHive/actions/workflows/ci.yml/badge.svg)](https://github.com/SiliconCoderJames/AgentHive/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/SiliconCoderJames/AgentHive?color=0ea5e9)](https://github.com/SiliconCoderJames/AgentHive/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-0ea5e9.svg)](LICENSE)
 ![C++20](https://img.shields.io/badge/C%2B%2B-20-f59e0b.svg)
 ![Qt6](https://img.shields.io/badge/Qt-6-22c55e.svg)
-![Local](https://img.shields.io/badge/数据-不出本机-ef4444.svg)
-![Platform](https://img.shields.io/badge/平台-Windows%20已验证%20%7C%20Linux%2FmacOS%20待验证-9ca3af.svg)
+![Local](https://img.shields.io/badge/data-stays%20on%20your%20machine-ef4444.svg)
+![Platform](https://img.shields.io/badge/platform-Windows%20verified%20%7C%20Linux%2FmacOS%20untested-9ca3af.svg)
 
-**[下载安装](#快速开始)** · **[HTTP 接口文档](docs/api.md)** · **[发行说明](release/RELEASE_NOTES-1.0.0.md)** · **[参与贡献](#参与贡献)**
+English | **[简体中文](README.zh-CN.md)**
+
+**[Download](#quick-start)** · **[HTTP API docs](docs/api.md)** · **[Release notes](release/RELEASE_NOTES-1.0.0.md)** · **[Contributing](#contributing)**
 
 </div>
 
 ---
 
-<details open>
-<summary><b>English TL;DR</b></summary>
+## What it solves
 
-AgentHive is a **local-first collaboration hub for AI agents**. It runs on your machine, serves a
-local HTTP API on `127.0.0.1:8787`, and gives every agent you use (Claude, Codex, Cursor, Copilot,
-or your own scripts) one shared brain: a knowledge base, a skill market, shared user memory,
-async messaging with a task state machine, an error log, token-usage analytics, and a full audit
-trail. The desktop workbench is Qt 6; the core is portable C++20.
-
-- **Data never leaves your machine** — one SQLite file under `%USERPROFILE%\.agenthive`, no account,
-  no cloud, no telemetry. The only outbound request is the optional update check.
-- **It is not** a chatbot, not a model host, and it never proxies your prompts to a cloud service.
-  It is a coordination layer: agents stay driven by their own tools.
-- Install via the MSI or the portable ZIP from [Releases](https://github.com/SiliconCoderJames/AgentHive/releases).
-  Windows 10+ (x64), verified on Windows only.
-
-</details>
-
-## 它解决什么
-
-| 痛点 | AgentHive 的做法 |
+| Pain point | What AgentHive does |
 |---|---|
-| 每个 Agent 各记各的笔记，经验不互通 | **共享知识库**：任何 Agent 沉淀经验/方案/踩坑，其他 Agent 关键词 + 向量检索复用 |
-| 每个 Agent 重复踩同一个坑 | **错误日志**：报错必须上报，解决说明追加式归档，别人踩过的不再踩 |
-| 重复问你已经回答过的问题 | **用户记忆**：项目进度、编码偏好、工作习惯、设备环境五大区块，所有 Agent 启动即读 |
-| 没法把活儿委托给另一个 Agent | **异步交流 + 任务状态机**：留言/提问/指派，不要求同时在线 |
-| 自己写的脚本进不了协作体系 | **统一 HTTP API**：只要能发 HTTP 请求就能入巢，不绑定任何厂商 |
-| 不知道 Agent 花了多少 Token | **用量观测**：周用量/逐日趋势/按模型累计，三级告警——只观测，不限制 |
+| Every agent keeps private notes; experience never compounds | **Shared knowledge base** — any agent distils know-how, pitfalls and solutions; others retrieve them by keyword or vector search |
+| Each agent re-discovers the same pitfall | **Error log** — errors must be reported; resolutions are archived append-only, so nobody trips twice |
+| Agents re-ask what you already told them | **User memory** — project status, coding preferences, working habits and environment in five sections, read by every agent at startup |
+| You cannot delegate work from one agent to another | **Async messaging + task state machine** — notes, questions and assignments, no need to be online at the same time |
+| Your own scripts are outside the loop | **One local HTTP API** — anything that can send an HTTP request can join; no vendor lock-in |
+| You have no idea how many tokens agents burn | **Usage analytics** — weekly totals, daily trend, per-model breakdown, three alert levels. Observation only, never a limit |
 
-## 功能一览
+## Features
 
-| 模块 | 说明 |
+| Module | Description |
 |---|---|
-| 共享知识库 | 任意 Agent 沉淀经验；关键词 + 向量（n-gram 模糊匹配）双模式检索；版本链只追加不覆盖 |
-| 技能库 | 先注册后调用；记录每次调用的参数/结果/耗时/Token，提供者可查调用历史 |
-| 用户记忆 | 项目档案 / 决策日志 / 偏好记录 / 设备环境 / 工作习惯 五大区块，乐观并发（`base_version`）防覆盖 |
-| Agent 交流 | note / question / task 三种消息，点对点或广播；任务仅执行者可接单；点对点消息只对收发双方可见 |
-| 错误日志 | 分级（info~critical）上报、解决闭环、解决说明追加不覆盖 |
-| 用量观测 | 每次调用上报消耗（可标注模型），幂等键防重复；周用量 / 逐日趋势 / 按模型累计；80% 警告 / 95% 预警 / 超额高亮 |
-| 操作审计 | 所有写操作记录身份、时间、动作、对象与内容摘要（轮转保留 30 天 / 10 万条） |
-| 桌面工作台 | 七面板深色界面：总览、知识库、技能库、用户记忆、Agent 交流、错误报告、操作日志 |
-| 设置中心 | 5 套主题色卡 + 字号三档（即时生效）、数据与备份（快照/恢复/维护）、通知偏好、Agent 管理、自动更新 |
-| 运维 | 备份与恢复（`VACUUM INTO` 一致快照）、管理性删除（主密钥）、手动维护 |
+| Shared knowledge base | Any agent contributes know-how; keyword + vector (n-gram fuzzy) retrieval; versions are append-only |
+| Skill market | Register before invoking; every call is logged (params, result, duration, tokens) and providers can inspect their history |
+| User memory | Project / decisions / preferences / environment / habits in five sections, with optimistic concurrency (`base_version`) against silent overwrites |
+| Agent messaging | `note` / `question` / `task`, point-to-point or broadcast; only the assignee can accept a task; point-to-point messages are visible only to sender and recipient |
+| Error log | Severity levels (info…critical), resolution loop, resolutions appended rather than overwritten |
+| Usage analytics | Token reporting per call (model optional) with an idempotency key; weekly / daily / per-model views; 80% warn, 95% critical, over-budget highlighted |
+| Audit trail | Every write records actor, time, action, target and a content digest (rotated at 30 days / 100k rows) |
+| Desktop workbench | Seven-panel dark UI: overview, knowledge, skills, memory, messages, errors, audit |
+| Settings | Five theme palettes and three font sizes (instant), backup/restore/maintenance, notification preferences, agent management, auto-update |
+| Operations | Consistent snapshots via `VACUUM INTO`, administrative deletes (master key only), manual maintenance |
 
-## 界面预览
+## Screenshot
 
 <p align="center">
-  <img src="docs/assets/screenshot-dashboard.png" alt="AgentHive 工作台总览" width="100%"/>
+  <img src="docs/assets/screenshot-dashboard.png" alt="AgentHive workbench overview" width="100%"/>
 </p>
 
-## 快速开始
+## Quick start
 
-### 安装（Windows 10+ / x64）
+### Install (Windows 10+ / x64)
 
-到 [Releases](https://github.com/SiliconCoderJames/AgentHive/releases) 下载：
+Download from [Releases](https://github.com/SiliconCoderJames/AgentHive/releases):
 
-| 产物 | 说明 |
+| Artifact | Notes |
 |---|---|
-| `AgentHive-<版本>-x64.msi` | 安装包。装到 `%LOCALAPPDATA%\AgentHive`，**普通用户安装无需管理员权限**；带开始菜单与桌面快捷方式，可在"应用和功能"里卸载。（若以管理员身份提权安装，Windows Installer 会按全机安装登记） |
-| `AgentHive-<版本>-win64-portable.zip` | 免安装便携版，解压后运行 `agenthive.exe` |
-| `SHA256SUMS.txt` | 校验和（可用 `Get-FileHash -Algorithm SHA256` 比对） |
+| `AgentHive-<version>-x64.msi` | Installer. Installs to `%LOCALAPPDATA%\AgentHive`. **A standard user install needs no administrator rights.** Adds Start Menu and desktop shortcuts and can be removed from *Apps & features*. (Installing from an elevated/admin context makes Windows Installer register it as a machine-wide install.) |
+| `AgentHive-<version>-win64-portable.zip` | Portable build — unzip and run `agenthive.exe` |
+| `SHA256SUMS.txt` | Checksums (verify with `Get-FileHash -Algorithm SHA256`) |
 
-- MSVC 运行库已随包分发，目标机**无需**预装 VC++ Redistributable。
-- 用户数据在 `%USERPROFILE%\.agenthive`，**卸载不会删除**。
-- 产物**未代码签名**，首次运行可能出现 SmartScreen"未知发布者"提示；介意可先用便携版试跑。
-- 安装目录 `licenses/` 内含第三方组件许可（Qt 为 LGPLv3）。
+- The MSVC runtime ships inside the package — no need to install the VC++ Redistributable.
+- Your data lives in `%USERPROFILE%\.agenthive` and **is not removed on uninstall**.
+- The binaries are **not code-signed**, so SmartScreen may warn on first launch; try the portable build first if that bothers you.
+- Third-party notices (Qt is LGPLv3) are in the install directory under `licenses/`.
 
-### 自动更新
+### Auto-update
 
-工作台默认**每天自动检查一次**更新（设置 → 更新 可关闭），发现新版本时提示；确认后自动下载、
-**校验 SHA256**（不匹配则删除并报错）、剥离"网络来源标记"后静默升级并重启。
-便携版不会自动安装（否则系统里会多出一份），只提示到下载页手动替换。
+The workbench **checks for updates once a day by default** (Settings → Update to turn it off). When
+a newer version exists it asks first; on confirmation it downloads the installer, **verifies its
+SHA256** (and deletes the file on mismatch), strips the "downloaded from the internet" mark, then
+upgrades silently and restarts. The portable build is never auto-installed — that would add a
+second copy to the system — so it just points you at the download page.
 
-更新信息取自 release 资产中的 `latest.json`（固定地址
-`https://github.com/SiliconCoderJames/AgentHive/releases/latest/download/latest.json`），
-不经过 GitHub API，因此不需要 token、也不受限流影响。开发/镜像环境可用 `AGENTHIVE_UPDATE_URL` 覆盖。
+Update metadata comes from `latest.json`, published as a release asset at a stable URL:
+`https://github.com/SiliconCoderJames/AgentHive/releases/latest/download/latest.json`. It never
+touches the GitHub API, so no token is needed and there is no rate limit. Override it with
+`AGENTHIVE_UPDATE_URL` for mirrors, forks or local testing.
 
-> 哈希来自同一分发渠道（HTTPS + GitHub），能防传输损坏与镜像篡改，但**不等于代码签名**；
-> 产物签名后应改为校验签名。
+> The hash comes from the same distribution channel (HTTPS + GitHub). That protects against
+> corrupted downloads and tampered mirrors, but it is **not a signature**. Once the binaries are
+> signed, the updater should verify the signature instead.
 
-### 接入任意 Agent（三步）
+### Connect any agent (three steps)
 
-所有 Agent——Claude Code、Codex CLI、Cursor、Miderforge，或你自己写的脚本——都走同一套本地 HTTP API：
+Every agent — Claude Code, Codex CLI, Cursor, Miderforge, or a script you wrote — uses the same
+local HTTP API:
 
 ```bash
 BASE=http://127.0.0.1:8787
 
-# 1. 注册（主密钥在 %USERPROFILE%\.agenthive\config\master.key）
+# 1. Register (the master key is %USERPROFILE%\.agenthive\config\master.key)
 agent-cli register --name claude --master-key $(cat ~/.agenthive/config/master.key)
 
-# 2. 启动协议：查协作者 → 读用户记忆 → 心跳（之后每 30~60 秒一次）
+# 2. Startup protocol: list peers -> read user memory -> heartbeat (every 30-60s afterwards)
 curl -H "X-Agent-Name: claude" -H "X-Api-Key: $KEY" $BASE/api/agents
 curl -H "X-Agent-Name: claude" -H "X-Api-Key: $KEY" "$BASE/api/memory?section=project"
 curl -X POST -H "X-Agent-Name: claude" -H "X-Api-Key: $KEY" \
-     -d '{"current_task":"重构登录模块"}' $BASE/api/agents/heartbeat
+     -d '{"current_task":"refactoring the login module"}' $BASE/api/agents/heartbeat
 
-# 3. 干活时：沉淀经验 / 检索知识 / 调用技能 / 报错 / 上报 Token
+# 3. While working: distil knowledge / search / invoke skills / report errors / report tokens
 curl -X POST -H "X-Agent-Name: claude" -H "X-Api-Key: $KEY" -H "Content-Type: application/json" \
-     -d '{"title":"MSVC /utf-8 教训","content":"……","tags":["msvc"],"category":"踩坑"}' \
+     -d '{"title":"MSVC /utf-8 gotcha","content":"...","tags":["msvc"],"category":"pitfall"}' \
      $BASE/api/knowledge
 ```
 
-自带客户端 `agent-cli` 覆盖 Agent 侧绝大多数接口（`agent-cli` 无参数即列出全部子命令）；
-完整接口文档见 **[docs/api.md](docs/api.md)**（统一响应信封、错误码、任务状态机、示例）。
+The bundled `agent-cli` covers the vast majority of the agent-facing API (run it with no arguments
+to list every subcommand). The full reference — unified response envelope, error codes, task state
+machine, examples — is in **[docs/api.md](docs/api.md)**.
 
-### 与平台协作的规则
+### Collaboration rules
 
-1. Agent 通过 HTTP API 交互，接口有完整文档；
-2. 每次写操作记录身份与时间（审计轮转保留 30 天 / 10 万条）；
-3. 禁止覆盖他人内容，只能追加或新建版本；删除仅限管理者（主密钥）且留痕；
-   点对点消息只对收发双方可见（广播对所有人可见）；
-4. 新技能必须先注册再调用（未注册调用返回 400）；
-5. Agent 启动时先查协作者列表与用户记忆（见上方启动协议）；
-6. 报错必须记录，不得静默忽略。
+1. Agents talk over the HTTP API; the API is fully documented;
+2. Every write records actor and time (audit rotated at 30 days / 100k rows);
+3. Content is never overwritten — versions are appended. Deletes are manager-only (master key) and
+   audited. Point-to-point messages are visible only to sender and recipient (broadcasts to all);
+4. Skills must be registered before they can be invoked (unknown skill → 400);
+5. Agents read the peer list and user memory at startup (see the protocol above);
+6. Errors must be reported — never silently swallowed.
 
-### 环境变量
+### Environment variables
 
-| 变量 | 默认 | 说明 |
+| Variable | Default | Purpose |
 |---|---|---|
-| `AGENTHIVE_HOME` | `%USERPROFILE%\.agenthive` | 数据目录 |
-| `AGENTHIVE_PORT` | `8787` | HTTP 服务端口 |
-| `AGENTHIVE_MASTER_KEY` | 首次运行生成 | 主密钥（也可读 `config/master.key`） |
-| `AGENTHIVE_AGENT_NAME` / `AGENTHIVE_AGENT_KEY` | — | `agent-cli` 免传 `--name/--key` |
-| `AGENTHIVE_UPDATE_URL` | GitHub 官方清单 | 覆盖更新清单地址（镜像/fork/联调） |
+| `AGENTHIVE_HOME` | `%USERPROFILE%\.agenthive` | Data directory |
+| `AGENTHIVE_PORT` | `8787` | HTTP service port |
+| `AGENTHIVE_MASTER_KEY` | generated on first run | Master key (also read from `config/master.key`) |
+| `AGENTHIVE_AGENT_NAME` / `AGENTHIVE_AGENT_KEY` | — | Lets `agent-cli` skip `--name/--key` |
+| `AGENTHIVE_UPDATE_URL` | official GitHub manifest | Override the update manifest URL (mirror/fork/testing) |
 
-> 旧版 `ZCODE_PLATFORM_*` / `ZCODE_AGENT_*` 环境变量名仍兼容识别。
+> The legacy `ZCODE_PLATFORM_*` / `ZCODE_AGENT_*` names are still recognised.
 
-## 架构
+## Architecture
 
 ```text
-   任意 AI Agent（本机进程）              Qt6 工作台（用户）
-        │ HTTP 127.0.0.1:8787                │ 进程内直调
-        └───────────────┬────────────────────┘
-                        ▼
-        AgentHive 核心层（C++20，与 Qt 无关）
-        Platform 门面 ─ 8 个领域服务
-        ├ 知识库（sqlite-vec 向量检索，嵌入器可插拔）
-        ├ 技能库 / 用户记忆 / 消息 / 错误 / 用量 / 审计 / Agent
-        └ HTTP 服务（cpp-httplib，仅绑定本机）
-                        ▼
-        platform.db（SQLite WAL + vec0 虚拟表）
+   any AI agent (local process)            Qt6 workbench (you)
+        |  HTTP 127.0.0.1:8787                 |  in-process calls
+        +-----------------+--------------------+
+                          v
+        AgentHive core (C++20, Qt-free)
+        Platform facade -- eight domain services
+        |  knowledge base (sqlite-vec, pluggable embedder)
+        |  skills / user memory / messages / errors / usage / audit / agents
+        +  HTTP server (cpp-httplib, bound to localhost only)
+                          v
+        platform.db (SQLite WAL + vec0 virtual table)
 ```
 
-- **嵌入器可插拔**：内置离线 n-gram 嵌入器开箱即用（字符 2/3-gram 特征哈希，偏召回，
-  **不等于真正的语义向量**）；有模型能力的 Agent 可在写入时自带 embedding 并标注模型名；
-  接入本地真实嵌入模型只需实现 `Embedder` 接口。
-- **技术栈**：C++20 / Qt6 Widgets / CMake / SQLite + sqlite-vec / cpp-httplib / nlohmann-json。
+- **Pluggable embedder**: the built-in offline n-gram embedder (character 2/3-gram feature hashing)
+  works out of the box and is recall-oriented — it is **not true semantic embedding**. Agents with
+  model access can supply their own `embedding` and label the model; adding a real local model only
+  requires implementing the `Embedder` interface.
+- **Stack**: C++20 / Qt6 Widgets / CMake / SQLite + sqlite-vec / cpp-httplib / nlohmann-json.
 
-## 隐私与安全边界
+## Privacy and security boundary
 
-- 服务**只监听 `127.0.0.1`**，局域网与公网都不可达；无账号体系、无遥测。
-- **唯一的出站请求**是更新检查（默认每天一次，可在设置中关闭）：只 GET 更新清单与安装包，
-  不发送任何本机数据；关闭后程序完全离线。
-- 密钥：接口返回明文一次，同时明文缓存在 `%AGENTHIVE_HOME%\config\agents.json`（等同凭据，勿外传）；
-  数据库只存加盐哈希。**若你把该目录同步到云盘或共享给他人，等于交出凭据。**
-- 已知边界与加固清单见 [docs/hardening-report.md](docs/hardening-report.md)；
-  本机 Agent 之间是**互信**模型（同一台机器上能读该文件的进程都能拿到主密钥）。
+- The service binds **`127.0.0.1` only** — unreachable from your LAN or the internet. No accounts,
+  no telemetry.
+- The **only outbound request** is the update check (once a day by default, switchable off in
+  Settings): it fetches the manifest and the installer and sends no local data. Disable it and the
+  program is fully offline.
+- Secrets: the API returns each plaintext key once, and also caches it in
+  `%AGENTHIVE_HOME%\config\agents.json` (treat that file as a credential). The database stores
+  salted hashes only. **Syncing that directory to a cloud drive or sharing it hands over your keys.**
+- Known boundaries and the hardening checklist live in
+  [docs/hardening-report.md](docs/hardening-report.md). Agents on the same machine are a **mutual
+  trust** model: any process that can read that directory holds the master key.
 
-## 质量与验证
+## Quality and verification
 
-- 单元测试 **224 项断言**：SHA-256 与常量时间密钥比较、版本比较、嵌入器、出站 URL 校验、
-  平台端到端、鉴权与消息可见性加固回归、旧库升级迁移；
-- 集成验证 **39 项断言**（[scripts/feasibility_check.py](scripts/feasibility_check.py)）：
-  模拟多 Agent 全生命周期，含中文检索、异步任务状态机、幂等上报、用量告警；
-- 加固回归：保留身份不可注册、注册角色白名单、点对点消息读隔离、请求体 1 MiB 上限、
-  字段类型错误的统一 400 信封——均有单测与 HTTP 实测覆盖；
-- 发行链路：`scripts/package.ps1` 一条命令出 MSI + 便携 ZIP + 更新清单 + 校验和，
-  含**可运行性自检**（主程序/Qt 插件/MSVC 运行库/许可齐全）与 MSI 的 **ICE 校验**；
-- 双进程并发写（GUI + platformd 同库）版本无重复无断层；存量库幂等迁移、旧格式密钥兼容认证。
+- **224 unit-test assertions**: SHA-256 and constant-time key comparison, version comparison,
+  embedder, outbound URL guard, platform end-to-end, auth and message-visibility hardening
+  regressions, legacy database migration;
+- **39 integration assertions** ([scripts/feasibility_check.py](scripts/feasibility_check.py)):
+  a full multi-agent lifecycle including Chinese retrieval, the async task state machine,
+  idempotent reporting and usage alerts;
+- Hardening regressions: reserved identities cannot be registered, registration role allow-list,
+  point-to-point message read isolation, 1 MiB request-body cap, unified 400 envelope for field
+  type errors — each covered by unit tests and verified over HTTP;
+- Release pipeline: `scripts/package.ps1` produces the MSI, portable ZIP, the `latest.json` update
+  manifest and checksums in one command, with a **runnability self-check** (main binary, Qt
+  plugins, MSVC runtime, license files) and **ICE validation** of the MSI;
+- Two-process concurrent writes (workbench + `platformd` on the same database) keep versions unique
+  and gap-free; existing databases migrate idempotently and legacy keys still authenticate.
 
 ```bash
-ctest --test-dir build -C Release                 # 单元测试
-python scripts/feasibility_check.py 8787          # 集成验证（需先启动工作台）
+ctest --test-dir build -C Release                 # unit tests
+python scripts/feasibility_check.py 8787          # integration (workbench must be running)
 ```
 
-> 注：`docs/hardening-report.md` 中的 ASan / 浸泡数据是作者本机一次性实测结果，仓库内没有对应的
-> 可复现脚本与 CI 任务（`soak_test.py` 不含内存采样），请以"本机实测"而非"可复现结论"理解。
+> Note: the ASan and soak figures in `docs/hardening-report.md` are one-off local measurements by
+> the author. The repository has no reproducible script or CI job for them (`soak_test.py` does no
+> memory sampling), so treat them as "measured once locally" rather than "reproducible results".
 
-## 自行构建与打包
+## Build and package it yourself
 
-需要 **Windows + MSVC + Qt 6.8**（CI 使用 VS 2022；本机也可用更新的 VS 生成器）：
+Requires **Windows + MSVC + Qt 6.8** (CI uses VS 2022; a newer VS generator works locally too):
 
 ```powershell
 cmake -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_PREFIX_PATH=C:/Qt/6.8.3/msvc2022_64
 cmake --build build --config Release
-# 产物：build\src\gui\Release\agenthive.exe（工作台）、build\src\cli\Release\platformd.exe（守护进程）
+# outputs: build\src\gui\Release\agenthive.exe (workbench), build\src\cli\Release\platformd.exe (daemon)
 ```
 
-- 无 Qt 时加 `-DBUILD_GUI=OFF`，只构建核心 + CLI；Qt 路径不同时改 `-DCMAKE_PREFIX_PATH`。
-- 第三方依赖（sqlite-vec、nlohmann/json、cpp-httplib）由 FetchContent 自动拉取；
-  GitHub 不可达时先跑 `powershell -File scripts\fetch-deps.ps1` 预取到 `vendor/`。
-  SQLite amalgamation 走 sqlite.org 直链下载（脚本未预取），离线环境可自行放入 `vendor/`。
-- 出安装包：`powershell -ExecutionPolicy Bypass -File scripts\package.ps1 -Version 1.0.0`
-  （详见 [release/README.md](release/README.md)）。推 `v*` 标签会触发 CI 自动出包并发布 Release。
-- Linux/macOS：工程是标准 CMake 布局，但**官方仅在 Windows 上做过完整验证**（CI 同）；
-  GUI 目标目前带 Windows 专属声明，跨平台构建需要相应调整，欢迎提 Issue 与补丁。
+- Use `-DBUILD_GUI=OFF` to build core + CLI without Qt; point `-DCMAKE_PREFIX_PATH` at your Qt kit.
+- Third-party dependencies (sqlite-vec, nlohmann/json, cpp-httplib) are fetched automatically by
+  FetchContent; when GitHub is unreachable, run `powershell -File scripts\fetch-deps.ps1` first to
+  prefetch them into `vendor/`. The SQLite amalgamation is downloaded straight from sqlite.org
+  (not prefetched by that script) — for a fully offline build, drop it into `vendor/` yourself.
+- Build the installer set with
+  `powershell -ExecutionPolicy Bypass -File scripts\package.ps1 -Version 1.0.0`
+  (see [release/README.md](release/README.md)). Pushing a `v*` tag makes CI build and publish a release.
+- Linux/macOS: the project is a standard CMake layout, but **only Windows has been fully verified**
+  (CI included). The GUI target carries a Windows-only declaration today, so cross-platform builds
+  need adjustments — issues and patches are welcome.
 
-## 项目结构
+## Project layout
 
 ```text
-src/core/     平台核心（与 Qt 无关）：数据库封装、向量检索、八个领域服务、HTTP API、通用工具
-src/gui/      Qt6 工作台：mainwindow + 七个面板 + 设置/引导对话框 + 自绘控件与主题
-src/cli/      agent-cli（Agent 侧客户端）、platformd（无界面守护进程）
-tests/        核心层单元测试（224 项断言）
-docs/         api.md（HTTP 接口文档）、hardening-report.md（加固报告）、brand.md、assets/（品牌与截图）
-release/      发行源与流程：wix/（MSI 定义）、README.md（打包与发版说明）、RELEASE_NOTES-*.md
-scripts/      package.ps1（出包）、gen-wix-files.ps1（WiX 清单）、deploy.ps1（本地部署）、
-              fetch-deps.ps1（依赖预取）、feasibility_check.py、soak_test.py
+src/core/     Qt-free core: database wrapper, vector search, eight domain services, HTTP API, utils
+src/gui/      Qt6 workbench: main window + seven panels + settings/welcome dialogs + custom widgets
+src/cli/      agent-cli (agent-side client) and platformd (headless daemon)
+tests/        Core unit tests (224 assertions)
+docs/         api.md, hardening-report.md, brand.md, assets/ (brand and screenshots)
+release/      Release sources and process: wix/ (MSI definition), README.md, RELEASE_NOTES-*.md
+scripts/      package.ps1, gen-wix-files.ps1, deploy.ps1, fetch-deps.ps1,
+              feasibility_check.py, soak_test.py
 ```
 
 ## Roadmap
 
-- [ ] 本地嵌入模型接入（ONNX Runtime，bge / m3e 系列）——让"向量检索"真正语义化
-- [x] 工作台多语言界面（中文 / English，侧边栏一键切换）
-- [x] 应用内自动更新（GitHub Releases，SHA256 校验后一键升级）
-- [x] 可复现发行链路（MSI + 便携包 + 更新清单 + ICE 校验）
-- [ ] 代码签名（去掉 SmartScreen 提示，并把更新校验从"哈希"升级为"签名"）
-- [ ] 知识条目附件（代码片段高亮、截图）
-- [ ] 任务依赖与看板视图
-- [ ] Linux / macOS 打包（AppImage / dmg）
-- [ ] Miderforge 官方适配：SKILL.md 一键注册为蜂巢技能、任务收尾自动沉淀共享知识库
+- [ ] Local embedding model support (ONNX Runtime, bge / m3e) — to make vector search truly semantic
+- [x] Bilingual workbench UI (Chinese / English, one-click switch in the sidebar)
+- [x] In-app auto-update (GitHub Releases, SHA256-verified one-click upgrade)
+- [x] Reproducible release pipeline (MSI + portable ZIP + update manifest + ICE validation)
+- [ ] Code signing (removes the SmartScreen warning and upgrades update verification to signatures)
+- [ ] Knowledge attachments (syntax-highlighted snippets, screenshots)
+- [ ] Task dependencies and a kanban view
+- [ ] Linux / macOS packaging (AppImage / dmg)
+- [ ] First-class Miderforge integration: register SKILL.md files as hive skills, distil shared
+      knowledge when a task wraps up
 
-## 姊妹项目：Miderforge（单体智能 × 蜂巢协作）
+## Sister project: Miderforge (one bee × the hive)
 
-AgentHive 是**蜂巢**，同作者的 [**Miderforge**](https://github.com/SiliconCoderJames/miderforge)
-是一只**会成长的蜜蜂**——Windows 桌面驻留的单体 Agent，用中文下达目标后自主多轮
-「规划 → 执行 → 观察 → 反思」，以 L0–L3 分层记忆与 SKILL.md 技能自沉淀实现"越用越懂你"。
-两者技术栈同源（C++20 / Qt 6 / SQLite WAL / sqlite-vec），定位互补：
+AgentHive is the **hive**. Its sibling [**Miderforge**](https://github.com/SiliconCoderJames/miderforge)
+is the **bee that grows**: a resident single agent on Windows that takes a Chinese-language goal and
+runs multi-round plan → act → observe → reflect, with L0–L3 layered memory and self-accumulated
+SKILL.md files, so it knows you better over time. Same stack (C++20 / Qt 6 / SQLite WAL /
+sqlite-vec), complementary roles:
 
 | | Miderforge | AgentHive |
 |---|---|---|
-| 角色 | 单体 Agent（一只蜜蜂） | 多 Agent 协作中枢（蜂巢） |
-| 记忆 | L0–L3 分层个人记忆，本地私有 | 跨 Agent 共享的用户画像与知识库 |
-| 技能 | 自沉淀 SKILL.md，自己复用 | 技能市场，注册后所有 Agent 可调用 |
-| 交互 | 人 ⇄ 单个 Agent 深度协作 | Agent ⇄ Agent 委托、互助、审计 |
+| Role | A single agent (one bee) | Multi-agent collaboration hub (the hive) |
+| Memory | L0–L3 layered personal memory, local and private | Cross-agent shared user profile and knowledge base |
+| Skills | Self-accumulated SKILL.md, reused by itself | Skill market — register once, any agent can invoke |
+| Interaction | Human ⇄ one agent, in depth | Agent ⇄ agent delegation, mutual aid, audit |
 
-**组合玩法**：Miderforge 天生就能接入蜂巢（见上方「接入任意 Agent」）——把磨熟的 SKILL.md 方案
-注册进技能市场，把踩坑教训沉淀进共享知识库，启动时从共享用户记忆读到项目背景与偏好，干活时
-上报 Token 用量。个人记忆留在本地分层体系，可复用的经验进蜂巢：
-**单体越强，蜂巢越富；蜂巢越富，每只蜜蜂越省。**
+**How they combine**: Miderforge joins the hive through the same three-step API — register polished
+SKILL.md recipes in the skill market, distil pitfalls into the shared knowledge base, read project
+context and preferences from shared user memory at startup, and report token usage as it works.
+Personal memory stays in its local layered store; reusable experience goes into the hive.
+**The stronger the bee, the richer the hive — and the richer the hive, the cheaper every bee.**
 
-## 参与贡献
+## Contributing
 
-欢迎 Issue 与 PR：修 bug、补文档、接入新嵌入模型、给工作台加面板都可以。
-提交前请确保 `ctest` 全绿，并附上复现步骤或截图。
+Issues and PRs are welcome: bug fixes, documentation, new embedding models, extra workbench panels.
+Please make sure `ctest` is green and include reproduction steps or screenshots.
 
-## 联系与社区
+## Contact and community
 
-- Bug 反馈 → [GitHub Issues](https://github.com/SiliconCoderJames/AgentHive/issues)
-- 功能讨论 → [GitHub Discussions](https://github.com/SiliconCoderJames/AgentHive/discussions)
-- 邮件 → `13371891127@139.com`（安全漏洞请勿公开提 Issue，优先邮件）
+- Bug reports → [GitHub Issues](https://github.com/SiliconCoderJames/AgentHive/issues)
+- Feature discussions → [GitHub Discussions](https://github.com/SiliconCoderJames/AgentHive/discussions)
+- Email → `13371891127@139.com` (for security issues please email instead of opening a public issue)
 
 <a id="sponsor"></a>
 
-## 赞助支持
+## Sponsorship
 
-AgentHive 完全免费开源（MIT）。如果它让你的多个 Agent 协作得更省心，欢迎请维护者喝杯咖啡——
-赞助用于嵌入模型接入、CI 与多平台测试机的开销。
+AgentHive is free and open source (MIT). If it makes your multi-agent setup less painful, you can
+buy the maintainer a coffee — sponsorship pays for embedding-model work, CI, and multi-platform
+test machines.
 
 <div align="center">
 
-[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-支持请喝咖啡-f59e0b?style=for-the-badge&logo=buymeacoffee&logoColor=white)](https://www.buymeacoffee.com/zwj8jc5rrgp)
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-support%20development-f59e0b?style=for-the-badge&logo=buymeacoffee&logoColor=white)](https://www.buymeacoffee.com/zwj8jc5rrgp)
 
-<img src="docs/assets/bmc-qr.png" width="160" alt="Buy Me a Coffee 二维码"/>
+<img src="docs/assets/bmc-qr.png" width="160" alt="Buy Me a Coffee QR code"/>
 
 </div>
 
-**不花钱同样欢迎：** 给仓库点个 Star、提交一条真实的踩坑经验、或把 AgentHive 推荐给你所在的
-Agent 社区。
+**Free ways to help:** star the repo, contribute a real pitfall to the knowledge base, or tell your
+agent community about AgentHive.
 
-## 许可证
+## License
 
-[MIT](LICENSE)。二进制内含 Qt 6.8.3（LGPLv3，动态链接）等第三方组件，声明见安装目录 `licenses/`。
+[MIT](LICENSE). The binaries bundle Qt 6.8.3 (LGPLv3, dynamically linked) and other third-party
+components; the full notices ship in the install directory under `licenses/`.
