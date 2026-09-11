@@ -32,3 +32,10 @@ file(READ ${CMAKE_CURRENT_SOURCE_DIR}/db/schema.sql SCHEMA_SQL_CONTENT)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/db/schema_sql.h.in
                ${CMAKE_CURRENT_BINARY_DIR}/generated/schema_sql.h @ONLY)
 target_include_directories(zplatform_core PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/generated)
+
+# 版本号单一来源 → 生成 version.h（界面、/api/health、安装包共用）
+# 放在 generated/core/ 下：以 generated 为 include 根，代码里写 #include "core/version.h"，
+# 避免 "version.h" 这种通用名与 C++20 <version> 之类在同一 include 路径上撞名。
+file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/generated/core)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/version.h.in
+               ${CMAKE_CURRENT_BINARY_DIR}/generated/core/version.h @ONLY)

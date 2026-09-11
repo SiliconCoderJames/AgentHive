@@ -51,9 +51,11 @@ private:
     std::vector<std::function<PanelBase*(zp::Platform&, QWidget*)>> panelFactories_;
     QWidget* side_ = nullptr;
     QFrame* brandLine_ = nullptr;
+    QLabel* logoMark_ = nullptr;  // 品牌图标（仓库 logo.png，缺失时回退矢量蜂巢）
     QLabel* logo_ = nullptr;
     QLabel* statusServer_ = nullptr;
     QLabel* statusUsage_ = nullptr;
+    QLabel* statusUpdated_ = nullptr;  // 最近一次刷新时刻（数据新鲜度）
     QLabel* spin_ = nullptr;
     QToolButton* settingsBtn_ = nullptr;
     QToolButton* langBtn_ = nullptr;

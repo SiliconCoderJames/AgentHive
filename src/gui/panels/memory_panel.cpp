@@ -64,15 +64,15 @@ void MemoryPanel::refresh() {
     std::string err;
     platform_.memoryList("", entries_, err);
 
-    // 头部：条目总数 + 最后更新时间
-    QString lastUpdated = "—";
+    // 头部：条目总数 + 最后更新时间（相对时间；文案接入双语）
+    QString lastRaw;
     for (const auto& m : entries_) {
-        QString t = QString::fromStdString(m.created_at);
-        if (t > lastUpdated || lastUpdated == "—") lastUpdated = t;
+        const QString t = QString::fromStdString(m.created_at);
+        if (lastRaw.isEmpty() || t > lastRaw) lastRaw = t;  // UTC ISO 字典序即时序
     }
-    headerLabel_->setText(QString("记忆条目总数: %1 · 最后更新: %2")
+    headerLabel_->setText(i18n::trs("记忆条目 %1 · 最后更新 %2", "Entries %1 · last updated %2")
                               .arg(formatNum(static_cast<qint64>(entries_.size())))
-                              .arg(lastUpdated));
+                              .arg(lastRaw.isEmpty() ? QString("—") : relTime(lastRaw)));
 
     // 重建五区块折叠卡片
     while (sectionsLay_->count() > 1) {  // 末尾是 stretch
@@ -92,21 +92,23 @@ void MemoryPanel::refresh() {
         if (group.empty()) {
             // 空状态：蜂巢母题 + 出路提示（品牌触点，见 docs/brand.md §3）
             auto* empty = new ui::HexEmptyState(
-                "🧠", i18n::trs("该区块暂无记忆", "No memories in this section yet"),
+                i18n::trs("该区块暂无记忆", "No memories in this section yet"),
                 i18n::trs("通过 memory set 或工具栏写入第一条，所有 Agent 共享",
                           "Add the first entry via memory set or the toolbar — shared by all agents"),
                 content);
             cl->addWidget(empty);
         } else {
             for (const auto& m : group) {
+                const QString raw = QString::fromStdString(m.created_at);
                 auto* row = new QLabel(ui::th(
                     QString("<b style='color:@accent@;'>%1</b>"
-                            " <span style='color:@muted@; font-size:10px;'>v%2 · %3 · %4</span><br>%5")
+                            " <span style='color:@muted@; font-size:10px;' title='%6'>v%2 · %3 · %4</span><br>%5")
                         .arg(QString::fromStdString(m.key).toHtmlEscaped())
                         .arg(m.version)
                         .arg(QString::fromStdString(m.author))
-                        .arg(QString::fromStdString(m.created_at))
-                        .arg(QString::fromStdString(m.value).toHtmlEscaped().left(200))),
+                        .arg(relTime(raw))
+                        .arg(QString::fromStdString(m.value).toHtmlEscaped().left(200))
+                        .arg(localStamp(raw))),
                     content);
                 row->setTextFormat(Qt::RichText);
                 row->setWordWrap(true);
@@ -194,10 +196,10 @@ void MemoryPanel::onShowHistory() {
         QString v = QString::fromStdString(history[i].value);
         QString shown = v.size() > 200 ? v.left(200) + "…" : v;
         QString ver = QString("v%1").arg(history[i].version);
-        if (i == 0) ver += "（最新）";
+        if (i == 0) ver += i18n::trs("（最新）", " (latest)");
         setRow(table, static_cast<int>(i),
                {ver, QString::fromStdString(history[i].author),
-                QString::fromStdString(history[i].created_at), shown});
+                relTime(QString::fromStdString(history[i].created_at)), shown});
     }
     table->resizeColumnToContents(0);
     table->resizeColumnToContents(1);

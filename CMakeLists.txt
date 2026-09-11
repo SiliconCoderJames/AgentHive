@@ -1,5 +1,19 @@
 cmake_minimum_required(VERSION 3.25)
-project(zcode_platform VERSION 0.1.0 LANGUAGES C CXX)
+project(zcode_platform VERSION 1.0.0 LANGUAGES C CXX)
+
+# ---- 版本号：默认取 project(VERSION)，发布流水线用 -DAGENTHIVE_VERSION=v1.2.3 覆盖 ----
+set(AGENTHIVE_VERSION "${PROJECT_VERSION}" CACHE STRING "发布版本（可带 v 前缀与预发布后缀）")
+# 允许 "v1.2.3" 与 "1.2.3-rc1"：MSI 的 ProductVersion 必须是纯 x.y.z 数字形式
+string(REGEX REPLACE "^v" "" _ver_raw "${AGENTHIVE_VERSION}")
+string(REGEX MATCH "^[0-9]+\\.[0-9]+\\.[0-9]+" AGENTHIVE_VERSION_NUMERIC "${_ver_raw}")
+if(NOT AGENTHIVE_VERSION_NUMERIC)
+    set(AGENTHIVE_VERSION_NUMERIC "${PROJECT_VERSION}")
+endif()
+string(REPLACE "." ";" _ver_parts "${AGENTHIVE_VERSION_NUMERIC}")
+list(GET _ver_parts 0 AGENTHIVE_VERSION_MAJOR)
+list(GET _ver_parts 1 AGENTHIVE_VERSION_MINOR)
+list(GET _ver_parts 2 AGENTHIVE_VERSION_PATCH)
+message(STATUS "AgentHive version: ${AGENTHIVE_VERSION} (installer: ${AGENTHIVE_VERSION_NUMERIC})")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -15,6 +29,13 @@ option(BUILD_CLI   "Build agent-cli and platformd" ON)
 option(BUILD_TESTS "Build unit tests" ON)
 
 include(FetchContent)
+
+# 第三方依赖一律不启用它们自己的 install 规则：否则 `cmake --install` 会把
+# cpp-httplib 的头文件、cmake config 与文档一起拷进发行目录（曾污染出 include/、
+# lib/cmake/、share/ 三棵目录树）。依赖以源码内联进本工程，不对外分发它们的开发文件。
+set(HTTPLIB_INSTALL OFF CACHE BOOL "" FORCE)
+set(HTTPLIB_TEST OFF CACHE BOOL "" FORCE)
+set(JSON_Install OFF CACHE BOOL "" FORCE)
 
 # ---- third-party dependencies ---------------------------------------------
 # 网络韧性：scripts/fetch-deps.ps1 可把 GitHub 依赖预取到 vendor/（带重试）。

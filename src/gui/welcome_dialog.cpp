@@ -18,7 +18,9 @@
 WelcomeDialog::WelcomeDialog(zp::Platform& platform, QWidget* parent) : QDialog(parent) {
     setWindowTitle(i18n::trs("欢迎来到 AgentHive", "Welcome to AgentHive"));
     setWindowFlag(Qt::WindowContextHelpButtonHint, false);
-    setFixedSize(620, 540);
+    // 不锁死尺寸：字号调到 14px 或系统字体放大时，固定尺寸会把内容挤掉
+    setMinimumSize(620, 540);
+    resize(620, 540);
 
     auto* root = new QVBoxLayout(this);
     root->setContentsMargins(28, 24, 28, 20);
@@ -43,28 +45,29 @@ WelcomeDialog::WelcomeDialog(zp::Platform& platform, QWidget* parent) : QDialog(
     root->addWidget(slogan);
     root->addSpacing(10);
 
-    // 三步接入卡片
+    // 三步接入卡片（图标用与侧栏同源的矢量图标，替代 emoji：跨平台字形一致）
     struct Step {
-        const char* icon;
+        const char* kind;
         const char* zh;
         const char* en;
         const char* zhDesc;
         const char* enDesc;
     };
     const Step steps[] = {
-        {"🐝", "蜂巢已就绪", "Hive is ready", "工作台内置本地服务，127.0.0.1 仅本机可达",
+        {"overview", "蜂巢已就绪", "Hive is ready", "工作台内置本地服务，127.0.0.1 仅本机可达",
          "The workbench ships a local-only service on 127.0.0.1"},
-        {"🔑", "接入你的 Agent", "Connect your agents",
+        {"key", "接入你的 Agent", "Connect your agents",
          "复制下方命令，在任意 Agent 的终端执行即可入巢", "Copy the command and run it in any agent's terminal"},
-        {"📚", "共享与成长", "Share and grow",
+        {"knowledge", "共享与成长", "Share and grow",
          "经验进知识库、技能进市场，所有 Agent 越用越顺",
          "Knowledge and skills are shared by every agent"},
     };
     for (const auto& s : steps) {
         auto* row = new QHBoxLayout();
         row->setSpacing(12);
-        auto* icon = new QLabel(QString::fromUtf8(s.icon), this);
-        icon->setStyleSheet("font-size:22px; background:transparent;");
+        auto* icon = new QLabel(this);
+        icon->setPixmap(ui::makeIcon(s.kind, ui::brand(), 22).pixmap(22, 22));
+        icon->setStyleSheet("background:transparent;");
         icon->setFixedWidth(30);
         auto* text = new QLabel(this);
         text->setTextFormat(Qt::RichText);

@@ -96,13 +96,15 @@ QMenu::separator { height: 1px; background: @line@; margin: 4px 8px; }
 /* ---- 按钮 ---- */
 QPushButton {
     background-color: @fieldhover@;
-    border: none;
+    border: 1px solid transparent;
     border-radius: 8px;
     padding: 8px 18px;
     font-size: 13px;
 }
 QPushButton:hover { background-color: @line@; }
 QPushButton:pressed { background-color: @card@; }
+/* 键盘可达性：焦点态给出明确描边（默认会被深色主题吃掉） */
+QPushButton:focus { border: 1px solid @accent@; }
 QPushButton#primary {
     background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 @accenthi@, stop:1 @accentdeep@);
     color: #ffffff;
@@ -112,8 +114,18 @@ QPushButton#primary:hover {
     background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 @accenthi@, stop:1 @accent@);
 }
 QPushButton#primary:pressed { background-color: @accentdeep@; }
+QPushButton#primary:disabled {
+    background-color: @card@;
+    color: @muted@;
+    font-weight: normal;
+}
 QPushButton#danger { background-color: @danger@; color: #ffffff; }
-QPushButton:disabled { background-color: @fieldhover@; color: @muted@; }
+/* 禁用态必须比可用态明显更暗：原先两者底色相同，只有文字变灰，用户分不清能不能点 */
+QPushButton:disabled {
+    background-color: @card@;
+    border: 1px solid @line@;
+    color: @muted@;
+}
 
 /* ---- 表格 / 树 / 列表 ---- */
 QTableWidget, QTreeWidget, QListWidget, QTextBrowser {

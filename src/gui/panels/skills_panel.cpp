@@ -54,7 +54,7 @@ SkillsPanel::SkillsPanel(zp::Platform& platform, QWidget* parent)
     table_->setHorizontalHeaderLabels({i18n::trs("名称", "Name"), i18n::trs("显示名", "Display"),
                                       i18n::trs("分类", "Category"), i18n::trs("提供者", "Owner"), i18n::trs("版本", "Ver."),
                                       i18n::trs("状态", "Status"), i18n::trs("使用热度", "Usage Heat")});
-    table_->horizontalHeader()->setSectionResizeMode(6, QHeaderView::Stretch);
+    fitTableColumns(table_, 6);  // 使用热度列吃剩余空间，其余按内容宽
     polishTable(table_);
     table_->resizeColumnsToContents();
     attachTableContextMenu(table_);
@@ -187,7 +187,7 @@ void SkillsPanel::onSelectSkill(int row) {
             .arg(QString::fromStdString(s.category).toHtmlEscaped())
             .arg(s.version)
             .arg(QString::fromStdString(s.status).toHtmlEscaped())
-            .arg(QString::fromStdString(s.updated_at))
+            .arg(relTime(QString::fromStdString(s.updated_at)))
             .arg(QString::fromStdString(s.param_schema).toHtmlEscaped())));
 }
 

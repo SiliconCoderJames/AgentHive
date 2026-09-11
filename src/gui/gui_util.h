@@ -1,8 +1,10 @@
 #pragma once
-// GUI 小工具函数：表格填充、即时过滤、右键菜单（复制/详情/导出 CSV）、数字格式化。
+// GUI 小工具函数：表格填充、即时过滤、右键菜单（复制/详情/导出 CSV）、数字格式化、
+// 相对时间。时间统一由后端以 UTC ISO8601 下发，展示层在此转成本地时区与人类可读文案。
 #include <QAbstractItemView>
 #include <QApplication>
 #include <QClipboard>
+#include <QDateTime>
 #include <QEvent>
 #include <QFileDialog>
 #include <QHeaderView>
@@ -11,6 +13,7 @@
 #include <QMenu>
 #include <QMessageBox>
 #include <QTableWidget>
+#include <QTimeZone>
 #include <QTreeWidget>
 
 #include <functional>
@@ -36,6 +39,87 @@ inline QString formatNum(qint64 n) {
     QString s = QString::number(n);
     for (int i = s.size() - 3; i > 0; i -= 3) s.insert(i, ',');
     return s;
+}
+
+// UTC ISO8601 -> 本地 QDateTime（无 'Z' 后缀时按 UTC 解释；解析失败返回无效值）
+inline QDateTime parseUtcIso(const QString& iso) {
+    if (iso.isEmpty()) return {};
+    return QDateTime::fromString(iso.endsWith('Z') ? iso : iso + "Z", Qt::ISODate);
+}
+
+// 相对时间：把 "2026-09-10T14:07:04Z" 转成「刚刚 / 12 分钟前 / 3 小时前 / 2 天前」，
+// 超过一周回落为本地 "MM-dd HH:mm"。解析失败时原样返回，不吞信息。
+inline QString relTime(const QString& iso) {
+    const QDateTime t = parseUtcIso(iso);
+    if (!t.isValid()) return iso;
+    const QDateTime local = t.toLocalTime();
+    qint64 secs = local.secsTo(QDateTime::currentDateTime());
+    if (secs < 0) secs = 0;  // 时钟偏差时不显示"未来"
+    if (secs < 45) return i18n::trs("刚刚", "just now");
+    if (secs < 3600) return i18n::trs("%1 分钟前", "%1 min ago").arg(secs / 60);
+    if (secs < 86400) return i18n::trs("%1 小时前", "%1 h ago").arg(secs / 3600);
+    if (secs < 7 * 86400) return i18n::trs("%1 天前", "%1 d ago").arg(secs / 86400);
+    return local.toString("MM-dd HH:mm");
+}
+
+// 绝对本地时间（tooltip 用）：悬停即可看到精确时刻，兼顾相对时间的易读性。
+inline QString localStamp(const QString& iso) {
+    const QDateTime t = parseUtcIso(iso);
+    return t.isValid() ? t.toLocalTime().toString("yyyy-MM-dd HH:mm:ss") : iso;
+}
+
+// 表格列自适应并铺满可用宽度：指定一列吃剩余空间，其余按内容宽。
+// 不这么做时，列宽之和一旦超过视口就会出现"空表也有横向滚动条"，
+// 时间列之类的窄列还会被压成 "06:51:..." 看不出完整时刻。
+inline void fitTableColumns(QTableWidget* table, int stretchColumn = -1) {
+    auto* h = table->horizontalHeader();
+    for (int c = 0; c < table->columnCount(); ++c)
+        h->setSectionResizeMode(c, QHeaderView::ResizeToContents);
+    if (stretchColumn >= 0 && stretchColumn < table->columnCount()) {
+        h->setSectionResizeMode(stretchColumn, QHeaderView::Stretch);
+        h->setStretchLastSection(false);
+    } else {
+        h->setStretchLastSection(true);
+    }
+}
+
+// 审计日志的 detail 是紧凑 JSON。这里做轻量清洗（不引入 JSON 依赖），
+// 让"改了哪个字段、值是什么"能一眼读出来：
+//   {"call_type":"llm","tokens_in":2600}  ->  call_type=llm · tokens_in=2600
+// 非 JSON 形态（或解析不出键值对）时原样返回，绝不吞信息。
+inline QString prettyDetail(const QString& raw) {
+    QString s = raw.trimmed();
+    if (s.size() < 2 || !s.startsWith('{') || !s.endsWith('}')) return raw;
+    s = s.mid(1, s.size() - 2);
+    QString out;
+    int depth = 0;
+    bool inStr = false;
+    QString field;
+    auto flush = [&] {
+        QString f = field.trimmed();
+        field.clear();
+        if (f.isEmpty()) return;
+        // 去掉包裹的引号，逗号分隔的键值对换成分隔符
+        if (f.startsWith('"') && f.endsWith('"') && f.size() >= 2) f = f.mid(1, f.size() - 2);
+        if (!out.isEmpty()) out += " · ";
+        out += f;
+    };
+    for (int i = 0; i < s.size(); ++i) {
+        const QChar c = s[i];
+        if (c == '"' && (i == 0 || s[i - 1] != '\\')) {
+            inStr = !inStr;
+            if (depth == 0) continue;  // 扁平键值对去掉引号：call_type=llm 而非 call_type="llm"
+        }
+        if (!inStr) {
+            if (c == '[' || c == '{') ++depth;
+            else if (c == ']' || c == '}') --depth;
+            else if (c == ':' && depth == 0) { field += '='; continue; }
+            else if (c == ',' && depth == 0) { flush(); continue; }
+        }
+        field += c;
+    }
+    flush();
+    return out.isEmpty() ? raw : out;
 }
 
 // 表格统一抛光：隔行底色、隐藏垂直表头、整行选择、只读、舒适行高
@@ -99,7 +183,7 @@ inline QLineEdit* makeTableFilter(QTableWidget* table, QWidget* parent,
                                   const QString& placeholder = {}) {
     auto* edit = new QLineEdit(parent);
     edit->setPlaceholderText(placeholder.isEmpty()
-                                 ? i18n::trs("🔍  输入即筛…", "🔍  Type to filter…")
+                                 ? i18n::trs("输入即筛…", "Type to filter…")
                                  : placeholder);
     edit->setClearButtonEnabled(true);
     edit->setToolTip(i18n::trs("即时过滤（Ctrl+F 聚焦 · Esc 清空）",
@@ -141,7 +225,7 @@ inline QLineEdit* makeTreeFilter(QTreeWidget* tree, QWidget* parent,
                                  const QString& placeholder = {}) {
     auto* edit = new QLineEdit(parent);
     edit->setPlaceholderText(placeholder.isEmpty()
-                                 ? i18n::trs("🔍  输入即筛…", "🔍  Type to filter…")
+                                 ? i18n::trs("输入即筛…", "Type to filter…")
                                  : placeholder);
     edit->setClearButtonEnabled(true);
     edit->setToolTip(i18n::trs("即时过滤（Ctrl+F 聚焦 · Esc 清空）",
@@ -159,13 +243,13 @@ inline void attachTableContextMenu(QTableWidget* table, int idColumn = -1) {
                      table, [table, idColumn](const QPoint& pos) {
                          int row = table->rowAt(pos.y());
                          QMenu menu(table);
-                         QAction* copyCell = menu.addAction("复制单元格");
-                         QAction* copyRow = menu.addAction("复制整行");
+                         QAction* copyCell = menu.addAction(i18n::trs("复制单元格", "Copy cell"));
+                         QAction* copyRow = menu.addAction(i18n::trs("复制整行", "Copy row"));
                          QAction* copyId = nullptr;
                          if (idColumn >= 0 && row >= 0)
-                             copyId = menu.addAction("复制 ID");
+                             copyId = menu.addAction(i18n::trs("复制 ID", "Copy ID"));
                          menu.addSeparator();
-                         QAction* exportCsv = menu.addAction("导出 CSV…");
+                         QAction* exportCsv = menu.addAction(i18n::trs("导出 CSV…", "Export CSV…"));
                          QAction* act = menu.exec(table->viewport()->mapToGlobal(pos));
                          if (!act || row < 0) return;
                          if (act == copyCell) {
@@ -183,11 +267,14 @@ inline void attachTableContextMenu(QTableWidget* table, int idColumn = -1) {
                              if (it) QApplication::clipboard()->setText(it->text());
                          } else if (act == exportCsv) {
                              QString path = QFileDialog::getSaveFileName(
-                                 table, "导出 CSV", "export.csv", "CSV (*.csv)");
+                                 table, i18n::trs("导出 CSV", "Export CSV"), "export.csv",
+                                 "CSV (*.csv)");
                              if (path.isEmpty()) return;
                              QFile f(path);
                              if (!f.open(QIODevice::WriteOnly | QIODevice::Text)) {
-                                 QMessageBox::warning(table, "导出失败", "无法写入文件");
+                                 QMessageBox::warning(table, i18n::trs("导出失败", "Export failed"),
+                                                      i18n::trs("无法写入文件",
+                                                                "cannot write the file"));
                                  return;
                              }
                              auto esc = [](QString v) {
@@ -208,7 +295,8 @@ inline void attachTableContextMenu(QTableWidget* table, int idColumn = -1) {
                                          << (c + 1 < table->columnCount() ? "," : "\n");
                                  }
                              }
-                             QMessageBox::information(table, "导出完成", path);
+                             QMessageBox::information(table, i18n::trs("导出完成", "Export done"),
+                                                      path);
                          }
                      });
 }

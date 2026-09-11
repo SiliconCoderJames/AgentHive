@@ -45,8 +45,15 @@ LogsPanel::LogsPanel(zp::Platform& platform, QWidget* parent)
     // 时间线：顶层 = 日期，子项 = 该日操作
     tree_ = new QTreeWidget(this);
     tree_->setHeaderLabels({i18n::trs("时间", "Time"), i18n::trs("身份", "Actor"), i18n::trs("动作", "Action"),i18n::trs("对象", "Target"), i18n::trs("详情", "Detail")});
+    // 固定列宽：时间列要同时容下"层级缩进 + 完整 HH:mm:ss"，否则被压成 "06:..."
+    tree_->setIndentation(14);
+    tree_->setColumnWidth(0, 116);
+    tree_->setColumnWidth(1, 104);
+    tree_->setColumnWidth(2, 200);
+    tree_->setColumnWidth(3, 170);
     tree_->header()->setStretchLastSection(true);
     tree_->setAlternatingRowColors(true);
+    tree_->setRootIsDecorated(true);
     layout->addWidget(tree_, 1);
     // 即时过滤框：树建好后创建，置于「共 N 条」左侧
     filterEdit_ = makeTreeFilter(tree_, this);
@@ -82,8 +89,12 @@ void LogsPanel::refresh() {
     QTreeWidgetItem* dayItem = nullptr;
     QString curDay;
     for (const auto& r : records_) {
-        QString ts = QString::fromStdString(r.created_at);
-        QString day = ts.left(10);
+        // 后端时间统一为 UTC；直接截字符串会把 UTC 时刻当本地时间显示。
+        // 这里换算成本地时区后再分组与显示，避免"日志时间和手表对不上"。
+        const QDateTime dt = parseUtcIso(QString::fromStdString(r.created_at));
+        const QDateTime local = dt.isValid() ? dt.toLocalTime() : QDateTime();
+        QString day = local.isValid() ? local.toString("yyyy-MM-dd")
+                                      : QString::fromStdString(r.created_at).left(10);
         if (day != curDay) {
             curDay = day;
             dayItem = new QTreeWidgetItem(tree_, {day, "", "", "", ""});
@@ -95,11 +106,14 @@ void LogsPanel::refresh() {
             dayItem->setForeground(0, QBrush(ui::accent()));
         }
         auto* row = new QTreeWidgetItem(dayItem);
-        row->setText(0, ts.mid(11, 8));
+        row->setText(0, local.isValid() ? local.toString("HH:mm:ss")
+                                       : QString::fromStdString(r.created_at).mid(11, 8));
         row->setText(1, QString::fromStdString(r.actor));
         row->setText(2, QString::fromStdString(r.action));
         row->setText(3, QString::fromStdString(r.target));
-        row->setText(4, QString::fromStdString(r.detail));
+        // 详情是紧凑 JSON，直接显示既占宽又难读；清洗成 "字段=值 · 字段=值"
+        row->setText(4, prettyDetail(QString::fromStdString(r.detail)));
+        row->setToolTip(4, QString::fromStdString(r.detail));
         for (int c = 0; c < 5; ++c) row->setFlags(row->flags() & ~Qt::ItemIsEditable);
     }
     tree_->expandToDepth(0);

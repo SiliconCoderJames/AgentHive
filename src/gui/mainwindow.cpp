@@ -7,6 +7,8 @@
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QMenu>
+#include <QPixmap>
+#include <QScrollArea>
 #include <QShortcut>
 #include <QStatusBar>
 #include <QSystemTrayIcon>
@@ -28,10 +30,13 @@
 MainWindow::MainWindow(zp::Platform& platform, QWidget* parent)
     : QMainWindow(parent), platform_(platform) {
     setWindowTitle("AgentHive · 多 Agent 协作工作台");
-    {   // 恢复上次窗口几何（位置/大小/最大化状态；关闭到托盘前已保存）
-        QSettings s;
-        restoreGeometry(s.value("ui/geometry").toByteArray());
-    }
+    // 最小尺寸必须先于几何恢复设定：否则会恢复出比最小尺寸还小的窗口
+    // （原先在 main 里调用时为时已晚，布局被压到裁切）
+    setMinimumSize(1080, 680);
+    // 恢复上次窗口几何（位置/大小/最大化状态；关闭到托盘前已保存）
+    QSettings s;
+    const QByteArray geo = s.value("ui/geometry").toByteArray();
+    if (!geo.isEmpty()) restoreGeometry(geo);
 
     auto* central = new QWidget(this);
     auto* layout = new QHBoxLayout(central);
@@ -49,9 +54,25 @@ MainWindow::MainWindow(zp::Platform& platform, QWidget* parent)
     auto* brandLay = new QVBoxLayout(brand);
     brandLay->setContentsMargins(16, 16, 12, 14);
     brandLay->setSpacing(2);
-    logo_ = new QLabel("🐝 AgentHive", brand);
+    // 品牌区：仓库品牌图标（与窗口/托盘图标同源）+ 字标，替代 emoji 蜜蜂
+    // （emoji 在不同 Windows 版本上字形差异大，且与新的矢量图标体系不一致）
+    auto* brandRow = new QHBoxLayout();
+    brandRow->setSpacing(8);
+    logoMark_ = new QLabel(brand);
+    logoMark_->setFixedSize(24, 24);
+    {
+        QPixmap mark(":/brand/logo.png");
+        logoMark_->setPixmap(mark.isNull()
+                                 ? ui::makeIcon("overview", ui::brand(), 22).pixmap(22, 22)
+                                 : mark.scaled(24, 24, Qt::KeepAspectRatio,
+                                               Qt::SmoothTransformation));
+    }
+    logo_ = new QLabel("AgentHive", brand);
+    brandRow->addWidget(logoMark_);
+    brandRow->addWidget(logo_);
+    brandRow->addStretch(1);
+    brandLay->addLayout(brandRow);
     tagline_ = new QLabel(brand);
-    brandLay->addWidget(logo_);
     brandLay->addWidget(tagline_);
     sideLay->addWidget(brand);
 
@@ -68,7 +89,9 @@ MainWindow::MainWindow(zp::Platform& platform, QWidget* parent)
     auto* foot = new QWidget(side_);
     auto* footLay = new QHBoxLayout(foot);
     footLay->setContentsMargins(10, 0, 10, 0);
-    ver_ = new QLabel("v1.0", foot);
+    ver_ = new QLabel(QString("v%1").arg(zp::kPlatformVersion), foot);
+    ver_->setToolTip(i18n::trs("AgentHive 版本 %1", "AgentHive %1")
+                         .arg(QString::fromUtf8(zp::kPlatformVersion)));
     settingsBtn_ = new QToolButton(foot);
     settingsBtn_->setIcon(ui::makeIcon("gear", ui::muted(), 16));
     settingsBtn_->setToolTip(i18n::trs("设置", "Settings"));
@@ -176,14 +199,12 @@ void MainWindow::buildNav() {
         {"audit", "操作日志", "Audit"},
     };
     for (const auto& [kind, zh, en] : items) {
-        const bool isErr = QString(kind) == "errors";
-        const QColor base = isErr ? ui::danger() : ui::muted();
-        auto* it = new QListWidgetItem(
-            ui::makeIcon(kind, base, 18, isErr ? ui::danger() : ui::selText()),
-            "  " + i18n::trs(zh, en));
+        // 图标与文字一律中性色；「错误报告」有未解决错误时由 updateStatusBar
+        // 换红色图标 + 追加计数，避免侧栏在没有错误时也长期处于告警色
+        auto* it = new QListWidgetItem(ui::makeIcon(kind, ui::muted(), 18, ui::selText()),
+                                       "  " + i18n::trs(zh, en));
         nav_->addItem(it);
     }
-    nav_->item(5)->setForeground(QBrush(ui::danger()));  // 错误报告项恒红，异常时更醒目
 }
 
 void MainWindow::applyLanguage() {
@@ -202,14 +223,25 @@ void MainWindow::applyLanguage() {
 
 void MainWindow::rebuildPanels() {
     int row = nav_ ? nav_->currentRow() : 0;
-    for (auto* p : panels_) {
-        stack_->removeWidget(p);
-        p->deleteLater();
-    }
+    // 拆除旧页面：面板已交给滚动容器持有，直接按栈内条目销毁即可
     panels_.clear();
+    while (stack_->count() > 0) {
+        QWidget* w = stack_->widget(0);
+        stack_->removeWidget(w);
+        w->deleteLater();
+    }
     for (auto& f : panelFactories_) {
-        panels_.push_back(f(platform_, this));
-        stack_->addWidget(panels_.back());
+        PanelBase* panel = f(platform_, this);
+        // 每个面板套一层滚动容器：窗口偏小或字号调大时内容可滚动可达。
+        // 原先面板直接进 QStackedWidget，最小高度之和超出视口时底部内容会被裁掉。
+        auto* scroll = new QScrollArea(stack_);
+        scroll->setWidget(panel);
+        scroll->setWidgetResizable(true);
+        scroll->setFrameShape(QFrame::NoFrame);
+        scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+        scroll->viewport()->setAutoFillBackground(false);
+        panels_.push_back(panel);
+        stack_->addWidget(scroll);
     }
     if (row >= 0 && row < static_cast<int>(panels_.size())) {
         stack_->setCurrentIndex(row);
@@ -312,10 +344,13 @@ void MainWindow::applyTheme() {
 void MainWindow::buildStatusBar() {
     statusServer_ = new QLabel(this);
     statusUsage_ = new QLabel(this);
+    statusUpdated_ = new QLabel(this);
     spin_ = new QLabel(this);
     spin_->setStyleSheet(ui::th("color:@accent@; font-size:14px;"));
+    spin_->setToolTip(i18n::trs("正在刷新…", "refreshing…"));
     statusBar()->addWidget(spin_);
     statusBar()->addWidget(statusServer_);
+    statusBar()->addPermanentWidget(statusUpdated_);
     statusBar()->addPermanentWidget(statusUsage_);
 }
 
@@ -359,20 +394,40 @@ void MainWindow::updateStatusBar() {
                 .arg(i18n::trs("剩余", "left"))
                 .arg(formatNum(sum.budget - sum.total_tokens)));
     }
-    // 导航徽标：未解决错误数附加在「错误报告」项上
+    // 导航徽标：未解决错误数附加在「错误报告」项上（图标随计数换色，不再用 emoji 前缀）
     std::vector<zp::ErrorReport> openErrors;
     if (platform_.errorList("open", "", 99, openErrors, err)) {
         openErrors_ = static_cast<int>(openErrors.size());
         // 偏好开启时，新增未解决错误弹提醒（首次采样不提醒）
         if (errorToast_ && seenOpenErrors_ >= 0 && openErrors_ > seenOpenErrors_) {
-            ui::Toast::show(this, i18n::trs("⚠ 新增 %1 条未解决错误", "⚠ %1 new unresolved "
+            ui::Toast::show(this, i18n::trs("新增 %1 条未解决错误", "%1 new unresolved "
                                             "error(s)").arg(openErrors_ - seenOpenErrors_),
                             false);
         }
         seenOpenErrors_ = openErrors_;
-        nav_->item(5)->setText(
-            openErrors_ > 0
-                ? QString("🚨  %1  (%2)").arg(i18n::trs("错误报告", "Errors")).arg(openErrors_)
-                : "🚨  " + i18n::trs("错误报告", "Errors"));
+        const QString label = i18n::trs("错误报告", "Errors");
+        if (auto* errItem = nav_->item(5)) {
+            const bool has = openErrors_ > 0;
+            errItem->setText(has ? QString("  %1   (%2)").arg(label).arg(openErrors_)
+                                 : "  " + label);
+            errItem->setIcon(ui::makeIcon("errors", has ? ui::danger() : ui::muted(), 18,
+                                          has ? ui::danger() : ui::selText()));
+            errItem->setForeground(QBrush(has ? ui::danger()
+                                              : (nav_->currentRow() == 5 ? ui::selText()
+                                                                         : ui::muted())));
+            errItem->setToolTip(has ? i18n::trs("%1 条未解决错误", "%1 unresolved error(s)")
+                                          .arg(openErrors_)
+                                    : i18n::trs("暂无未解决错误", "no unresolved errors"));
+        }
+    }
+    // 数据新鲜度：让用户知道当前显示是不是刚取的数
+    if (statusUpdated_) {
+        // 首次刷新发生在 timer_ 创建之前，这里必须容忍空指针
+        const int secs = timer_ ? timer_->interval() / 1000 : 3;
+        statusUpdated_->setText(i18n::trs("更新于 %1", "updated %1")
+                                    .arg(QTime::currentTime().toString("HH:mm:ss")));
+        statusUpdated_->setToolTip(
+            i18n::trs("自动刷新间隔 %1 秒（设置中心可调）", "auto-refresh every %1 s (see Settings)")
+                .arg(secs));
     }
 }

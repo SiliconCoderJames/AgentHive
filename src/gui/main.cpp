@@ -1,8 +1,11 @@
 #include <QApplication>
 #include <QFile>
+#include <QLocalServer>
+#include <QLocalSocket>
 #include <QMessageBox>
 #include <QPainter>
 #include <QPixmap>
+#include <QScreen>
 #include <QSettings>
 
 #include <cstdlib>
@@ -12,6 +15,35 @@
 #include "i18n.h"
 #include "mainwindow.h"
 #include "theme.h"
+
+namespace {
+
+// ---- 单实例：安装版有了开始菜单快捷方式后，用户很容易双击出第二个实例，
+// 而第二个实例会因 8787 端口被占用弹出"HTTP 服务启动失败"的警告框。
+// 这里用本地 socket 做互斥：已有实例就把它唤到前台，然后本进程直接退出。 ----
+QString singleInstanceKey() {
+    std::string port = zp::envOr("AGENTHIVE_PORT", "ZCODE_PLATFORM_PORT");
+    if (port.empty()) port = "8787";
+    // 以数据目录 + 端口为键：同一份数据同时只允许一个工作台
+    const std::string home = zp::defaultHomeDir();
+    return QString("AgentHive-%1-%2")
+        .arg(QString::fromStdString(zp::sha256Hex(home + ":" + port)).left(16),
+             QString::fromStdString(port));
+}
+
+// 返回 true 表示已有实例在运行（调用方应直接退出）
+bool notifyExistingInstance(const QString& key) {
+    QLocalSocket sock;
+    sock.connectToServer(key);
+    if (!sock.waitForConnected(300)) return false;
+    sock.write("show");
+    sock.flush();
+    sock.waitForBytesWritten(300);
+    sock.disconnectFromServer();
+    return true;
+}
+
+}  // namespace
 
 // 程序化绘制蜂巢图标：深色圆角底 + 琥珀色六边形蜂巢 + 入口点
 static QPixmap hiveIcon(int side) {
@@ -63,6 +95,13 @@ int main(int argc, char** argv) {
     // 注意 qt_add_resources(PREFIX "/theme") 会把子目录 qss/ 拼进资源路径
     app.setStyleSheet(ui::themeQss());
 
+    // 单实例：已有工作台在跑就唤醒它并退出，避免第二个实例因端口占用报错
+    const QString instanceKey = singleInstanceKey();
+    if (notifyExistingInstance(instanceKey)) return 0;
+    QLocalServer::removeServer(instanceKey);  // 清理上次异常退出残留的 socket 文件
+    QLocalServer instanceGuard;
+    instanceGuard.listen(instanceKey);
+
     zp::Platform platform(zp::defaultHomeDir());
     std::string err;
     if (!platform.bootstrap(err)) {
@@ -85,10 +124,20 @@ int main(int argc, char** argv) {
 
     MainWindow w(platform);
     w.setMinimumSize(1080, 680);
-    {   // 上次窗口几何由 MainWindow 自行恢复；无记录时才用默认尺寸
-        QSettings s;
-        if (!s.contains("ui/geometry")) w.resize(1280, 800);
-    }
+    // 无历史几何时首次运行最大化：总览页四行卡片在 1080x680 下放不下，会需要滚动。
+    // 注意不能用 showMaximized() 后再 show()——后者会把窗口状态重置回普通尺寸，
+    // 应先把最大化写进 windowState 再统一 show()。用户调整过窗口后，
+    // 几何写入 ui/geometry，后续启动按上次的尺寸恢复。
+    if (!QSettings().contains("ui/geometry")) w.setWindowState(Qt::WindowMaximized);
+    // 第二个实例来敲门时：把现有窗口显示/置前（而不是新开一个）
+    QObject::connect(&instanceGuard, &QLocalServer::newConnection, &w, [&instanceGuard, &w] {
+        while (QLocalSocket* c = instanceGuard.nextPendingConnection()) {
+            c->deleteLater();
+            w.setVisible(true);
+            w.raise();
+            w.activateWindow();
+        }
+    });
     w.show();
     return app.exec();
 }

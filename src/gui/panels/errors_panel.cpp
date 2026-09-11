@@ -116,7 +116,7 @@ void ErrorsPanel::refresh() {
         setRow(table_, static_cast<int>(i),
                {QString::fromStdString(e.severity), QString::fromStdString(e.title),
                 QString::fromStdString(e.reporter), QString::fromStdString(e.status),
-                QString::fromStdString(e.created_at)});
+                relTime(QString::fromStdString(e.created_at))});
         // 严重度着色：critical 红 / error 橙 / warning 黄 / info 灰
         QString sev = QString::fromStdString(e.severity);
         QColor c = sev == "critical" ? ui::danger()
@@ -129,6 +129,7 @@ void ErrorsPanel::refresh() {
             item->setFont(f);
         }
     }
+    fitTableColumns(table_, 1);  // 标题列吃剩余空间，避免窄列被截断 / 出现横向滚动条
     emptyLabel_->setVisible(errors_.empty());
     splitter_->setVisible(!errors_.empty());
     applyTableFilter(table_, filterEdit_->text());  // 行已重建，重放即时过滤态

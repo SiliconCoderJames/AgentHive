@@ -97,6 +97,9 @@ MessagesPanel::MessagesPanel(zp::Platform& platform, QWidget* parent)
     acceptBtn_ = new QPushButton(i18n::trs("接受任务", "Accept"), this);
     doneBtn_ = new QPushButton(i18n::trs("任务完成", "Done"), this);
     declineBtn_ = new QPushButton(i18n::trs("拒绝任务", "Decline"), this);
+    // 动作层级：回复是主操作；"拒绝任务"用危险色，避免和一排同色按钮混在一起误点
+    replyBtn_->setObjectName("primary");
+    declineBtn_->setObjectName("danger");
     brow->addWidget(infoLabel_, 1);
     brow->addWidget(replyBtn_);
     brow->addWidget(readBtn_);
@@ -158,7 +161,7 @@ void MessagesPanel::renderChat() {
                     "<b>%8</b><br>%10"
                     "</div></div>")
                     .arg(QString::fromStdString(m.uuid))
-                    .arg(QString::fromStdString(m.created_at))
+                    .arg(relTime(QString::fromStdString(m.created_at)))
                     .arg(QString::fromStdString(m.sender).toHtmlEscaped())
                     .arg(recipient.toHtmlEscaped())
                     .arg(kindChip(QString::fromStdString(m.kind)))

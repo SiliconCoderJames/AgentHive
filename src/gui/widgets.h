@@ -4,12 +4,14 @@
 #include <QBrush>
 #include <QConicalGradient>
 #include <QEnterEvent>
+#include <QMouseEvent>
 #include <QFontMetrics>
 #include <QFrame>
 #include <QIcon>
 #include <QGraphicsOpacityEffect>
 #include <QLabel>
 #include <QLinearGradient>
+#include <QLocale>
 #include <QPainter>
 #include <QPointer>
 #include <QPropertyAnimation>
@@ -50,11 +52,67 @@ inline QString pillStyle(const QColor& c, int alpha = 50) {
         .arg(alpha);
 }
 
+// ---- 图表空状态：弱化蜂巢描边 + 主文案 + 出路提示 ----
+// 比一行裸文字更明确「这里将会出现什么、需要做什么」，空数据时不再是一块死区。
+inline void paintChartEmpty(QPainter& p, const QRect& r, const QString& title, const QString& hint) {
+    p.setRenderHint(QPainter::Antialiasing);
+    const int cy = r.center().y();
+    // 高度够时才画蜂巢母题，避免小卡片里被裁切
+    if (r.height() >= 130) {
+        const qreal r0 = 13.0;
+        const QPointF c(r.center().x(), cy - 30.0);
+        QPen pen(QColor(brand().red(), brand().green(), brand().blue(), 90), 3.0, Qt::SolidLine,
+                 Qt::RoundCap, Qt::RoundJoin);
+        p.setPen(pen);
+        p.setBrush(Qt::NoBrush);
+        auto hex = [&](const QPointF& ctr) {
+            QPolygonF h;
+            for (int i = 0; i < 6; ++i) {
+                qreal a = M_PI / 180.0 * (60.0 * i - 30.0);
+                h << ctr + QPointF(r0 * std::cos(a), r0 * std::sin(a));
+            }
+            p.drawPolygon(h);
+        };
+        hex(c + QPointF(0, -r0 * 1.02));
+        hex(c + QPointF(-r0 * 0.9, r0 * 0.55));
+        hex(c + QPointF(r0 * 0.9, r0 * 0.55));
+    }
+    QFont f = p.font();
+    f.setPixelSize(12);
+    f.setBold(true);
+    p.setFont(f);
+    p.setPen(QPen(muted()));
+    p.drawText(QRect(r.left(), cy + 6, r.width(), 18), Qt::AlignCenter, title);
+    f.setPixelSize(11);
+    f.setBold(false);
+    p.setFont(f);
+    QColor dim = muted();
+    dim.setAlpha(165);
+    p.setPen(QPen(dim));
+    p.drawText(QRect(r.left() + 8, cy + 26, r.width() - 16, 18), Qt::AlignCenter, hint);
+}
+
+// 紧凑数字：<1万原样，1万~100万 "12.3k"，≥100万 "1.23M"（柱顶标注与环内文字自适应用）
+inline QString fmtCompact(qint64 v) {
+    if (v < 10000) return QString::number(v);
+    const bool mega = v >= 1000000;
+    double x = mega ? double(v) / 1000000.0 : double(v) / 1000.0;
+    QString s = QString::number(x, 'f', x < 100 ? 1 : 0);
+    while (s.contains('.') && s.endsWith('0')) s.chop(1);
+    if (s.endsWith('.')) s.chop(1);
+    return s + (mega ? "M" : "k");
+}
+
 // ---- 环形进度：中间显示 已用/总额/百分比，临近预算橙→红，进度弧平滑动画 ----
 class RingProgress : public QWidget {
 public:
     RingProgress(QWidget* parent = nullptr) : QWidget(parent) {
-        setMinimumSize(170, 170);
+        // 最小尺寸刻意压小：窗口在 1080x680 逻辑尺寸 + 12/13/14 三档字号下都要放得下
+        setMinimumSize(118, 118);
+        setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+        // 透明底色：否则全局 QSS 的 QWidget 背景会在卡片内再涂一层页面底色，
+        // 卡片里会出现一圈"卡中卡"暗框
+        setStyleSheet("background:transparent;");
     }
     void setValues(qint64 used, qint64 total, const QString& caption) {
         used_ = used;
@@ -109,7 +167,7 @@ protected:
         f.setPixelSize(side / 6);
         f.setBold(true);
         p.setFont(f);
-        QRectF center = rect.adjusted(20, 20, -20, -20);
+        QRectF center = rect.adjusted(14, 14, -14, -14);
         p.drawText(center.adjusted(0, -14, 0, -14), Qt::AlignCenter,
                    QString("%1%").arg(ratio * 100, 0, 'f', 1));
         f.setPixelSize(side / 14);
@@ -120,10 +178,23 @@ protected:
             for (int i = s.size() - 3; i > 0; i -= 3) s.insert(i, ',');
             return s;
         };
+        // drawText 传入矩形会按矩形裁剪：环变小或数字变长时，首个数字会被切掉
+        // （曾出现 "4,200 / 10,000,00"）。这里按可用宽度决定是否退化为紧凑记法。
+        QFontMetrics fm(p.font());
+        const int avail = int(center.width());
+        auto fit = [&](QString s, qint64 a, qint64 b) {
+            if (fm.horizontalAdvance(s) <= avail) return s;
+            return QString("%1 / %2").arg(fmtCompact(a), fmtCompact(b));
+        };
         p.drawText(center.adjusted(0, 16, 0, 16), Qt::AlignCenter,
-                   QString("%1 / %2").arg(fmt(used_), fmt(total_)));
+                   fit(QString("%1 / %2").arg(fmt(used_), fmt(total_)), used_, total_));
         if (!caption_.isEmpty()) {
-            p.drawText(center.adjusted(0, 40, 0, 40), Qt::AlignCenter, caption_);
+            QString cap = caption_;
+            if (fm.horizontalAdvance(cap) > avail) {
+                cap = QString("%1 %2").arg(i18n::trs("剩余", "left"),
+                                           fmtCompact(used_ > total_ ? 0 : total_ - used_));
+            }
+            p.drawText(center.adjusted(0, 40, 0, 40), Qt::AlignCenter, cap);
         }
     }
 
@@ -138,7 +209,30 @@ private:
 class HBarChart : public QWidget {
 public:
     explicit HBarChart(QWidget* parent = nullptr) : QWidget(parent) {
-        setMinimumHeight(120);
+        setMinimumHeight(96);
+        setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+        setStyleSheet("background:transparent;");  // 见 RingProgress：避免卡片内出现暗框
+        setMouseTracking(true);  // 悬停行高亮 + tooltip：光看条长读不出确切数字
+    }
+    // 悬停行：给出精确数值（千分位），并在绘制时高亮该行
+    void mouseMoveEvent(QMouseEvent* e) override {
+        const int n = entries_.size();
+        const int idx = (n > 0) ? int(e->position().y()) / qMax(1, height() / n) : -1;
+        const int next = (idx >= 0 && idx < n) ? idx : -1;
+        if (next == hovered_) return;
+        hovered_ = next;
+        if (hovered_ >= 0)
+            setToolTip(QString("%1: %2").arg(entries_[hovered_].first)
+                           .arg(QLocale().toString(entries_[hovered_].second)));
+        else
+            setToolTip(QString());
+        update();
+    }
+    void leaveEvent(QEvent*) override {
+        if (hovered_ < 0) return;
+        hovered_ = -1;
+        setToolTip(QString());
+        update();
     }
     void setEntries(const QVector<QPair<QString, qint64>>& entries) {
         entries_ = entries;
@@ -161,9 +255,14 @@ protected:
     void paintEvent(QPaintEvent*) override {
         QPainter p(this);
         p.setRenderHint(QPainter::Antialiasing);
-        if (entries_.isEmpty()) {
-            p.setPen(QPen(muted()));
-            p.drawText(rect(), Qt::AlignCenter, i18n::trs("暂无用量数据", "no usage data yet"));
+        bool allZero = true;
+        for (const auto& e : entries_)
+            if (e.second != 0) { allZero = false; break; }
+        // 空表或全 0：走空状态，避免画出一排没有意义的 "0" 标签
+        if (entries_.isEmpty() || allZero) {
+            paintChartEmpty(p, rect(), i18n::trs("暂无用量数据", "no usage data yet"),
+                            i18n::trs("Agent 上报 Token 后在此对比",
+                                      "shows up as agents report tokens"));
             return;
         }
         qint64 maxV = 1;
@@ -183,6 +282,13 @@ protected:
         };
         for (int i = 0; i < entries_.size(); ++i) {
             int y = i * rowH;
+            if (i == hovered_) {  // 悬停行底色，扫读时不易看错行
+                QColor hl = fieldHover();
+                hl.setAlpha(120);
+                p.setPen(Qt::NoPen);
+                p.setBrush(hl);
+                p.drawRoundedRect(QRect(0, y + 1, width() - 1, rowH - 2), 6, 6);
+            }
             // 名称过长省略号收尾，避免与柱体重叠
             QFontMetrics fm(p.font());
             QString label = fm.elidedText(entries_[i].first, Qt::ElideRight, labelW - 8);
@@ -217,19 +323,9 @@ protected:
 private:
     QVector<QPair<QString, qint64>> entries_;
     double sweep_ = 1.0;
+    int hovered_ = -1;
     QPointer<QVariantAnimation> anim_;
 };
-
-// 紧凑数字：<1万原样，1万~100万 "12.3k"，≥100万 "1.23M"（柱顶标注用）
-inline QString fmtCompact(qint64 v) {
-    if (v < 10000) return QString::number(v);
-    const bool mega = v >= 1000000;
-    double x = mega ? double(v) / 1000000.0 : double(v) / 1000.0;
-    QString s = QString::number(x, 'f', x < 100 ? 1 : 0);
-    while (s.contains('.') && s.endsWith('0')) s.chop(1);
-    if (s.endsWith('.')) s.chop(1);
-    return s + (mega ? "M" : "k");
-}
 
 // ---- 主题色卡：迷你界面预览（底色/侧栏/文本线/强调块/品牌点），点击选择主题 ----
 class ThemeSwatch : public QFrame {
@@ -315,7 +411,34 @@ private:
 class VBarChart : public QWidget {
 public:
     explicit VBarChart(QWidget* parent = nullptr) : QWidget(parent) {
-        setMinimumHeight(170);
+        setMinimumHeight(120);
+        setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+        setStyleSheet("background:transparent;");  // 见 RingProgress：避免卡片内出现暗框
+        setMouseTracking(true);  // 柱顶只有紧凑标注（34.2k），悬停给出确切数值
+    }
+    // 悬停柱：tooltip 给出「日期: 数值」，并把该柱提亮
+    void mouseMoveEvent(QMouseEvent* e) override {
+        const int n = entries_.size();
+        int next = -1;
+        if (n > 0 && width() > 4) {
+            const double slot = double(width() - 4) / n;
+            const int idx = int((e->position().x() - 2) / qMax(1.0, slot));
+            if (idx >= 0 && idx < n) next = idx;
+        }
+        if (next == hovered_) return;
+        hovered_ = next;
+        if (hovered_ >= 0)
+            setToolTip(QString("%1: %2").arg(entries_[hovered_].first)
+                           .arg(QLocale().toString(entries_[hovered_].second)));
+        else
+            setToolTip(QString());
+        update();
+    }
+    void leaveEvent(QEvent*) override {
+        if (hovered_ < 0) return;
+        hovered_ = -1;
+        setToolTip(QString());
+        update();
     }
     void setEntries(const QVector<QPair<QString, qint64>>& entries) {
         entries_ = entries;
@@ -338,9 +461,14 @@ protected:
     void paintEvent(QPaintEvent*) override {
         QPainter p(this);
         p.setRenderHint(QPainter::Antialiasing);
-        if (entries_.isEmpty()) {
-            p.setPen(QPen(muted()));
-            p.drawText(rect(), Qt::AlignCenter, i18n::trs("暂无用量数据", "no usage data yet"));
+        bool allZero = true;
+        for (const auto& e : entries_)
+            if (e.second != 0) { allZero = false; break; }
+        // 空表或全 0：走空状态（连续日期补 0 时不会画成一条贴着轴的零线）
+        if (entries_.isEmpty() || allZero) {
+            paintChartEmpty(p, rect(), i18n::trs("暂无用量数据", "no usage data yet"),
+                            i18n::trs("Agent 上报 Token 后在此累积",
+                                      "accumulates as agents report tokens"));
             return;
         }
         const int valueH = 18;  // 顶部数值标签区
@@ -367,6 +495,7 @@ protected:
             QRectF bar(cx - barW / 2, plot.bottom() - h, barW, h);
             bool isMax = entries_[i].second == maxV && maxV > 1;
             QColor base = isMax ? brand() : accent();
+            if (i == hovered_) base = base.lighter(125);  // 悬停柱提亮
             QLinearGradient sheen(bar.topLeft(), bar.bottomLeft());
             sheen.setColorAt(0.0, base.lighter(135));
             sheen.setColorAt(1.0, base.darker(108));
@@ -389,6 +518,7 @@ protected:
 private:
     QVector<QPair<QString, qint64>> entries_;
     double sweep_ = 1.0;
+    int hovered_ = -1;
     QPointer<QVariantAnimation> anim_;
 };
 
@@ -465,8 +595,7 @@ public:
         task_->setWordWrap(true);
         lay->addWidget(task_);
         seen_ = new QLabel(this);
-        seen_->setStyleSheet(
-            th("color:@muted@; font-size:10px; font-family:@mono@,monospace; background:transparent;"));
+        seen_->setStyleSheet(th("color:@muted@; font-size:10px; background:transparent;"));
         lay->addWidget(seen_);
         // 在线呼吸灯：点亮的绿点每 900ms 明暗交替，离线则恒灰
         pulse_ = new QTimer(this);
@@ -477,17 +606,28 @@ public:
         });
         pulse_->start();
     }
+    // lastSeenRel/lastSeenAbs：由调用方用 ui::relTime 生成的相对文案 + 本地绝对时刻
+    // （tooltip），避免控件层依赖时间格式化，也避免在卡片里出现裸 ISO 串。
     void setAgent(const QString& name, const QString& status, const QString& role,
-                  const QString& task, const QString& lastSeen) {
+                  const QString& task, const QString& lastSeenRel, const QString& lastSeenAbs) {
         name_->setText(name);
+        name_->setToolTip(name);
         online_ = status == "online";
         updateDot();
         status_->setText(online_ ? i18n::trs("在线", "online") : i18n::trs("离线", "offline"));
         status_->setStyleSheet(online_ ? pillStyle(ok()) : pillStyle(muted(), 40));
         role_->setText(role);
+        role_->setToolTip(i18n::trs("角色：%1", "role: %1").arg(role));
         task_->setText(task.isEmpty() ? i18n::trs("（无当前任务）", "(no current task)") : task);
-        seen_->setText(lastSeen.isEmpty() ? i18n::trs("从未活跃", "never seen")
-                                      : i18n::trs("活跃于 ", "last active ") + lastSeen);
+        task_->setToolTip(task);
+        if (lastSeenRel.isEmpty()) {
+            seen_->setText(i18n::trs("从未活跃", "never seen"));
+            seen_->setToolTip(QString());
+        } else {
+            seen_->setText(online_ ? i18n::trs("活跃于 %1", "active %1").arg(lastSeenRel)
+                                   : i18n::trs("最后活跃 %1", "last seen %1").arg(lastSeenRel));
+            seen_->setToolTip(lastSeenAbs);
+        }
     }
 
 private:
@@ -509,6 +649,10 @@ private:
 };
 
 // ---- 告警卡片：红=阻断 / 橙=警告 / 黄=注意 ----
+// 前置声明：卡片需要一个与导航同源的矢量图标；定义在文件末尾（同为 inline）
+inline QIcon makeIcon(const QString& kind, const QColor& color, int px = 18,
+                      const QColor& selectedColor = {});
+
 class AlertCard : public QFrame {
 public:
     AlertCard(const QString& severity, const QString& text, QWidget* parent = nullptr)
@@ -523,10 +667,17 @@ public:
                           .arg(c.name()));
         auto* lay = new QHBoxLayout(this);
         lay->setContentsMargins(12, 8, 12, 8);
+        lay->setSpacing(8);
+        // 矢量警示图标（替代 ⚠/⛔/🚫 emoji：颜色随严重度、形状跨平台一致）
+        auto* ic = new QLabel(this);
+        ic->setPixmap(makeIcon("errors", c, 15).pixmap(15, 15));
+        ic->setStyleSheet("background:transparent;");
+        ic->setFixedWidth(15);
+        lay->addWidget(ic);
         auto* label = new QLabel(text, this);
         label->setWordWrap(true);
-        label->setStyleSheet(QString("color:%1; font-size:12px;").arg(c.name()));
-        lay->addWidget(label);
+        label->setStyleSheet(QString("color:%1; font-size:12px; background:transparent;").arg(c.name()));
+        lay->addWidget(label, 1);
     }
 };
 
@@ -564,12 +715,13 @@ private:
 };
 
 // ---- 空状态母题：蜜金蜂巢三六边形 + 标题 + 出路提示（品牌触点，见 docs/brand.md §3）----
+// 品牌规范指定空状态插画用六边形母题；原先在其上再叠一个 emoji，
+// 与新的矢量图标体系不一致，已移除（母题本身即插画）。
 class HexEmptyState : public QWidget {
 public:
-    HexEmptyState(const QString& emoji, const QString& title, const QString& hint,
-                  QWidget* parent = nullptr)
-        : QWidget(parent), emoji_(emoji), title_(title), hint_(hint) {
-        setMinimumHeight(180);
+    HexEmptyState(const QString& title, const QString& hint, QWidget* parent = nullptr)
+        : QWidget(parent), title_(title), hint_(hint) {
+        setMinimumHeight(170);
     }
 
 protected:
@@ -597,25 +749,22 @@ protected:
         p.setPen(Qt::NoPen);
         p.setBrush(accent());
         p.drawEllipse(c + QPointF(0, -r * 1.02), r * 0.3, r * 0.3);
-        // emoji + 标题 + 出路提示
+        // 标题 + 出路提示
         p.setPen(QPen(text()));
         QFont f = p.font();
-        f.setPixelSize(26);
-        p.setFont(f);
-        p.drawText(QRect(0, 96, width(), 34), Qt::AlignCenter, emoji_);
         f.setPixelSize(13);
         f.setBold(true);
         p.setFont(f);
-        p.drawText(QRect(0, 134, width(), 20), Qt::AlignCenter, title_);
+        p.drawText(QRect(0, 116, width(), 20), Qt::AlignCenter, title_);
         f.setPixelSize(11);
         f.setBold(false);
         p.setFont(f);
         p.setPen(QPen(muted()));
-        p.drawText(QRect(24, 156, width() - 48, 40), Qt::AlignHCenter | Qt::TextWordWrap, hint_);
+        p.drawText(QRect(24, 138, width() - 48, 40), Qt::AlignHCenter | Qt::TextWordWrap, hint_);
     }
 
 private:
-    QString emoji_, title_, hint_;
+    QString title_, hint_;
 };
 
 // 蜂巢母题注册为文档图片资源：HTML 空状态里 <img src="hexmotif"> 引用，
@@ -652,8 +801,9 @@ inline void attachHexMotif(QTextDocument* doc) {
 // ---- 线性图标：Lucide 几何（MIT，24 网格 stroke-2 圆角端点）+ 主题色注入，
 //      QSvgRenderer 渲染为高清位图。替代 emoji 与手绘形状。
 // kind: overview / knowledge / skills / memory / messages / errors / audit / gear
-inline QIcon makeIcon(const QString& kind, const QColor& color, int px = 18,
-                      const QColor& selectedColor = {}) {
+// （默认参数在文件前部的 AlertCard 前置声明处给出）
+inline QIcon makeIcon(const QString& kind, const QColor& color, int px,
+                      const QColor& selectedColor) {
     QString inner;
     if (kind == "overview")  // 品牌母题：六边形 + 蜂巢入口点
         inner = "<path d='M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 "
@@ -677,6 +827,30 @@ inline QIcon makeIcon(const QString& kind, const QColor& color, int px = 18,
     else if (kind == "audit")
         inner = "<circle cx='12' cy='12' r='10'/>"
                 "<polyline points='12 6 12 12 16 14'/>";
+    else if (kind == "palette")  // 外观
+        inner = "<circle cx='13.5' cy='6.5' r='.5'/><circle cx='17.5' cy='10.5' r='.5'/>"
+                "<circle cx='8.5' cy='7.5' r='.5'/><circle cx='6.5' cy='12.5' r='.5'/>"
+                "<path d='M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.9 0 1.6-.7 1.6-1.7 0-.4-.2-.8-.4-1.1"
+                "-.3-.3-.4-.7-.4-1.1a1.6 1.6 0 0 1 1.7-1.7h2c3 0 5.5-2.5 5.5-5.5C22 6 17.5 2 12 2z'/>";
+    else if (kind == "database")  // 数据与备份
+        inner = "<ellipse cx='12' cy='5' rx='9' ry='3'/>"
+                "<path d='M3 5v14a9 3 0 0 0 18 0V5'/><path d='M3 12a9 3 0 0 0 18 0'/>";
+    else if (kind == "bell")  // 通知
+        inner = "<path d='M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9'/>"
+                "<path d='M10.3 21a1.94 1.94 0 0 0 3.4 0'/>";
+    else if (kind == "plug")  // 接入 / API
+        inner = "<path d='M12 22v-5'/><path d='M9 8V2'/><path d='M15 8V2'/>"
+                "<path d='M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z'/>";
+    else if (kind == "refresh")  // 更新
+        inner = "<path d='M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8'/>"
+                "<path d='M21 3v5h-5'/>"
+                "<path d='M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16'/>"
+                "<path d='M8 16H3v5'/>";
+    else if (kind == "info")  // 关于
+        inner = "<circle cx='12' cy='12' r='10'/><path d='M12 16v-4'/><path d='M12 8h.01'/>";
+    else if (kind == "key")  // 密钥 / 接入命令
+        inner = "<path d='m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4'/>"
+                "<path d='m21 2-9.6 9.6'/><circle cx='7.5' cy='15.5' r='5.5'/>";
     else if (kind == "gear")
         inner = "<path d='M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 "
                 "2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 "

@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 
+#include "core/version.h"  // CMake 生成：AGENTHIVE_VERSION 等
+
 namespace zp {
 
 struct AgentInfo {
@@ -129,6 +131,7 @@ enum class SearchMode { Keyword, Semantic };
 
 constexpr const char* kDefaultRole = "member";
 constexpr const char* kManagerName = "zcode";
-constexpr const char* kPlatformVersion = "0.1.0";
+// 版本号来自 CMake 生成的 version.h（单一来源，界面/健康检查/安装包共用）
+constexpr const char* kPlatformVersion = AGENTHIVE_VERSION;
 
 }  // namespace zp

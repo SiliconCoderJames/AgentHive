@@ -33,8 +33,12 @@ protected:
         headerTitle_ = new QLabel(i18n::trs(zhTitle, enTitle), this);
         headerTitle_->setStyleSheet(
             ui::th("font-size:20px; font-weight:700; color:@text@;"));
+        // 竖向固定：否则面板高于内容时，多余空间会被标题/副标题吸收，
+        // 标题与正文之间被撑出一大片空白（内容区反而没拿到空间）
+        headerTitle_->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
         headerSub_ = new QLabel(i18n::trs(zhSub, enSub), this);
         headerSub_->setStyleSheet(ui::th("font-size:12px; color:@muted@; margin-top:2px;"));
+        headerSub_->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
         // 标题蜜金→天蓝竖向渐变饰条：全面板统一的品牌签名
         auto* bar = new QFrame(this);
         bar->setFixedSize(4, 26);

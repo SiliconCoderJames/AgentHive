@@ -1,0 +1,11 @@
+#pragma once
+// 版本号单一来源：由 CMake 从本模板生成（见 src/core/CMakeLists.txt）。
+// 默认取根 CMakeLists 的 project(... VERSION ...)；发布流水线可用
+//   -DAGENTHIVE_VERSION=v1.2.3
+// 覆盖（CI 从 git tag 取）。界面侧栏、/api/health、安装包属性都读这里，
+// 避免"界面显示 v1.0、API 自报 0.1.0、安装包又是另一个版本"的三处不一致。
+#define AGENTHIVE_VERSION "@AGENTHIVE_VERSION@"
+#define AGENTHIVE_VERSION_NUMERIC "@AGENTHIVE_VERSION_NUMERIC@"
+#define AGENTHIVE_VERSION_MAJOR @AGENTHIVE_VERSION_MAJOR@
+#define AGENTHIVE_VERSION_MINOR @AGENTHIVE_VERSION_MINOR@
+#define AGENTHIVE_VERSION_PATCH @AGENTHIVE_VERSION_PATCH@

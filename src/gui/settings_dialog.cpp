@@ -31,11 +31,16 @@
 #include "gui_util.h"
 #include "i18n.h"
 #include "theme.h"
+#include "widgets.h"
 
 namespace {
 constexpr const char* kRepoApi =
     "https://api.github.com/repos/SiliconCoderJames/AgentHive/releases/latest";
 constexpr const char* kRepoPage = "https://github.com/SiliconCoderJames/AgentHive/releases";
+
+// 设置导航项：kind 取自 ui::makeIcon 的图标种类
+constexpr const char* kNavKinds[] = {"palette",  "database", "bell", "overview",
+                                     "plug",     "refresh",  "info"};
 
 // 版本比较（形如 0.1.0）：a > b 返回 1，相等 0，否则 -1
 int cmpVersion(const QString& a, const QString& b) {
@@ -64,17 +69,19 @@ SettingsDialog::SettingsDialog(zp::Platform& platform, QWidget* parent)
     nav_ = new QListWidget(this);
     nav_->setFixedWidth(150);
     nav_->setFocusPolicy(Qt::NoFocus);  // 去除虚线焦点框
-    for (const auto& [icon, zh, en] : std::vector<std::tuple<const char*, const char*, const char*>>{
-             {"🎨", "外观", "Appearance"},
-             {"💾", "数据与备份", "Data & Backup"},
-             {"🔔", "通知偏好", "Notifications"},
-             {"🐝", "Agent 管理", "Agents"},
-             {"🔌", "Agent API", "Agent API"},
-             {"🔄", "更新", "Update"},
-             {"ℹ️", "关于", "About"},
-         }) {
-        nav_->addItem(QString("%1  %2").arg(icon, i18n::trs(zh, en)));
-    }
+    // 与主导航同一套矢量图标（原先这里是 emoji，和已经换成线性图标的主侧栏不一致）
+    const std::vector<std::tuple<const char*, const char*, const char*>> navItems{
+        {"palette", "外观", "Appearance"},
+        {"database", "数据与备份", "Data & Backup"},
+        {"bell", "通知偏好", "Notifications"},
+        {"overview", "Agent 管理", "Agents"},
+        {"plug", "Agent API", "Agent API"},
+        {"refresh", "更新", "Update"},
+        {"info", "关于", "About"},
+    };
+    for (const auto& [kind, zh, en] : navItems)
+        nav_->addItem(new QListWidgetItem(ui::makeIcon(kind, ui::muted(), 16, ui::selText()),
+                                          "  " + i18n::trs(zh, en)));
     root->addWidget(nav_);
 
     stack_ = new QStackedWidget(this);
@@ -122,6 +129,10 @@ void SettingsDialog::applyChrome() {
     for (std::size_t i = 0; i < swatches_.size() && i < ui::themes().size(); ++i)
         swatches_[i]->setSelected(static_cast<int>(i) == ui::themeIdx());
     for (const auto& [w, tmpl] : styledLabels_) w->setStyleSheet(ui::th(tmpl));
+    // 图标按当前主题重新着色（换主题时导航图标也要跟着变）
+    for (int i = 0; i < nav_->count() && i < 7; ++i)
+        if (auto* it = nav_->item(i))
+            it->setIcon(ui::makeIcon(kNavKinds[i], ui::muted(), 16, ui::selText()));
 }
 
 // ---- 外观：主题色卡网格 + 字号 ----
@@ -399,7 +410,8 @@ void SettingsDialog::refreshAgents() {
         setRow(agentsTable_, static_cast<int>(i),
                {QString::fromStdString(a.name), QString::fromStdString(a.role),
                 QString::fromStdString(a.status), QString::fromStdString(a.current_task),
-                QString::fromStdString(a.last_seen_at)});
+                a.last_seen_at.empty() ? QString("—")
+                                       : relTime(QString::fromStdString(a.last_seen_at))});
     }
 }
 

@@ -29,18 +29,23 @@ KnowledgePanel::KnowledgePanel(zp::Platform& platform, QWidget* parent)
                 "经验 / 方案 / 踩坑统一沉淀，关键词与语义双模式检索，版本只追加不覆盖",
                 "Shared know-how with keyword & semantic search; append-only versions");
 
-    // 工具栏
+    // 工具栏：拆成两行。原先 6 个控件挤在一行，搜索框和过滤框都被压到占位符截断。
+    // 第一行 = 主操作（搜索 / 新建），第二行 = 统计与次级筛选。
     auto* toolbar = new QHBoxLayout;
     searchEdit_ = new QLineEdit(this);
     searchEdit_->setPlaceholderText(i18n::trs("搜索知识库（关键词或自然语言）…", "Search knowledge (keyword or natural language)..."));
+    searchEdit_->setClearButtonEnabled(true);
     semanticCheck_ = new QCheckBox(i18n::trs("语义搜索", "Semantic"), this);
+    semanticCheck_->setToolTip(i18n::trs("按向量距离排序（内置 n-gram 模糊匹配，偏召回）",
+                                         "Rank by vector distance (built-in n-gram, recall-oriented)"));
     tagEdit_ = new QLineEdit(this);
     tagEdit_->setPlaceholderText(i18n::trs("按标签过滤", "Filter by tag"));
+    tagEdit_->setClearButtonEnabled(true);
     auto* searchBtn = new QPushButton(i18n::trs("搜索", "Search"), this);
+    searchBtn->setObjectName("primary");
     auto* newBtn = new QPushButton(i18n::trs("＋ 新建条目", "＋ New Entry"), this);
     toolbar->addWidget(searchEdit_, 1);
     toolbar->addWidget(semanticCheck_);
-    toolbar->addWidget(tagEdit_);
     toolbar->addWidget(searchBtn);
     toolbar->addWidget(newBtn);
     layout->addLayout(toolbar);
@@ -48,10 +53,16 @@ KnowledgePanel::KnowledgePanel(zp::Platform& platform, QWidget* parent)
     connect(searchEdit_, &QLineEdit::returnPressed, this, &KnowledgePanel::onSearch);
     connect(newBtn, &QPushButton::clicked, this, &KnowledgePanel::onNewEntry);
 
-    // 统计摘要栏：总条目数 / 今日新增 / 热门标签
+    // 第二行：统计摘要（左）+ 标签过滤 + 结果即筛（右）
+    auto* subBar = new QHBoxLayout;
     statsLabel_ = new QLabel(this);
     statsLabel_->setObjectName("muted");
-    layout->addWidget(statsLabel_);
+    subBar->addWidget(statsLabel_);
+    subBar->addStretch(1);
+    subBar->addWidget(new QLabel(i18n::trs("标签", "Tag"), this));
+    tagEdit_->setMaximumWidth(160);
+    subBar->addWidget(tagEdit_);
+    layout->addLayout(subBar);
 
     auto* splitter = new QSplitter(Qt::Horizontal, this);
     table_ = new QTableWidget(0, 5, splitter);
@@ -62,9 +73,9 @@ KnowledgePanel::KnowledgePanel(zp::Platform& platform, QWidget* parent)
     splitter->addWidget(table_);
     // 结果即筛：对当前搜索结果做本地即时过滤（与上方服务端搜索互补）
     viewFilter_ = makeTableFilter(table_, this,
-                                  i18n::trs("🔍  结果即筛…", "🔍  Filter results…"));
+                                  i18n::trs("结果即筛…", "Filter results…"));
     viewFilter_->setMaximumWidth(170);
-    toolbar->insertWidget(toolbar->indexOf(searchBtn), viewFilter_);
+    subBar->addWidget(viewFilter_);
     // 双击行 = 大窗阅读全文（右侧详情栏偏窄时不挤）
     connect(table_, &QTableWidget::cellDoubleClicked, this,
             &KnowledgePanel::onEntryViewer);
@@ -127,16 +138,18 @@ void KnowledgePanel::onSearch() {
         for (const auto& t : e.tags) tags += QString::fromStdString(t) + " ";
         setRow(table_, static_cast<int>(i),
                {QString::fromStdString(e.title), QString::fromStdString(e.author), tags.trimmed(),
-                QString::number(e.version), QString::fromStdString(e.created_at)});
+                QString::number(e.version), relTime(QString::fromStdString(e.created_at))});
     }
+    fitTableColumns(table_, 0);  // 标题吃剩余空间，其余按内容宽（避免出现横向滚动条）
     applyTableFilter(table_, viewFilter_->text());  // 新结果套用当前过滤
 
-    // 统计摘要：总数 / 今日新增 / 热门标签
-    QString today = QString::fromStdString(zp::nowIso()).left(10);
+    // 统计摘要：总数 / 今日新增 / 热门标签（"今日"按本地日期，避免与用户时区错位）
+    const QDate todayLocal = QDate::currentDate();
     int todayCount = 0;
     std::map<QString, int> tagFreq;
     for (const auto& h : hits_) {
-        if (QString::fromStdString(h.entry.created_at).startsWith(today)) ++todayCount;
+        const QDateTime dt = parseUtcIso(QString::fromStdString(h.entry.created_at));
+        if (dt.isValid() && dt.toLocalTime().date() == todayLocal) ++todayCount;
         for (const auto& t : h.entry.tags) ++tagFreq[QString::fromStdString(t)];
     }
     QVector<QPair<QString, int>> top(tagFreq.begin(), tagFreq.end());
@@ -183,7 +196,9 @@ void KnowledgePanel::onSelectEntry(int row) {
                        .arg(i18n::trs("版本", "Version"))
                        .arg(e.version)
                        .arg(i18n::trs("分类", "Category"), QString::fromStdString(e.category))
-                       .arg(i18n::trs("时间", "Time"), QString::fromStdString(e.created_at));
+                       .arg(i18n::trs("时间", "Time"), relTime(QString::fromStdString(e.created_at))
+                                                            + " (" +
+                                                            localStamp(QString::fromStdString(e.created_at)) + ")");
     if (semanticCheck_->isChecked())
         meta += QString(" · %1: %2").arg(i18n::trs("距离", "dist")).arg(hit.score, 0, 'f', 4);
     metaLabel_->setText(meta);
@@ -198,9 +213,17 @@ void KnowledgePanel::onSelectEntry(int row) {
             versionCombo_->addItem(QString("v%1 — %2 (%3)")
                                        .arg(v.version)
                                        .arg(QString::fromStdString(v.author))
-                                       .arg(QString::fromStdString(v.created_at)));
+                                       .arg(relTime(QString::fromStdString(v.created_at))));
+    }
+    // 空下拉框会渲染成一个带小三角的空方块，看起来像渲染残留；给出占位并禁用
+    if (versions_.empty()) {
+        versionCombo_->addItem(i18n::trs("无历史版本", "no versions"));
+        versionCombo_->setEnabled(false);
+    } else {
+        versionCombo_->setEnabled(true);
     }
     versionCombo_->setCurrentIndex(0);
+    addVersionBtn_->setEnabled(!e.uuid.empty());
     versionCombo_->blockSignals(false);
 }
 
@@ -223,7 +246,7 @@ void KnowledgePanel::onEntryViewer(int row) {
             .arg(i18n::trs("作者", "Author"), QString::fromStdString(e.author))
             .arg(i18n::trs("标签", "Tags"), tags.trimmed().toHtmlEscaped())
             .arg(i18n::trs("分类", "Category"), QString::fromStdString(e.category))
-            .arg(i18n::trs("时间", "Time"), QString::fromStdString(e.created_at)));
+            .arg(i18n::trs("时间", "Time"), relTime(QString::fromStdString(e.created_at))));
     meta->setStyleSheet(ui::th("color:@muted@; font-size:12px;"));
     auto* view = new QPlainTextEdit(&dlg);
     view->setReadOnly(true);
@@ -246,7 +269,7 @@ void KnowledgePanel::onVersionChanged(int idx) {
                             .arg(i18n::trs("作者", "Author"), QString::fromStdString(v.author))
                             .arg(i18n::trs("版本", "Version"))
                             .arg(v.version)
-                            .arg(i18n::trs("时间", "Time"), QString::fromStdString(v.created_at)));
+                            .arg(i18n::trs("时间", "Time"), relTime(QString::fromStdString(v.created_at))));
 }
 
 void KnowledgePanel::onNewEntry() {
