@@ -14,6 +14,7 @@
 #include <QHeaderView>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QLineEdit>
 #include <QListWidget>
 #include <QMessageBox>
 #include <QProgressBar>
@@ -627,6 +628,35 @@ QWidget* SettingsDialog::buildUpdatePage() {
             [](bool on) { ui::UpdateChecker::setAutoCheckEnabled(on); });
     lay->addWidget(autoCheckBox_);
 
+    // 网络韧性：GitHub 直连经常超时/断流。这里可填加速前缀，或允许直连失败后自动换公共镜像。
+    auto* mirrorRow = new QHBoxLayout();
+    auto* mirrorLabel = thLabel("font-size:12px; color:@muted@;", page);
+    mirrorLabel->setText(i18n::trs("镜像加速前缀", "Mirror prefix"));
+    mirrorEdit_ = new QLineEdit(page);
+    mirrorEdit_->setPlaceholderText("https://ghfast.top/");
+    mirrorEdit_->setText(ui::UpdateChecker::mirrorPrefix());
+    mirrorEdit_->setClearButtonEnabled(true);
+    mirrorEdit_->setToolTip(i18n::trs(
+        "填写 GitHub 加速前缀（形如 https://ghfast.top/）；留空表示只用直连。\n"
+        "镜像仅用于下载安装包，更新清单与 SHA256 始终直连 GitHub。",
+        "A GitHub accelerator prefix such as https://ghfast.top/; leave empty for direct only.\n"
+        "Mirrors are used for the installer download only - the manifest and its SHA256 always "
+        "come straight from GitHub."));
+    connect(mirrorEdit_, &QLineEdit::editingFinished, this,
+            [this] { ui::UpdateChecker::setMirrorPrefix(mirrorEdit_->text()); });
+    mirrorRow->addWidget(mirrorLabel);
+    mirrorRow->addWidget(mirrorEdit_, 1);
+    lay->addLayout(mirrorRow);
+
+    autoMirrorBox_ = new QCheckBox(
+        i18n::trs("GitHub 直连失败时自动尝试公共加速镜像",
+                  "Try public mirrors automatically when GitHub is unreachable"),
+        page);
+    autoMirrorBox_->setChecked(ui::UpdateChecker::autoMirrorEnabled());
+    connect(autoMirrorBox_, &QCheckBox::toggled, this,
+            [](bool on) { ui::UpdateChecker::setAutoMirrorEnabled(on); });
+    lay->addWidget(autoMirrorBox_);
+
     if (!ui::UpdateChecker::isInstalledCopy()) {
         auto* portable = thLabel("font-size:11px; color:@muted@;", page);
         portable->setText(i18n::trs(
@@ -664,10 +694,14 @@ QWidget* SettingsDialog::buildUpdatePage() {
     auto* note = thLabel("font-size:11px; color:@muted@;", page);
     note->setText(i18n::trs(
         "更新从 GitHub Releases 获取：下载后先校验 SHA256 再安装，校验不通过会删除文件。"
-        "纯本地运行、无遥测；安装包为 per-user，不需要管理员权限。",
+        "网络不稳时会自动重试并断点续传，直连失败后按需切换镜像；镜像只用于下载安装包，"
+        "更新清单与校验和始终直连 GitHub。纯本地运行、无遥测；安装包为 per-user，"
+        "不需要管理员权限。",
         "Updates come from GitHub Releases: the download is verified against its SHA256 before "
-        "installing, and deleted if the checksum does not match. No telemetry; the installer is "
-        "per-user and needs no administrator rights."));
+        "installing, and deleted if the checksum does not match. Flaky networks are handled with "
+        "retries and resume, with mirrors as a fallback; mirrors only serve the installer, while "
+        "the manifest and its checksums always come straight from GitHub. No telemetry; the "
+        "installer is per-user and needs no administrator rights."));
     note->setWordWrap(true);
     lay->addWidget(note);
     lay->addStretch(1);

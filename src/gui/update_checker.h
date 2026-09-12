@@ -15,8 +15,16 @@
 //   * 便携版不走 MSI 安装（否则会装出第二份），只提示去下载页。
 //   * 诚实说明：哈希来自同一分发渠道（HTTPS + GitHub），能防传输损坏与镜像篡改，
 //     但不等于代码签名；签名后应改成校验签名。
+//
+// 网络韧性（GitHub 在国内经常超时、断流）：
+//   * 清单拉取失败按退避重试若干次，不因一次抖动就报错；
+//   * 产物下载失败按退避重试，且**断点续传**（Range）——只补没下完的差额；
+//   * 直连失败后可切换到镜像前缀重试（用户自定义镜像 + 可选公共镜像）；
+//   * 仅产物走镜像：清单与其中的 SHA256 始终直连 GitHub，可信锚点不经过第三方，
+//     因此镜像最坏只能让下载失败，无法替换内容（哈希不匹配会被拒绝安装）。
 #include <QObject>
 #include <QString>
+#include <QStringList>
 #include <QUrl>
 
 class QNetworkAccessManager;
@@ -51,6 +59,12 @@ public:
     // 运行的是安装版（%LOCALAPPDATA%\MiderHive，兼容旧品牌 %LOCALAPPDATA%\AgentHive）还是便携版
     static bool isInstalledCopy();
 
+    // ---- 网络韧性偏好（与设置页共用；GitHub 可达性差时的兜底）----
+    static QString mirrorPrefix();                 // 用户自定义镜像前缀（空 = 只用直连）
+    static void setMirrorPrefix(const QString& prefix);
+    static bool autoMirrorEnabled();               // 直连失败后是否自动尝试公共镜像（默认开）
+    static void setAutoMirrorEnabled(bool on);
+
     void check();                                       // 拉清单并比对版本
     void downloadAndInstall(const UpdateInfo& info);    // 下载 → 校验 → 安装 → 退出
 
@@ -64,10 +78,19 @@ signals:
     void installing();   // 已启动安装程序，调用方应准备退出
 
 private:
-    void downloadMsi(const UpdateInfo& info);
+    void fetchManifest(int attempt);   // 清单拉取（带退避重试）
+    void startAttempt();               // 单次下载尝试（带 Range 续传）
     void verifyAndInstall(const UpdateInfo& info, const QString& filePath);
 
     QNetworkAccessManager* net_ = nullptr;
+    // 韧性下载状态：候选地址（直连 → 自定义镜像 → 公共镜像）、当前地址与尝试次数、已收字节
+    UpdateInfo dlInfo_;
+    QString dlPath_;
+    QStringList dlUrls_;
+    int dlUrlIdx_ = 0;
+    int dlAttempt_ = 0;
+    int dlTries_ = 0;
+    qint64 dlGot_ = 0;
 };
 
 }  // namespace ui

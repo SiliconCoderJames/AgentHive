@@ -16,6 +16,7 @@
 
 class QCheckBox;
 class QComboBox;
+class QLineEdit;
 class QProgressBar;
 class QListWidget;
 class QPushButton;
@@ -55,6 +56,8 @@ private:
     QTableWidget* agentsTable_ = nullptr;
     QLabel* latest_ = nullptr;  // 更新页状态行
     QCheckBox* autoCheckBox_ = nullptr;
+    QLineEdit* mirrorEdit_ = nullptr;        // 更新镜像前缀（GitHub 直连不稳时的兜底）
+    QCheckBox* autoMirrorBox_ = nullptr;     // 直连失败后是否自动尝试公共镜像
     QPushButton* installBtn_ = nullptr;
     QPushButton* skipBtn_ = nullptr;
     QProgressBar* progress_ = nullptr;

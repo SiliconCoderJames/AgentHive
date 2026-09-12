@@ -15,6 +15,7 @@
 #include <QSettings>
 #include <QStandardPaths>
 #include <QTextStream>
+#include <QTimer>
 
 #include "core/types.h"   // ah::kPlatformVersion
 #include "core/util.h"
@@ -51,6 +52,34 @@ namespace {
 constexpr const char* kRepoSlug = "SiliconCoderJames/MiderHive";
 constexpr const char* kReleasesPage = "https://github.com/SiliconCoderJames/MiderHive/releases";
 
+// 韧性参数：GitHub 直连在国内经常超时/断流，一次失败就报错太脆。
+constexpr int kManifestAttempts = 3;   // 清单只有几百字节，多试几次几乎不花代价
+constexpr int kAssetAttempts = 3;      // 每个候选地址的重试次数（配合 Range 只补差额）
+constexpr int kManifestTimeoutMs = 15000;
+constexpr int kAssetTimeoutMs = 25000;  // 资产下载放宽空闲超时：慢链路起步慢 ≠ 死链
+
+// 退避：0.8s → 1.6s → 3.2s（瞬时故障多半几秒内自愈，也不必让用户干等）
+int backoffMs(int attempt) { return 800 * (1 << qBound(0, attempt - 1, 4)); }
+
+// 公共加速镜像：把原始 GitHub URL 当路径拼接（形如 https://ghfast.top/https://github.com/...）。
+// 只用于**产物下载**；清单与其内的 SHA256 始终直连 GitHub，可信锚点不经过第三方——
+// 因此镜像最坏只能让下载失败（DoS），无法替换内容（哈希不匹配会被拒绝安装）。
+const QStringList& builtinMirrors() {
+    static const QStringList k = {
+        QStringLiteral("https://ghfast.top/"),
+        QStringLiteral("https://gh-proxy.com/"),
+        QStringLiteral("https://ghproxy.net/"),
+    };
+    return k;
+}
+
+QUrl applyMirror(const QString& prefix, const QUrl& original) {
+    QString p = prefix.trimmed();
+    if (p.isEmpty()) return original;
+    if (!p.endsWith('/')) p += '/';
+    return QUrl(p + original.toString());
+}
+
 // 清单地址：默认走 releases/latest 的固定资产 URL；可用环境变量覆盖（便于本地联调与 fork）
 QUrl manifestUrl() {
     const std::string override =
@@ -60,13 +89,13 @@ QUrl manifestUrl() {
                     .arg(QString::fromLatin1(kRepoSlug)));
 }
 
-QNetworkRequest makeRequest(const QUrl& url) {
+QNetworkRequest makeRequest(const QUrl& url, int timeoutMs) {
     QNetworkRequest req(url);
     req.setHeader(QNetworkRequest::UserAgentHeader,
                   QString("MiderHive/%1").arg(QString::fromLatin1(ah::kPlatformVersion)));
     req.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
                      QNetworkRequest::NoLessSafeRedirectPolicy);  // release 资产会 302 到 CDN
-    req.setTransferTimeout(15000);
+    req.setTransferTimeout(timeoutMs);
     return req;
 }
 
@@ -120,6 +149,23 @@ void UpdateChecker::skipVersion(const QString& version) {
     s.setValue("ui/skippedVersion", version);
 }
 
+QString UpdateChecker::mirrorPrefix() {
+    QSettings s;
+    return s.value("ui/updateMirror").toString().trimmed();
+}
+void UpdateChecker::setMirrorPrefix(const QString& prefix) {
+    QSettings s;
+    s.setValue("ui/updateMirror", prefix.trimmed());
+}
+bool UpdateChecker::autoMirrorEnabled() {
+    QSettings s;
+    return s.value("ui/updateAutoMirror", true).toBool();
+}
+void UpdateChecker::setAutoMirrorEnabled(bool on) {
+    QSettings s;
+    s.setValue("ui/updateAutoMirror", on);
+}
+
 bool UpdateChecker::isInstalledCopy() {
     // 安装版固定落在 %LOCALAPPDATA%\MiderHive（GenericDataLocation 在 Windows 上即 %LOCALAPPDATA%），
     // 其余位置（解压出来的便携版、开发时的 build 目录）都按便携版处理。
@@ -135,13 +181,32 @@ bool UpdateChecker::isInstalledCopy() {
 void UpdateChecker::check() {
     emit checking();
     trace(QString("check() start, url=%1").arg(manifestUrl().toString()));
+    fetchManifest(1);
+}
+
+// 清单拉取带退避重试：网络抖动不该直接变成"更新失败"
+void UpdateChecker::fetchManifest(int attempt) {
     if (!net_) net_ = new QNetworkAccessManager(this);
-    QNetworkReply* reply = net_->get(makeRequest(manifestUrl()));
-    connect(reply, &QNetworkReply::finished, this, [this, reply] {
+    QNetworkReply* reply = net_->get(makeRequest(manifestUrl(), kManifestTimeoutMs));
+    connect(reply, &QNetworkReply::finished, this, [this, reply, attempt] {
         reply->deleteLater();
         if (reply->error() != QNetworkReply::NoError) {
-            trace(QString("check() network error: %1").arg(reply->errorString()));
-            emit failed(reply->errorString());
+            const QString why = reply->errorString();
+            trace(QString("check() attempt %1/%2 failed: %3")
+                      .arg(attempt)
+                      .arg(kManifestAttempts)
+                      .arg(why));
+            if (attempt < kManifestAttempts) {
+                QTimer::singleShot(backoffMs(attempt), this,
+                                   [this, attempt] { fetchManifest(attempt + 1); });
+                return;
+            }
+            emit failed(i18n::trs("无法获取更新信息（连接 GitHub 失败，已重试 %1 次）：%2\n"
+                                  "可稍后再试，或点「打开下载页」用浏览器查看。",
+                                  "Could not reach GitHub for update info (retried %1x): %2\n"
+                                  "Try again later, or use \"Open releases page\" in a browser.")
+                            .arg(kManifestAttempts)
+                            .arg(why));
             return;
         }
         const QByteArray raw = reply->readAll();
@@ -194,35 +259,110 @@ void UpdateChecker::downloadAndInstall(const UpdateInfo& info) {
         emit failed(i18n::trs("清单里没有可用的安装包信息", "manifest has no usable installer entry"));
         return;
     }
-    downloadMsi(info);
+    // 候选地址顺序：直连 GitHub → 用户自定义镜像 → 公共镜像（仅在允许时）
+    dlInfo_ = info;
+    dlPath_ = tempMsiPath(info.version);
+    dlUrls_.clear();
+    dlUrls_ << info.msiUrl.toString();
+    const QString custom = mirrorPrefix();
+    if (!custom.isEmpty()) dlUrls_ << applyMirror(custom, info.msiUrl).toString();
+    if (autoMirrorEnabled())
+        for (const QString& m : builtinMirrors()) dlUrls_ << applyMirror(m, info.msiUrl).toString();
+    dlUrlIdx_ = 0;
+    dlAttempt_ = 0;
+    dlTries_ = 0;
+    dlGot_ = 0;
+    trace(QString("download start: v%1 candidates=%2 customMirror=%3 autoMirror=%4")
+              .arg(info.version)
+              .arg(dlUrls_.size())
+              .arg(custom.isEmpty() ? "none" : custom)
+              .arg(autoMirrorEnabled() ? 1 : 0));
+    startAttempt();
 }
 
-void UpdateChecker::downloadMsi(const UpdateInfo& info) {
+// 单次下载尝试：已下部分用 Range 续传（服务器不支持 206 就自动从头来）。
+// 半成品**不删**——断网后重试只补差额，13 MB 的包不必每次重下。
+void UpdateChecker::startAttempt() {
     if (!net_) net_ = new QNetworkAccessManager(this);
-    const QString path = tempMsiPath(info.version);
-    QFile::remove(path);  // 覆盖上次残留的下载
+    const QUrl url(dlUrls_.at(dlUrlIdx_));
+    ++dlAttempt_;
+    ++dlTries_;
+    const qint64 total = dlInfo_.msiSize > 0 ? dlInfo_.msiSize : 0;
+    qint64 have = QFileInfo(dlPath_).size();
+    // 半成品已下满（上次多半是校验失败）：从头下，避免继续拼一个错文件
+    if (total > 0 && have >= total) have = 0;
+    QNetworkRequest req = makeRequest(url, kAssetTimeoutMs);
+    if (have > 0)
+        req.setRawHeader("Range", QByteArray("bytes=") + QByteArray::number(have) + "-");
+    trace(QString("download try %1: attempt %2/%3 url=%4 have=%5/%6")
+              .arg(dlTries_)
+              .arg(dlAttempt_)
+              .arg(kAssetAttempts)
+              .arg(url.toString())
+              .arg(have)
+              .arg(total));
 
-    QNetworkReply* reply = net_->get(makeRequest(info.msiUrl));
-    auto* out = new QFile(path, this);
-    if (!out->open(QIODevice::WriteOnly)) {
-        delete out;
+    QNetworkReply* reply = net_->get(req);
+    auto* out = new QFile(dlPath_, this);
+    if (!out->open(have > 0 ? (QIODevice::WriteOnly | QIODevice::Append) : QIODevice::WriteOnly)) {
+        out->deleteLater();
+        reply->deleteLater();
         emit failed(i18n::trs("无法写入临时目录", "cannot write to the temp directory"));
         return;
     }
-    connect(reply, &QNetworkReply::readyRead, this, [reply, out] { out->write(reply->readAll()); });
-    connect(reply, &QNetworkReply::downloadProgress, this,
-            [this](qint64 got, qint64 total) { emit downloadProgress(got, total); });
-    connect(reply, &QNetworkReply::finished, this, [this, reply, out, info, path] {
+    dlGot_ = have;
+    if (total > 0) emit downloadProgress(dlGot_, total);
+    // 服务器忽略 Range 而返回 200 时，续传会拼出脏文件——发现即截断重写
+    connect(reply, &QNetworkReply::metaDataChanged, this, [this, reply, out, have] {
+        const int code = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        if (have > 0 && code == 200) {
+            out->resize(0);
+            out->seek(0);
+            dlGot_ = 0;
+        }
+    });
+    connect(reply, &QNetworkReply::readyRead, this, [this, reply, out] {
+        const QByteArray chunk = reply->readAll();
+        out->write(chunk);
+        dlGot_ += chunk.size();
+        if (dlInfo_.msiSize > 0) emit downloadProgress(dlGot_, dlInfo_.msiSize);
+    });
+    connect(reply, &QNetworkReply::finished, this, [this, reply, out] {
         out->write(reply->readAll());
         out->close();
         out->deleteLater();
-        reply->deleteLater();
-        if (reply->error() != QNetworkReply::NoError) {
-            QFile::remove(path);
-            emit failed(reply->errorString());
+        const QString usedUrl = dlUrls_.at(dlUrlIdx_);
+        if (reply->error() == QNetworkReply::NoError) {
+            reply->deleteLater();
+            verifyAndInstall(dlInfo_, dlPath_);
             return;
         }
-        verifyAndInstall(info, path);
+        const QString why = reply->errorString();
+        reply->deleteLater();
+        trace(QString("download try %1 failed (%2): %3").arg(dlTries_).arg(usedUrl).arg(why));
+        if (dlAttempt_ < kAssetAttempts) {  // 同一地址再试（续传，只补差额）
+            QTimer::singleShot(backoffMs(dlAttempt_), this, [this] { startAttempt(); });
+            return;
+        }
+        dlAttempt_ = 0;
+        ++dlUrlIdx_;
+        if (dlUrlIdx_ < dlUrls_.size()) {  // 换下一个候选地址（镜像）
+            trace(QString("download switching to url %1/%2: %3")
+                      .arg(dlUrlIdx_ + 1)
+                      .arg(dlUrls_.size())
+                      .arg(dlUrls_.at(dlUrlIdx_)));
+            QTimer::singleShot(300, this, [this] { startAttempt(); });
+            return;
+        }
+        QFile::remove(dlPath_);  // 全部候选都失败：清掉半成品
+        emit failed(i18n::trs("下载失败（已重试 %1 次、尝试 %2 个地址）：%3\n"
+                              "可点「打开下载页」用浏览器下载，或在设置里填写镜像加速地址。",
+                              "Download failed (retried %1x across %2 url(s)): %3\n"
+                              "Use \"Open releases page\" to download in a browser, or set a "
+                              "mirror prefix in Settings.")
+                        .arg(dlTries_)
+                        .arg(dlUrls_.size())
+                        .arg(why));
     });
 }
 
