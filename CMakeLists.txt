@@ -2,6 +2,16 @@ cmake_minimum_required(VERSION 3.25)
 project(MiderHive VERSION 1.0.3 LANGUAGES C CXX)
 
 # ---- 版本号：默认取 project(VERSION)，发布流水线用 -DMIDERHIVE_VERSION=v1.2.3 覆盖 ----
+# 缓存陷阱：set(... CACHE) 在重配置时不会覆盖既有缓存值——project(VERSION) 从 1.0.1
+# 升到 1.0.3 后，长期使用的开发构建树仍一直自报首次配置时的旧版本（实测 /api/health
+# 与 MCP serverInfo 都报 1.0.1，而全新配置的发布树是正确的）。因此 project 版本变化
+# 时清一次缓存：既跟上版本，又保留 -D 显式覆盖（-D 的值每次 configure 都会重新写入
+# 缓存，不受 unset 影响）。
+if(NOT DEFINED _MIDERHIVE_LAST_PROJECT_VERSION
+   OR NOT _MIDERHIVE_LAST_PROJECT_VERSION STREQUAL "${PROJECT_VERSION}")
+    unset(MIDERHIVE_VERSION CACHE)
+endif()
+set(_MIDERHIVE_LAST_PROJECT_VERSION "${PROJECT_VERSION}" CACHE INTERNAL "跟踪 project(VERSION) 变化，见上")
 set(MIDERHIVE_VERSION "${PROJECT_VERSION}" CACHE STRING "发布版本（可带 v 前缀与预发布后缀）")
 # 传参校验：PowerShell 5.1 会把未加引号的 -DMIDERHIVE_VERSION=1.0.0 截断成 "...=1"，
 # 于是静默产出一个错误版本号（界面/API/安装包全错）。这类失败模式最难发现，

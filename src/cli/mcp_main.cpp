@@ -19,6 +19,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <optional>
 #include <functional>
 #include <iostream>
 #include <map>
@@ -54,19 +55,49 @@ struct Identity {
 };
 
 // agents.json 是平台约定的 name -> api_key 平面映射（bootstrap 预置 zcode，
-// 一键接入追加）。读失败/不存在都按空对象处理，不阻塞主流程。
-json readAgentsJson(const fs::path& home) {
+// 一键接入追加）。读失败/不存在都按空对象处理，不阻塞主流程；
+// 损坏（解析失败）返回 nullopt：调用方必须放弃写入，防止清空其他 agent 的明文密钥。
+std::optional<json> readAgentsJson(const fs::path& home) {
     std::ifstream in(home / "config" / "agents.json");
     if (!in) return json::object();
     json j = json::parse(in, nullptr, false);
+    if (j.is_discarded()) return std::nullopt;
     return j.is_object() ? j : json::object();
 }
 
 void writeAgentsJson(const fs::path& home, const json& j) {
     std::error_code ec;
-    fs::create_directories(home / "config", ec);
-    std::ofstream out(home / "config" / "agents.json", std::ios::trunc);
-    if (out) out << j.dump(2);
+    const fs::path dir = home / "config";
+    fs::create_directories(dir, ec);
+    const fs::path target = dir / "agents.json";
+    const fs::path tmp = dir / "agents.json.tmp";
+    {
+        // 先写临时文件再原子替换：中途失败不会留下半截文件（那等于丢失全部明文密钥，
+        // 与 platformd persistAgentKey 同一策略、同一原因）
+        std::ofstream out(tmp, std::ios::trunc);
+        if (!out) {
+            std::cerr << "[miderhive-mcp] cannot write " << tmp.string() << std::endl;
+            return;
+        }
+        out << j.dump(2) << "\n";
+        out.flush();
+        if (!out.good()) {
+            out.close();
+            std::cerr << "[miderhive-mcp] write failed: " << tmp.string() << std::endl;
+            fs::remove(tmp, ec);
+            return;
+        }
+        out.close();
+    }
+    fs::rename(tmp, target, ec);
+    if (ec) {
+        // Windows 的 rename 不覆盖既有文件：退化为先删再改名（同 persistAgentKey）
+        std::error_code ec2;
+        fs::remove(target, ec2);
+        fs::rename(tmp, target, ec);
+        if (ec) std::cerr << "[miderhive-mcp] cannot replace " << target.string()
+                          << ": " << ec.message() << std::endl;
+    }
 }
 
 Identity resolveIdentity() {
@@ -76,31 +107,43 @@ Identity resolveIdentity() {
                         : fs::path(envOr("MIDERHIVE_HOME"));
     // 2) 已有密钥文件：直接复用（同名重复注册会被平台拒绝）
     if (!id.name.empty() && id.key.empty()) {
-        json agents = readAgentsJson(home);
-        if (agents.contains(id.name) && agents[id.name].is_string())
-            id.key = agents[id.name].get<std::string>();
+        std::optional<json> agents = readAgentsJson(home);
+        if (agents && agents->contains(id.name) && (*agents)[id.name].is_string())
+            id.key = (*agents)[id.name].get<std::string>();
     }
     // 3) 有主密钥就自注册一次并落盘；此后重启走第 2 步复用同一身份
     std::string master = envOr("MIDERHIVE_MASTER_KEY");
     if (!id.name.empty() && id.key.empty() && !master.empty()) {
-        httplib::Client cli("http://127.0.0.1:" + envOr("MIDERHIVE_PORT", "8787"));
-        cli.set_connection_timeout(5, 0);
-        cli.set_read_timeout(15, 0);
-        httplib::Headers headers{{"X-Master-Key", master}};
-        json body = {{"name", id.name}, {"role", "member"}};
-        if (auto res = cli.Post("/api/agents/register", headers, body.dump(), "application/json")) {
-            json r = json::parse(res->body, nullptr, false);
-            if (res->status == 200 && r.is_object() && r.value("code", -1) == 0 &&
-                r.contains("data") && r["data"].contains("api_key")) {
-                id.key = r["data"]["api_key"].get<std::string>();
-                json agents = readAgentsJson(home);
-                agents[id.name] = id.key;
-                writeAgentsJson(home, agents);
-                std::cerr << "[miderhive-mcp] registered agent '" << id.name
-                          << "', key saved to config/agents.json" << std::endl;
+        // 密钥文件损坏时绝不自注册：合并写入会把其他 agent 的明文密钥清掉
+        std::optional<json> agents = readAgentsJson(home);
+        if (!agents) {
+            std::cerr << "[miderhive-mcp] config/agents.json is corrupt; refusing to "
+                         "auto-register (fix or remove the file first)" << std::endl;
+        } else {
+            httplib::Client cli("http://127.0.0.1:" + envOr("MIDERHIVE_PORT", "8787"));
+            cli.set_connection_timeout(5, 0);
+            cli.set_read_timeout(15, 0);
+            httplib::Headers headers{{"X-Master-Key", master}};
+            json body = {{"name", id.name}, {"role", "member"}};
+            if (auto res = cli.Post("/api/agents/register", headers, body.dump(), "application/json")) {
+                json r = json::parse(res->body, nullptr, false);
+                if (res->status == 200 && r.is_object() && r.value("code", -1) == 0 &&
+                    r.contains("data") && r["data"].contains("api_key")) {
+                    id.key = r["data"]["api_key"].get<std::string>();
+                    json merged = *agents;
+                    merged[id.name] = id.key;
+                    writeAgentsJson(home, merged);
+                    std::cerr << "[miderhive-mcp] registered agent '" << id.name
+                              << "', key saved to config/agents.json" << std::endl;
+                } else {
+                    std::cerr << "[miderhive-mcp] auto-register failed: HTTP " << res->status
+                              << " " << r.value("message", "") << std::endl;
+                }
             } else {
-                std::cerr << "[miderhive-mcp] auto-register failed: HTTP " << res->status
-                          << " " << r.value("message", "") << std::endl;
+                // 平台没起来/端口不对：说清原因，别让用户以为是环境变量配错
+                std::cerr << "[miderhive-mcp] cannot reach platform at 127.0.0.1:"
+                          << envOr("MIDERHIVE_PORT", "8787")
+                          << " for auto-register (is platformd running?)" << std::endl;
             }
         }
     }
@@ -378,7 +421,7 @@ std::vector<ToolDef> buildTools() {
                            {"uuid", "status"}),
                  [](const json& a) {
                      json body = {{"status", sarg(a, "status")}};
-                     return apiCall("POST /api/messages/" + sarg(a, "uuid") + "/status", &body);
+                     return apiCall("POST /api/messages/" + percentEncode(sarg(a, "uuid")) + "/status", &body);
                  }});
 
     t.push_back({"error_report",
@@ -425,7 +468,7 @@ std::vector<ToolDef> buildTools() {
                            {"uuid"}),
                  [](const json& a) {
                      json body = {{"notes", sopt(a, "notes")}};
-                     return apiCall("POST /api/errors/" + sarg(a, "uuid") + "/resolve", &body);
+                     return apiCall("POST /api/errors/" + percentEncode(sarg(a, "uuid")) + "/resolve", &body);
                  }});
 
     t.push_back({"skill_list",
@@ -552,7 +595,10 @@ void dispatch(Session& s, const json& req, bool needReply) {
         return;
     }
     if (method == "tools/call") {
-        std::string name = params.value("name", "");
+        // 客户端可能发来任意 JSON：name 必须类型安全地取，否则 type_error 会杀死进程
+        std::string name = params.contains("name") && params["name"].is_string()
+                               ? params["name"].get<std::string>()
+                               : "";
         auto it = s.byName.find(name);
         if (it == s.byName.end()) {
             // 未知工具按 JSON-RPC 参数错误回报（MCP 约定）

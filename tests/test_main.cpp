@@ -182,6 +182,11 @@ static std::string readFile(const std::string& path) {
     return s;
 }
 
+static void writeFileRaw(const std::string& path, const std::string& content) {
+    std::ofstream out(path, std::ios::trunc);
+    out << content;
+}
+
 static void step(const char* s) {
     std::printf("  . %s\n", s);
     std::fflush(stdout);
@@ -699,6 +704,23 @@ static void test_legacy_migration() {
         CHECK(!p.agentProvision("zcode", "zcode", denied, rotErr));   // 保留名
         CHECK(denied.empty());
         CHECK(!p.agentProvision("codex", "claude", denied, rotErr));  // 非管理者
+        // 密钥文件损坏（半截/垃圾）：持久化层必须干净失败（修复前 in >> j 直接抛异常
+        // 穿透到 HTTP 层变成 400），且绝不能覆盖重写——那等于清掉全部明文条目。
+        // API 层仍返回成功：库是事实源，明文缓存尽力而为（失败记审计）。
+        writeFileRaw((tmp / "config" / "agents.json").string(), "{corrupt");
+        std::string corruptKey;
+        bool corruptOk = p.agentProvision("zcode", "claude", corruptKey, rotErr);
+        if (!corruptOk) std::printf("  provision with corrupt keyfile err: %s\n", rotErr.c_str());
+        CHECK(corruptOk);
+        CHECK(p.authenticate("claude", corruptKey));            // 库侧已生效
+        CHECK(readFile((tmp / "config" / "agents.json").string()) == "{corrupt");  // 未被覆盖
+        // 修复文件后：明文缓存恢复正常写入
+        writeFileRaw((tmp / "config" / "agents.json").string(), "{}");
+        std::string repairedKey;
+        CHECK(p.agentProvision("zcode", "claude", repairedKey, rotErr));
+        CHECK(p.authenticate("claude", repairedKey));
+        CHECK(readFile((tmp / "config" / "agents.json").string()).find(repairedKey) !=
+              std::string::npos);
         p.shutdown();
     }
     std::error_code ec;

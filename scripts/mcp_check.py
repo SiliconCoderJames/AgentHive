@@ -218,6 +218,19 @@ def main():
         rid, resp = cli.request("bogus/method", {})
         check("未知方法 -> -32601", resp.get("error", {}).get("code") == -32601)
 
+        # ---- 畸形输入不得杀死服务器（此前 name 非字符串会 std::terminate）----
+        rid, resp = cli.request("tools/call", {"name": 123, "arguments": {}})
+        check("name 非字符串 -> -32602 不崩溃",
+              resp.get("error", {}).get("code") == -32602 and resp.get("id") == rid)
+        rid, resp = cli.request("tools/call", "params-not-object")
+        check("params 非对象 -> -32602", resp.get("error", {}).get("code") == -32602)
+        rid, resp = cli.request("ping", {})
+        check("畸形输入后服务器存活", resp.get("id") == rid and resp.get("result") == {})
+        # 通知后再来一个请求：通知处理不得吞掉后续回包
+        cli.notify("notifications/other")
+        rid, resp = cli.request("ping", {})
+        check("任意通知后请求仍应答", resp.get("id") == rid and resp.get("result") == {})
+
         # ---- memory_remove（zcode 权限）----
         _, _, is_err, _, _ = cli.call_tool(
             "memory_remove", {"section": "project", "key": "mcp-smoke"})

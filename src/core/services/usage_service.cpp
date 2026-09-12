@@ -28,7 +28,10 @@ bool UsageService::report(const std::string& agent, int64_t tokensIn, int64_t to
         }
         if (exists) {
             duplicate = true;
-            return db_.commit(err);
+            // COMMIT 失败同样要回滚：否则事务悬挂,后续所有写操作都会报
+            // "cannot start a transaction within a transaction"
+            if (!db_.commit(err)) { db_.rollback(); return false; }
+            return true;
         }
     }
     if (!db_.query(
@@ -49,7 +52,9 @@ bool UsageService::report(const std::string& agent, int64_t tokensIn, int64_t to
         db_.rollback();
         return false;
     }
-    return db_.commit(err);
+    // 同上：COMMIT 失败必须回滚,不能把打开的事务留在连接上
+    if (!db_.commit(err)) { db_.rollback(); return false; }
+    return true;
 }
 
 bool UsageService::daily(int days, std::vector<UsageDailyPoint>& out, std::string& err) {

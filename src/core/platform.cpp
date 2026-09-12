@@ -190,8 +190,11 @@ bool Platform::persistAgentKey(const std::string& name, const std::string& apiKe
     {
         std::ifstream in(path);
         if (in) {
-            in >> j;
-            if (in.fail() && !in.eof()) { err = "agents.json is not valid JSON: " + path; return false; }
+            // 非抛出解析：文件损坏（半截/空/垃圾）时 operator>> 会抛异常，
+            // 下面那道 fail 检查根本轮不到执行。这里转成如实的失败返回，
+            // 绝不能当空对象继续走——否则合并写入会清掉其他 agent 的明文密钥。
+            j = nlohmann::json::parse(in, nullptr, /*allow_exceptions=*/false);
+            if (j.is_discarded()) { err = "agents.json is not valid JSON: " + path; return false; }
             in.close();
         }
     }
