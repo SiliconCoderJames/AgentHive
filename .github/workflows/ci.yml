@@ -5,15 +5,32 @@ on:
     branches: [master, main]
   pull_request:
 
+# 最小权限：CI 只需要读代码。build/test 用不到任何写操作,
+# 泄漏的 GITHUB_TOKEN 也做不了事。
+permissions:
+  contents: read
+
+# 同一分支/PR 的新推送取消还在跑的旧构建：省排队时间,结论永远以最新提交为准
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   windows-build-test:
     name: Build + Unit Tests + Integration (Windows, Qt6)
     runs-on: windows-latest
+    # Qt 安装 + 全量构建 + 单测 + 两轮集成检查；60 分钟富余,卡死早失败早发现
+    timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      # 第三方 action 一律钉全量 commit SHA（SHA 经 git ls-remote 向官方仓库查证）,
+      # 标签可被移动而 SHA 不可变,防供应链投毒;注释里保留人可读的版本号
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # checkout 的 GITHUB_TOKEN 仅 checkout 需要,不留在 runner 磁盘上
+          persist-credentials: false
 
       - name: Install Qt 6.8
-        uses: jurplel/install-qt-action@v4
+        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4.3.1
         with:
           version: '6.8.3'
           arch: win64_msvc2022_64
@@ -30,7 +47,7 @@ jobs:
           Write-Host "using generator: $gen"
           cmake -S . -B build -G "$gen" -A x64 -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR"
 
-      - name: Build (core + cli + gui)
+      - name: Build (core + cli + mcp + gui)
         run: cmake --build build --config Release
 
       # Qt6 是 QUIET 查找、缺失时只 WARNING 并跳过 GUI 目标，构建仍然会"成功"。
@@ -40,7 +57,8 @@ jobs:
         run: |
           $exe = "build\src\gui\Release\miderhive.exe"
           if (-not (Test-Path $exe)) { throw "GUI target missing: $exe (Qt6 not found?)" }
-          $cli = @("build\src\cli\Release\agent-cli.exe", "build\src\cli\Release\platformd.exe")
+          $cli = @("build\src\cli\Release\agent-cli.exe", "build\src\cli\Release\platformd.exe",
+                   "build\src\cli\Release\miderhive-mcp.exe")
           foreach ($c in $cli) { if (-not (Test-Path $c)) { throw "CLI target missing: $c" } }
           Write-Host "build outputs verified"
 
@@ -71,6 +89,34 @@ jobs:
             $env:MIDERHIVE_ZCODE_KEY = $agents.zcode
             python scripts/feasibility_check.py 19090
             if ($LASTEXITCODE -ne 0) { throw "feasibility check failed" }
+          } finally {
+            Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+          }
+
+      # MCP 服务器是 agent 接入的新通道,协议适配层(JSON-RPC 分帧/工具转发/鉴权)
+      # 单测覆盖不到,必须像 feasibility check 一样跑真进程
+      - name: MCP server check (stdio JSON-RPC, 29 assertions)
+        shell: pwsh
+        env:
+          MIDERHIVE_MASTER_KEY: ci-test-master-key-not-a-secret
+        run: |
+          $dataHome = Join-Path $env:RUNNER_TEMP "miderhive-mcp-data"
+          New-Item -ItemType Directory -Force -Path $dataHome | Out-Null
+          $env:MIDERHIVE_HOME = $dataHome
+          $env:MIDERHIVE_PORT = "19091"
+          $p = Start-Process -FilePath "build\src\cli\Release\platformd.exe" -PassThru -NoNewWindow
+          try {
+            $ready = $false
+            foreach ($i in 1..30) {
+              try {
+                Invoke-RestMethod "http://127.0.0.1:19091/api/health" | Out-Null
+                $ready = $true; break
+              } catch { Start-Sleep -Seconds 1 }
+            }
+            if (-not $ready) { throw "platformd did not become healthy in 30s" }
+            $key = (Get-Content (Join-Path $dataHome "config\agents.json") | ConvertFrom-Json).zcode
+            python scripts/mcp_check.py 19091 "build\src\cli\Release\miderhive-mcp.exe" zcode $key
+            if ($LASTEXITCODE -ne 0) { throw "MCP check failed" }
           } finally {
             Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
           }
