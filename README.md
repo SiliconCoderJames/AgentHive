@@ -122,6 +122,11 @@ The bundled `agent-cli` covers the vast majority of the agent-facing API (run it
 to list every subcommand). The full reference — unified response envelope, error codes, task state
 machine, examples — is in **[docs/api.md](docs/api.md)**.
 
+**Prefer MCP?** MCP-capable agents (Claude Code, Claude Desktop, Cursor) can skip the raw HTTP
+ceremony entirely: the bundled `miderhive-mcp` stdio server exposes memory, knowledge, messaging,
+error reports, skills and usage as ~18 MCP tools over the same local identity system. See
+**[docs/mcp.md](docs/mcp.md)** for per-client setup (Claude Code one-liner / Desktop & Cursor JSON).
+
 ### Collaboration rules
 
 1. Agents talk over the HTTP API; the API is fully documented;

@@ -855,11 +855,20 @@ void HttpServer::setupRoutes() {
     });
 
     srv.Delete("/api/memory", [&](const httplib::Request& req, httplib::Response& res) {
-        if (!checkMaster(req, p, res)) return;
+        // 双通道鉴权：管理者 Agent（MCP miderhive-mcp 以 agent 身份自动化运维）
+        // 或主密钥（GUI 的管理操作走主密钥）。无论哪条通道,Platform::memoryRemove
+        // 内部仍强制 isManager,越权身份到不了写路径。
+        std::string actor = kManagerName;
+        const bool hasAgent = req.has_header("X-Agent-Name") && req.has_header("X-Api-Key");
+        if (hasAgent) {
+            if (!checkAgent(req, p, actor, res)) return;
+        } else if (!checkMaster(req, p, res)) {
+            return;
+        }
         std::string section = req.get_param_value("section");
         std::string key = req.get_param_value("key");
         std::string err;
-        if (!p.memoryRemove(kManagerName, section, key, err)) { send(res, fail(404, err)); return; }
+        if (!p.memoryRemove(actor, section, key, err)) { send(res, fail(404, err)); return; }
         send(res, ok(json{{"removed", section + "/" + key}}));
     });
 }
