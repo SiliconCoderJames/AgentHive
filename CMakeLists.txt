@@ -2,25 +2,37 @@ cmake_minimum_required(VERSION 3.25)
 project(MiderHive VERSION 1.0.3 LANGUAGES C CXX)
 
 # ---- 版本号：默认取 project(VERSION)，发布流水线用 -DMIDERHIVE_VERSION=v1.2.3 覆盖 ----
-# 缓存陷阱：set(... CACHE) 在重配置时不会覆盖既有缓存值——project(VERSION) 从 1.0.1
-# 升到 1.0.3 后，长期使用的开发构建树仍一直自报首次配置时的旧版本（实测 /api/health
-# 与 MCP serverInfo 都报 1.0.1，而全新配置的发布树是正确的）。因此 project 版本变化
-# 时清一次缓存：既跟上版本，又保留 -D 显式覆盖（-D 的值每次 configure 都会重新写入
-# 缓存，不受 unset 影响）。
-if(NOT DEFINED _MIDERHIVE_LAST_PROJECT_VERSION
-   OR NOT _MIDERHIVE_LAST_PROJECT_VERSION STREQUAL "${PROJECT_VERSION}")
-    unset(MIDERHIVE_VERSION CACHE)
+# 缓存陷阱：set(... CACHE) 在重配置时不会覆盖既有缓存值——project(VERSION) 升级后，
+# 开发构建树会一直用首次配置时写进去的旧默认值（实测自报 1.0.1，而全新配置的发布
+# 树是新的）。靠 _MIDERHIVE_LAST_PROJECT_VERSION 识别"缓存里存的还是旧 project 默认
+# 值"的场景并强制跟随新版；用户 -D 显式覆盖（值不同于旧默认）不受影响。注意不能用
+# "版本变化就 unset" 的写法：-D 的值在本 configure 一开始就已写入缓存，无条件 unset
+# 会把首次配置时的 -D 覆盖整个吞掉（实测：全新发布构建被打上 project 版本而非 tag 版本）。
+set(MIDERHIVE_VERSION "${PROJECT_VERSION}" CACHE STRING "发布版本（可带 v 前缀与预发布后缀）")
+if(DEFINED _MIDERHIVE_LAST_PROJECT_VERSION
+   AND NOT _MIDERHIVE_LAST_PROJECT_VERSION STREQUAL "${PROJECT_VERSION}"
+   AND MIDERHIVE_VERSION STREQUAL "${_MIDERHIVE_LAST_PROJECT_VERSION}")
+    set(MIDERHIVE_VERSION "${PROJECT_VERSION}" CACHE STRING "发布版本（可带 v 前缀与预发布后缀）" FORCE)
 endif()
 set(_MIDERHIVE_LAST_PROJECT_VERSION "${PROJECT_VERSION}" CACHE INTERNAL "跟踪 project(VERSION) 变化，见上")
-set(MIDERHIVE_VERSION "${PROJECT_VERSION}" CACHE STRING "发布版本（可带 v 前缀与预发布后缀）")
 # 传参校验：PowerShell 5.1 会把未加引号的 -DMIDERHIVE_VERSION=1.0.0 截断成 "...=1"，
 # 于是静默产出一个错误版本号（界面/API/安装包全错）。这类失败模式最难发现，
 # 因此这里宁可 configure 直接失败，并给出正确写法。
-if(NOT MIDERHIVE_VERSION MATCHES "^v?[0-9]+\\.[0-9]+\\.[0-9]+")
+# v/V 前缀都接受（大小写随后统一归一），但前缀之后必须是 主.次.修订[...]
+if(NOT MIDERHIVE_VERSION MATCHES "^[vV]?[0-9]+\\.[0-9]+\\.[0-9]+")
     message(FATAL_ERROR
-        "MIDERHIVE_VERSION 必须是 v?主.次.修订 形式，当前收到 '${MIDERHIVE_VERSION}'。\n"
+        "MIDERHIVE_VERSION 必须是 [vV]?主.次.修订 形式，当前收到 '${MIDERHIVE_VERSION}'。\n"
         "提示：PowerShell 5.1 会截断未加引号的 -DMIDERHIVE_VERSION=1.0.0，"
         "请写成 \"-DMIDERHIVE_VERSION=1.0.0\"（整体加引号），或直接用 scripts/package.ps1。")
+endif()
+# ---- 统一口径：无论传入 v1.0.4 / V1.0.4 / 1.0.4，内部一律归一为无前缀形式 ----
+# version.h(kPlatformVersion)、/api/health、MCP serverInfo、界面 "v%1" 拼接共用
+# 这一个形式。否则发布构建把原始 tag（带 v）一路传进来、开发构建取 project(VERSION)
+# （不带 v），同一份界面就会拼出 "vv1.0.3"，跳过版本这类字符串比较也会两边口径漂移。
+# （更新器的数值比较本就容忍前缀；这里把其余消费端一并统一，"共用"优于各处"区分"。）
+string(SUBSTRING "${MIDERHIVE_VERSION}" 0 1 _ver_first)
+if(_ver_first STREQUAL "v" OR _ver_first STREQUAL "V")
+    string(SUBSTRING "${MIDERHIVE_VERSION}" 1 -1 MIDERHIVE_VERSION)
 endif()
 string(REGEX REPLACE "^v" "" _ver_raw "${MIDERHIVE_VERSION}")
 # 允许 "1.2.3-rc1"：MSI 的 ProductVersion 必须是纯 x.y.z 数字形式

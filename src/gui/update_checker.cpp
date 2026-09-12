@@ -148,6 +148,12 @@ void UpdateChecker::skipVersion(const QString& version) {
     QSettings s;
     s.setValue("ui/skippedVersion", version);
 }
+bool UpdateChecker::isSkippedVersion(const QString& version) {
+    const QString skipped = skippedVersion();
+    if (skipped.isEmpty() || version.isEmpty()) return false;
+    // 数值等价（v/V 前缀与缺位都归一），避免裸字符串比较两边口径漂移
+    return ah::compareVersions(version.toStdString(), skipped.toStdString()) == 0;
+}
 
 QString UpdateChecker::mirrorPrefix() {
     QSettings s;

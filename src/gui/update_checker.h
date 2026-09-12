@@ -55,6 +55,10 @@ public:
     static void markChecked();
     static QString skippedVersion();
     static void skipVersion(const QString& version);
+    // 跳过判定用数值等价而不是字符串相等：清单 version 与历史保存值可能一边带
+    // v/V 前缀一边不带（旧版本保存的、或不同构建口径），裸比较会让"跳过此版本"
+    // 失效、弹窗反复出现
+    static bool isSkippedVersion(const QString& version);
 
     // 运行的是安装版（%LOCALAPPDATA%\MiderHive，兼容旧品牌 %LOCALAPPDATA%\AgentHive）还是便携版
     static bool isInstalledCopy();

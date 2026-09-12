@@ -310,7 +310,7 @@ void MainWindow::scheduleUpdateCheck() {
 }
 
 void MainWindow::promptUpdate(const ui::UpdateInfo& info) {
-    if (info.version == ui::UpdateChecker::skippedVersion()) return;  // 用户已选择跳过
+    if (ui::UpdateChecker::isSkippedVersion(info.version)) return;  // 用户已选择跳过（数值等价比较）
     QMessageBox box(this);
     box.setIcon(QMessageBox::Information);
     box.setWindowTitle(i18n::trs("发现新版本", "Update available"));

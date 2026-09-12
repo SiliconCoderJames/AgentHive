@@ -720,7 +720,7 @@ QWidget* SettingsDialog::buildUpdatePage() {
     connect(updater_, &ui::UpdateChecker::updateAvailable, this,
             [this](const ui::UpdateInfo& info) {
                 pending_ = info;
-                const bool skipped = (info.version == ui::UpdateChecker::skippedVersion());
+                const bool skipped = ui::UpdateChecker::isSkippedVersion(info.version);
                 latest_->setText(i18n::trs("发现新版本 ", "New version available ") + "v" +
                                  info.version +
                                  (skipped ? i18n::trs("（此前被跳过）", " (previously skipped)") : ""));

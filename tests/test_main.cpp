@@ -155,6 +155,10 @@ static void test_version_compare() {
     using ah::isNewerVersion;
     CHECK_EQ(compareVersions("1.0.0", "1.0.0"), 0);
     CHECK_EQ(compareVersions("v1.0.0", "1.0.0"), 0);   // v 前缀等价
+    CHECK_EQ(compareVersions("V1.0.0", "v1.0.0"), 0);  // 前缀大小写不敏感（V/v 混用）
+    CHECK_EQ(compareVersions("V1.0.0", "1.0.0"), 0);
+    CHECK(isNewerVersion("V1.0.1", "v1.0.0"));         // 跨大小写比较新版本
+    CHECK(!isNewerVersion("v1.0.0", "V1.0.0"));
     CHECK_EQ(compareVersions("1.2", "1.2.0"), 0);     // 缺位补 0
     CHECK(compareVersions("1.0.1", "1.0.0") > 0);
     CHECK(compareVersions("1.1.0", "1.0.9") > 0);
