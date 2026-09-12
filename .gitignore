@@ -11,6 +11,10 @@ _stage-*/
 # 打包所需的 WiX 源文件在 installer/MiderHive.wxs（入库）；本目录只留本地产物与说明。
 release/
 
+# Python 脚本（可行性验证 / 演示数据播种）产生的字节码缓存
+__pycache__/
+*.pyc
+
 # ---- 第三方依赖（FetchContent 缓存，scripts/fetch-deps.ps1 可重建）----
 vendor/
 
