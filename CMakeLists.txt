@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(MiderHive VERSION 1.0.1 LANGUAGES C CXX)
+project(MiderHive VERSION 1.0.2 LANGUAGES C CXX)
 
 # ---- 版本号：默认取 project(VERSION)，发布流水线用 -DMIDERHIVE_VERSION=v1.2.3 覆盖 ----
 set(MIDERHIVE_VERSION "${PROJECT_VERSION}" CACHE STRING "发布版本（可带 v 前缀与预发布后缀）")
