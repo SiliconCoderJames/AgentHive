@@ -460,14 +460,26 @@ bool Platform::knowledgeRemove(const std::string& actor, const std::string& uuid
     if (!isManager(actor)) { err = "only zcode can remove knowledge entries"; return false; }
     KnowledgeEntry cur;
     if (!knowledge_.latest(uuid, cur, err)) return false;
+    // 事务包裹删向量与删正文两步：后半步失败先回滚再返回失败，
+    // 避免留下无向量的正文（列表仍可见、语义检索失效的静默残留）
+    if (!db_.beginImmediate(err)) return false;
     // 删除全部版本与向量行（vec0 虚拟表按 entry_id 关联）
     if (!db_.query("DELETE FROM knowledge_vec WHERE entry_id IN "
                    "(SELECT id FROM knowledge_entries WHERE uuid=?)",
-                   [&](Stmt& st) { st.bind(1, uuid); }, nullptr, err))
+                   [&](Stmt& st) { st.bind(1, uuid); }, nullptr, err)) {
+        db_.rollback();
         return false;
+    }
     if (!db_.query("DELETE FROM knowledge_entries WHERE uuid=?",
-                   [&](Stmt& st) { st.bind(1, uuid); }, nullptr, err))
+                   [&](Stmt& st) { st.bind(1, uuid); }, nullptr, err)) {
+        db_.rollback();
         return false;
+    }
+    if (!db_.commit(err)) {
+        db_.rollback();
+        return false;
+    }
+    // 审计写在业务事务提交之后：审计失败只记入 err，不回滚已提交的删除
     audit_.log(actor, "knowledge.remove", uuid,
                nlohmann::json{{"title", cur.title}}.dump(), err);
     return true;

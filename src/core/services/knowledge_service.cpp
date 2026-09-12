@@ -40,6 +40,10 @@ bool KnowledgeService::create(const std::string& author, const std::string& titl
                               const std::string& embeddingProvider, KnowledgeEntry& out,
                               std::string& err) {
     std::string uuid = uuid4();
+    // 事务包裹正文与向量两步写入：向量一步失败时先回滚再返回失败，
+    // 否则会留下 is_latest=1 但无向量的孤儿记录——列表与关键词检索都能看到它，
+    // 语义检索却永远命中不了，且没有任何报错（范式与 addVersion 一致）
+    if (!db_.beginImmediate(err)) return false;
     if (!db_.query(
             "INSERT INTO knowledge_entries(uuid, title, content, tags_json, category, author, version, "
             "parent_version_id, is_latest, embedding_provider, created_at) "
@@ -54,10 +58,20 @@ bool KnowledgeService::create(const std::string& author, const std::string& titl
                 st.bind(7, embeddingProvider);
                 st.bind(8, nowIso());
             },
-            nullptr, err))
+            nullptr, err)) {
+        db_.rollback();
         return false;
+    }
     int64_t id = db_.lastInsertId();
-    if (!insertVec(id, embedding, err)) return false;
+    if (!insertVec(id, embedding, err)) {
+        db_.rollback();
+        return false;
+    }
+    if (!db_.commit(err)) {
+        db_.rollback();
+        return false;
+    }
+    // 提交后再读回：读回失败只代表本次调用失败，已提交的数据保持一致
     return latest(uuid, out, err);
 }
 

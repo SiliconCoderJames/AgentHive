@@ -12,12 +12,14 @@
 
 #include <httplib.h>
 #include <nlohmann/json.hpp>
+#include <sqlite3.h>
 
 #include "core/embed/embedder.h"
 #include "core/http/url_guard.h"
 #include "core/platform.h"
 #include "core/util.h"
 #include "core/version_util.h"
+#include "sqlite-vec.h"  // 生成头：第二个连接查 knowledge_vec 前需注册 vec0
 
 namespace fs = std::filesystem;
 using nlohmann::json;
@@ -521,6 +523,10 @@ static void test_platform_end_to_end() {
         std::vector<ah::MemoryEntry> memGone;
         CHECK(p.memoryList("project", memGone, rmErr));
         CHECK(memGone.empty());
+        // 删除是连历史版本一起删（COUNT 与 DELETE 原子），不是只翻转 is_latest
+        std::vector<ah::MemoryEntry> memHist;
+        CHECK(p.memoryHistory("project", "current", memHist, rmErr));
+        CHECK(memHist.empty());
         CHECK(!p.memoryRemove("zcode", "project", "nonexistent", rmErr));
 
         // ---- 加固项：备份与恢复 ----
@@ -550,6 +556,71 @@ static void test_platform_end_to_end() {
         CHECK(p.maintenanceRun("zcode", stats, rmErr));
         CHECK(stats.find("deleted_audit") != std::string::npos);
 
+        p.shutdown();
+    }
+    std::error_code ec;
+    fs::remove_all(tmp, ec);
+}
+
+// 直接对库文件统计行数：事务一致性（正文-向量、计数-删除）只能在存储层验证，
+// 走 API 探测会漏掉"列表可见但语义检索永远命中不了"的静默残留。
+// 平台对每个连接单独调用 sqlite3_vec_init 注册 vec0，第二个连接同样要先注册，
+// 否则查不了 knowledge_vec 虚表。
+static int64_t countRows(const fs::path& dbPath, const char* sql) {
+    sqlite3* db = nullptr;
+    if (sqlite3_open(dbPath.string().c_str(), &db) != SQLITE_OK) {
+        sqlite3_close(db);
+        return -1;
+    }
+    int64_t n = -1;
+    if (sqlite3_vec_init(db, nullptr, nullptr) == SQLITE_OK) {
+        sqlite3_stmt* st = nullptr;
+        if (sqlite3_prepare_v2(db, sql, -1, &st, nullptr) == SQLITE_OK) {
+            if (sqlite3_step(st) == SQLITE_ROW) n = sqlite3_column_int64(st, 0);
+        }
+        sqlite3_finalize(st);
+    }
+    sqlite3_close(db);
+    return n;
+}
+
+// 回归：知识的"正文-向量"两个存储必须同生同灭。
+// create() 是"INSERT 正文 + INSERT 向量"两步，knowledgeRemove() 是
+// "DELETE 向量 + DELETE 正文"两步；任一步失败若不回滚都会留下单侧残留：
+//   孤儿正文（is_latest=1 但无向量）——列表/关键词检索可见，语义检索永远命中不了且无报错；
+//   孤儿向量（正文已删但 vec0 行还在）——占用语义检索的 k 个召回名额，挤出正常结果。
+// 两条不变式直接查库验证：每条正文都有向量、每条向量都有正文。
+static void test_knowledge_vector_atomicity() {
+    fs::path tmp = fs::temp_directory_path() / ("MiderHive_test_vec_" + ah::randomHex(8));
+    fs::create_directories(tmp);
+    const fs::path dbPath = tmp / "platform.db";
+    {
+        ah::Platform p(tmp.string());
+        std::string err;
+        CHECK(p.bootstrap(err));
+        ah::KnowledgeEntry e;
+        CHECK(p.knowledgeCreate("zcode", "正文向量原子性",
+                                "正文与向量必须同生同灭，删除后不允许任何单侧残留。",
+                                {"回归"}, "验证", {}, "", e, err));
+        CHECK(!e.uuid.empty());
+        // 两个版本：create 与 addVersion 各写一条向量，remove 要把两条向量一起删干净
+        ah::KnowledgeEntry v2;
+        CHECK(p.knowledgeAddVersion("zcode", e.uuid, "", "第二版：覆盖追加版本路径的向量写入。", {}, "",
+                                    v2, err));
+        CHECK_EQ(v2.version, 2);
+
+        CHECK(p.knowledgeRemove("zcode", e.uuid, err));
+
+        // 不变式一：没有"有正文无向量"的孤儿（对应 create 的两步写入）
+        CHECK_EQ(countRows(dbPath, "SELECT COUNT(*) FROM knowledge_entries WHERE id NOT IN "
+                                   "(SELECT entry_id FROM knowledge_vec)"),
+                 0);
+        // 不变式二：没有"有向量无正文"的残留（对应 remove 的两步删除）
+        CHECK_EQ(countRows(dbPath, "SELECT COUNT(*) FROM knowledge_vec WHERE entry_id NOT IN "
+                                   "(SELECT id FROM knowledge_entries)"),
+                 0);
+        // 双版本的正文行全部删除
+        CHECK_EQ(countRows(dbPath, "SELECT COUNT(*) FROM knowledge_entries"), 0);
         p.shutdown();
     }
     std::error_code ec;
@@ -647,6 +718,7 @@ int main() {
     run("constant_time", test_constant_time_equals);
     run("version_compare", test_version_compare);
     run("platform_e2e", test_platform_end_to_end);
+    run("knowledge_vector_atomicity", test_knowledge_vector_atomicity);
     run("legacy_migration", test_legacy_migration);
 
     std::printf("checks: %d, failures: %d\n", g_checks, g_failures);

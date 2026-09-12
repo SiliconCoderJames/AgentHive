@@ -98,12 +98,26 @@ bool MemoryService::set(const std::string& author, const std::string& section, c
 bool MemoryService::remove(const std::string& section, const std::string& key, int64_t& removed,
                            std::string& err) {
     removed = 0;
+    // 事务包裹计数与删除：GUI 与 platformd 双进程并发写同库时，
+    // COUNT 与 DELETE 两步之间可能被插入新版本行，
+    // 令返回的 removed 与实际删除数不一致（该数字会写进审计 versions_removed）
+    if (!db_.beginImmediate(err)) return false;
     if (!db_.query("SELECT COUNT(*) FROM memory_entries WHERE section=? AND key=?",
                    [&](Stmt& st) { st.bind(1, section); st.bind(2, key); },
-                   [&](Stmt& st) { removed = st.i64(0); }, err))
+                   [&](Stmt& st) { removed = st.i64(0); }, err)) {
+        db_.rollback();
         return false;
-    return db_.query("DELETE FROM memory_entries WHERE section=? AND key=?",
-                     [&](Stmt& st) { st.bind(1, section); st.bind(2, key); }, nullptr, err);
+    }
+    if (!db_.query("DELETE FROM memory_entries WHERE section=? AND key=?",
+                   [&](Stmt& st) { st.bind(1, section); st.bind(2, key); }, nullptr, err)) {
+        db_.rollback();
+        return false;
+    }
+    if (!db_.commit(err)) {
+        db_.rollback();
+        return false;
+    }
+    return true;
 }
 
 bool MemoryService::history(const std::string& section, const std::string& key,
