@@ -61,7 +61,8 @@ $verNumeric = "$($Matches[1]).$($Matches[2]).$($Matches[3])"
 Write-Host "Release version: $Version (MSI: $verNumeric)"
 
 if ($VersionedDir) {
-    $OutDir   = Join-Path "release" ("V" + $verNumeric)
+    # Folder name mirrors the historical snapshots: release-V1.0.1 -> release-V1.0.2 ...
+    $OutDir   = Join-Path "release" ("release-V" + $verNumeric)
     $BuildDir = Join-Path $OutDir "build"
     $StageDir = Join-Path $OutDir "stage"
     Write-Host "per-version release folder: $OutDir (build: $BuildDir, stage: $StageDir)"
@@ -121,6 +122,11 @@ Step "4/7 generate WiX file manifest"
 # exist on a fresh clone; gen-wix-files.ps1 writes with [IO.File]::WriteAllText, which does
 # not create directories.
 New-Item -ItemType Directory -Force -Path (Join-Path $root "$OutDir/wix") | Out-Null
+if ($VersionedDir) {
+    # Snapshot the installer definition next to the artifacts, mirroring the historical
+    # release-V1.0.x folders that carried wix/<Brand>.wxs alongside files.generated.wxs.
+    Copy-Item (Join-Path $root "installer/MiderHive.wxs") (Join-Path $root "$OutDir/wix/MiderHive.wxs")
+}
 if ($PerMachine) {
     & "$PSScriptRoot/gen-wix-files.ps1" -StageDir (Join-Path $root $StageDir) `
         -OutFile (Join-Path $root "$OutDir/wix/files.generated.wxs") -PerMachine
@@ -215,6 +221,16 @@ $json = ($manifest | ConvertTo-Json -Depth 4)
                               (New-Object System.Text.UTF8Encoding($false)))
 Write-Host "  $manifestPath"
 Write-Host $json
+
+if ($VersionedDir) {
+    # Final contents must mirror the release-V1.0.x snapshot layout: deliverables, wix/ and
+    # docs only. Drop the reproducible build/stage intermediates and snapshot the process
+    # README so the folder is fully self-contained.
+    Copy-Item (Join-Path $root "release/README.md") (Join-Path $root "$OutDir/README.md") -Force
+    Remove-Item (Join-Path $root $BuildDir) -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item (Join-Path $root $StageDir) -Recurse -Force -ErrorAction SilentlyContinue
+    Write-Host "per-version folder finalized: $OutDir (README.md snapshotted, build/ stage/ removed)"
+}
 
 Write-Host "`n=== artifacts ===" -ForegroundColor Green
 Get-ChildItem $OutDir -File | Where-Object { $_.Extension -in @(".msi", ".zip", ".txt", ".json") } |
