@@ -92,8 +92,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          $ver = "${{ steps.ver.outputs.version }}" -replace '^v', ''
-          $tag = "v$ver"
+          # 产物文件名由 package.ps1 用"纯数字版本"命名（-rc1 之类后缀不进文件名），
+          # 这里必须切到同一种形式去找文件；tag 与预发布判定则用原始版本串。
+          $verRaw = "${{ steps.ver.outputs.version }}" -replace '^v', ''
+          if ($verRaw -notmatch '^([0-9]+\.[0-9]+\.[0-9]+)') { throw "unexpected version: $verRaw" }
+          $ver = $Matches[1]
+          $tag = "${{ steps.ver.outputs.version }}"
+          if (-not ($tag -match '^v')) { $tag = "v$verRaw" }
           $msi = "release/MiderHive-$ver-x64.msi"
           $zip = "release/MiderHive-$ver-win64-portable.zip"
           $sums = "release/SHA256SUMS.txt"
@@ -126,9 +131,9 @@ jobs:
           See ``release/RELEASE_NOTES-$ver.md`` for the full notes.
           "@
           }
-          # Tags containing '-' (e.g. v1.0.1-rc1) are published as pre-releases
+          # 版本串含 '-'（如 v1.0.1-rc1）时按预发布发布（用原始串判断,纯数字 $ver 已无后缀）
           $pre = @()
-          if ($ver -match '-') { $pre = @('--prerelease') }
+          if ($verRaw -match '-') { $pre = @('--prerelease') }
 
           # 已存在同标签的 Release 时直接补充资产，避免重复创建失败
           gh release view $tag 2>$null
