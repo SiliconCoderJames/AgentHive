@@ -38,7 +38,12 @@ param(
     # consumes them); CI passes ${{ github.repository }} so forks stay correct.
     [string]$Repo = "SiliconCoderJames/MiderHive",
     [switch]$SkipBuild,
-    [switch]$PerMachine
+    [switch]$PerMachine,
+    # Per-version release folder: derive OutDir/BuildDir/StageDir from the version so each
+    # release lives in one self-contained folder (release/V<version>/ holds the build tree,
+    # the stage dir, the generated WiX manifest, the MSI/ZIP artifacts and the release notes);
+    # the release/ root then only contains one folder per version plus the process README.
+    [switch]$VersionedDir
 )
 
 $ErrorActionPreference = "Stop"
@@ -54,6 +59,13 @@ if ($verRaw -notmatch '^([0-9]+)\.([0-9]+)\.([0-9]+)') {
 }
 $verNumeric = "$($Matches[1]).$($Matches[2]).$($Matches[3])"
 Write-Host "Release version: $Version (MSI: $verNumeric)"
+
+if ($VersionedDir) {
+    $OutDir   = Join-Path "release" ("V" + $verNumeric)
+    $BuildDir = Join-Path $OutDir "build"
+    $StageDir = Join-Path $OutDir "stage"
+    Write-Host "per-version release folder: $OutDir (build: $BuildDir, stage: $StageDir)"
+}
 
 Step "1/7 configure + build"
 if (-not $SkipBuild) {
