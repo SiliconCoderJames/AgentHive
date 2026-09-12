@@ -15,7 +15,7 @@ LogsPanel::LogsPanel(ah::Platform& platform, QWidget* parent)
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(16, 16, 16, 16);
     layout->setSpacing(12);
-    buildHeader(layout, "操作日志", "Audit Log",
+    buildHeader(layout, "audit", "操作日志", "Audit Log",
                 "谁、什么时候、做了什么——全部写操作可追溯，按天分组浏览",
                 "Every write, by whom and when - grouped by day");
 

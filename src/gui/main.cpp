@@ -1,5 +1,6 @@
 #include <QApplication>
 #include <QFile>
+#include <QFont>
 #include <QLocalServer>
 #include <QLocalSocket>
 #include <QMessageBox>
@@ -107,6 +108,16 @@ int main(int argc, char** argv) {
             app.setWindowIcon(brandIcon);
         else
             app.setWindowIcon(QIcon(hiveIcon(64)));
+    }
+
+    // 应用字体：优先 Segoe UI Variable（Win11 可变字体，低版本自动回落），并开启
+    // 等宽数字(tnum)——用量/时间戳每 3 秒刷新一次，等宽数字让它们不会左右抖动。
+    {
+        QFont f = app.font();
+        f.setFamilies({QStringLiteral("Segoe UI Variable Text"), QStringLiteral("Segoe UI"),
+                       QStringLiteral("Microsoft YaHei UI")});
+        f.setFeature(QFont::Tag("tnum"), 1);
+        app.setFont(f);
     }
 
     // 强制深色主题：QSS 模板经 ui::th() 主题化（当前主题与字号持久化于 QSettings）

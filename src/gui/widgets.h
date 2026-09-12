@@ -108,7 +108,7 @@ class RingProgress : public QWidget {
 public:
     RingProgress(QWidget* parent = nullptr) : QWidget(parent) {
         // 最小尺寸刻意压小：窗口在 1080x680 逻辑尺寸 + 12/13/14 三档字号下都要放得下
-        setMinimumSize(118, 118);
+        setMinimumSize(106, 106);
         setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
         // 透明底色：否则全局 QSS 的 QWidget 背景会在卡片内再涂一层页面底色，
         // 卡片里会出现一圈"卡中卡"暗框
@@ -209,7 +209,7 @@ private:
 class HBarChart : public QWidget {
 public:
     explicit HBarChart(QWidget* parent = nullptr) : QWidget(parent) {
-        setMinimumHeight(96);
+        setMinimumHeight(106);
         setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
         setStyleSheet("background:transparent;");  // 见 RingProgress：避免卡片内出现暗框
         setMouseTracking(true);  // 悬停行高亮 + tooltip：光看条长读不出确切数字
@@ -298,6 +298,12 @@ protected:
             // 宽度乘以入场扫掠进度
             double ratio = double(entries_[i].second) / double(maxV) * sweep_;
             int w = int(double(barW) * ratio);
+            // 轨道：柱体不再是悬空色条，"完成度"一眼可读（商业图表惯例）
+            QColor track = line();
+            track.setAlpha(95);
+            p.setPen(Qt::NoPen);
+            p.setBrush(track);
+            p.drawRoundedRect(QRect(barX, y + rowH / 2 - 5, barW, 10), 5, 5);
             QColor bar = accent();
             if (entries_[i].second != maxV) {
                 bar = accent().darker(100 + int((1.0 - ratio) * 90));
@@ -411,7 +417,7 @@ private:
 class VBarChart : public QWidget {
 public:
     explicit VBarChart(QWidget* parent = nullptr) : QWidget(parent) {
-        setMinimumHeight(120);
+        setMinimumHeight(106);
         setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
         setStyleSheet("background:transparent;");  // 见 RingProgress：避免卡片内出现暗框
         setMouseTracking(true);  // 柱顶只有紧凑标注（34.2k），悬停给出确切数值
@@ -473,14 +479,28 @@ protected:
         }
         const int valueH = 18;  // 顶部数值标签区
         const int labelH = 20;  // 底部日期标签区
-        QRectF plot(2, valueH, width() - 4, height() - valueH - labelH);
+        const int axisW = 34;   // 左侧刻度区：没有刻度的柱状图读不出量级
+        QRectF plot(axisW, valueH, width() - axisW - 2, height() - valueH - labelH);
         qint64 maxV = 1;
         for (const auto& e : entries_) maxV = qMax(maxV, e.second);
-        // 网格：顶/中/底三条淡虚线
+        // 网格：顶/中/底三条淡虚线 + 左侧量级刻度（顶=峰值，中=一半，底=0）
         p.setPen(QPen(line(), 1, Qt::DashLine));
         for (double r : {0.0, 0.5, 1.0}) {
             double y = plot.bottom() - plot.height() * r;
             p.drawLine(QPointF(plot.left(), y), QPointF(plot.right(), y));
+        }
+        {
+            QFont af = p.font();
+            af.setPixelSize(9);
+            p.setFont(af);
+            QColor dim = muted();
+            dim.setAlpha(190);
+            p.setPen(QPen(dim));
+            for (double r : {0.0, 0.5, 1.0}) {
+                double y = plot.bottom() - plot.height() * r;
+                p.drawText(QRectF(0, y - 8, axisW - 5, 16), Qt::AlignRight | Qt::AlignVCenter,
+                           fmtCompact(qint64(maxV * r)));
+            }
         }
         const int n = entries_.size();
         const double slot = plot.width() / n;
@@ -572,8 +592,8 @@ public:
         setObjectName("agentCard");
         hoverGlow(this, "agentCard");
         auto* lay = new QVBoxLayout(this);
-        lay->setContentsMargins(14, 12, 14, 12);
-        lay->setSpacing(6);
+        lay->setContentsMargins(13, 9, 13, 10);
+        lay->setSpacing(4);
         auto* head = new QHBoxLayout();
         name_ = new QLabel(this);
         name_->setStyleSheet("font-size:13px; font-weight:700; background:transparent;");
@@ -665,6 +685,9 @@ public:
                           .arg(c.green())
                           .arg(c.blue())
                           .arg(c.name()));
+        // 高度随内容增长：长文案换行后卡片必须跟着长高，否则文字会被卡片裁掉
+        // （审计脚本实测：超预算告警换行后被裁 33px）
+        setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Minimum);
         auto* lay = new QHBoxLayout(this);
         lay->setContentsMargins(12, 8, 12, 8);
         lay->setSpacing(8);
@@ -676,8 +699,110 @@ public:
         lay->addWidget(ic);
         auto* label = new QLabel(text, this);
         label->setWordWrap(true);
+        label->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::MinimumExpanding);
         label->setStyleSheet(QString("color:%1; font-size:12px; background:transparent;").arg(c.name()));
         lay->addWidget(label, 1);
+    }
+};
+
+// ---- KPI 磁贴：一屏顶部的关键数字（标题 / 大号数值 / 说明 + 图标徽章）----
+// 商业仪表盘惯例：数值用大号粗体 + 等宽数字（app 级 tnum），标题与说明弱化；
+// 悬停时描边点亮，颜色随语义（预算黄→红、错误红、正常绿）而变。
+class MetricTile : public QFrame {
+public:
+    MetricTile(const QString& iconKind, QWidget* parent = nullptr)
+        : QFrame(parent), iconKind_(iconKind) {
+        setObjectName("metricTile");
+        setAttribute(Qt::WA_Hover);
+        setMinimumHeight(68);
+        setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+        auto* lay = new QHBoxLayout(this);
+        lay->setContentsMargins(14, 10, 14, 10);
+        lay->setSpacing(10);
+        auto* col = new QVBoxLayout;
+        col->setContentsMargins(0, 0, 0, 0);
+        col->setSpacing(1);
+        title_ = new QLabel(this);
+        title_->setStyleSheet(th("color:@muted@; font-size:11px; background:transparent;"));
+        value_ = new QLabel(this);
+        value_->setStyleSheet(
+            th("color:@text@; font-size:23px; font-weight:700; background:transparent;"));
+        value_->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+        // 数值 + 环比胶囊同一行：变化量挨着数字，扫一眼就知道"涨了还是跌了"
+        delta_ = new QLabel(this);
+        delta_->setVisible(false);
+        auto* valueRow = new QHBoxLayout;
+        valueRow->setContentsMargins(0, 0, 0, 0);
+        valueRow->setSpacing(7);
+        valueRow->addWidget(value_);
+        valueRow->addWidget(delta_, 0, Qt::AlignVCenter);
+        valueRow->addStretch(1);
+        cap_ = new QLabel(this);
+        cap_->setStyleSheet(th("color:@muted@; font-size:11px; background:transparent;"));
+        col->addWidget(title_);
+        col->addLayout(valueRow);
+        col->addWidget(cap_);
+        lay->addLayout(col, 1);
+        icon_ = new QLabel(this);
+        icon_->setFixedSize(34, 34);
+        icon_->setAlignment(Qt::AlignCenter);
+        lay->addWidget(icon_, 0, Qt::AlignTop);
+        setStyleSheet(th("QFrame#metricTile { background:@card@; border:1px solid @line@;"
+                         " border-radius:12px; }"
+                         "QFrame#metricTile:hover { background:@fieldhover@;"
+                         " border:1px solid @accent@; }"));
+        paintIcon(accent());
+    }
+    // valueColor / iconColor 传无效色则回落为主题常规色
+    void set(const QString& title, const QString& value, const QString& caption,
+             const QColor& valueColor = QColor(), const QColor& iconColor = QColor()) {
+        title_->setText(title);
+        value_->setText(value);
+        cap_->setText(caption);
+        value_->setStyleSheet(
+            th(QString("color:%1; font-size:23px; font-weight:700; background:transparent;")
+                   .arg((valueColor.isValid() ? valueColor : text()).name())));
+        paintIcon(iconColor.isValid() ? iconColor : accent());
+    }
+    void setToolTipAll(const QString& tip) {
+        setToolTip(tip);
+        value_->setToolTip(tip);
+        title_->setToolTip(tip);
+        cap_->setToolTip(tip);
+    }
+    // 环比/占比胶囊：小号语义色徽标贴在数值右侧；传空文本即隐藏
+    void setDelta(const QString& text, const QColor& c) {
+        if (text.isEmpty()) {
+            delta_->setVisible(false);
+            return;
+        }
+        delta_->setText(text);
+        delta_->setStyleSheet(th(QString("color:%1; background:rgba(%2,%3,%4,38);"
+                                         " border-radius:7px; padding:1px 7px;"
+                                         " font-size:11px; font-weight:600;")
+                                     .arg(c.lighter(125).name())
+                                     .arg(c.red())
+                                     .arg(c.green())
+                                     .arg(c.blue())));
+        delta_->setVisible(true);
+    }
+
+private:
+    QString iconKind_;
+    QLabel* title_ = nullptr;
+    QLabel* value_ = nullptr;
+    QLabel* cap_ = nullptr;
+    QLabel* delta_ = nullptr;
+    QLabel* icon_ = nullptr;
+    QColor iconPainted_;
+    void paintIcon(const QColor& c) {
+        if (iconPainted_.isValid() && iconPainted_ == c) return;  // 颜色未变则跳过重绘
+        iconPainted_ = c;
+        icon_->setPixmap(makeIcon(iconKind_, c, 18).pixmap(18, 18));
+        icon_->setStyleSheet(th(QString("background:rgba(%1,%2,%3,34); border-radius:10px;")
+                                    .arg(c.red())
+                                    .arg(c.green())
+                                    .arg(c.blue())));
     }
 };
 

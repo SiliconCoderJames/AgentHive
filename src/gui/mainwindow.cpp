@@ -72,6 +72,7 @@ MainWindow::MainWindow(ah::Platform& platform, QWidget* parent)
                                                Qt::SmoothTransformation));
     }
     logo_ = new QLabel("MiderHive", brand);
+    logo_->setTextFormat(Qt::RichText);  // 字标为双色艺术字（Mider 中性 + Hive 品牌色），随主题重涂
     brandRow->addWidget(logoMark_);
     brandRow->addWidget(logo_);
     brandRow->addStretch(1);
@@ -189,8 +190,8 @@ void MainWindow::hideEvent(QHideEvent* e) {
 void MainWindow::buildNav() {
     nav_->clear();
     nav_->setStyleSheet(ui::th(
-        "QListWidget { background:@deep@; border:none; padding:0 8px; font-size:14px; }"
-        "QListWidget::item { padding:13px 14px; margin:3px 6px; border-radius:8px;"
+        "QListWidget { background:@deep@; border:none; padding:2px 8px; font-size:13px; }"
+        "QListWidget::item { padding:12px 14px; margin:2px 8px; border-radius:8px;"
         " color:@muted@; border-left:3px solid transparent; }"
         "QListWidget::item:hover { background:@card@; color:@text@; }"
         "QListWidget::item:selected { background:@selbg@; color:@seltext@;"
@@ -259,21 +260,31 @@ void MainWindow::rebuildPanels() {
 
 void MainWindow::applyChrome() {
     side_->setStyleSheet(ui::th("QWidget { background:@deep@; }"));
+    // 双色艺术字标：Mider 中性色 + Hive 品牌色，随主题重涂
+    logo_->setText(ui::th("<span style='color:@text@;'>Mider</span>"
+                          "<span style='color:@brand@;'>Hive</span>"));
     logo_->setStyleSheet(
-        ui::th("font-size:18px; font-weight:800; color:@text@; background:transparent;"));
-    tagline_->setStyleSheet(ui::th("font-size:11px; color:@muted@; background:transparent;"));
+        ui::th("font-size:19px; font-weight:800; color:@text@; background:transparent;"));
+    tagline_->setStyleSheet(
+        ui::th("font-size:11px; font-weight:500; color:@muted@; background:transparent;"));
     brandLine_->setStyleSheet(ui::th(
         "background:qlineargradient(x1:0,y1:0,x2:1,y2:0,"
         "stop:0 @brand@, stop:0.55 @accent@, stop:1 transparent);"
         "border-radius:1px; margin:0 18px 8px 18px;"));
-    ver_->setStyleSheet(ui::th("font-size:11px; color:@muted@; background:transparent;"));
+    ver_->setStyleSheet(ui::th(
+        "font-family:'@mono@'; font-size:11px; color:@muted@; background:transparent;"));
     const QString btn = ui::th(
-        "QToolButton { color:@muted@; font-size:11px; border:1px solid @line@;"
-        " border-radius:6px; padding:3px 9px; }"
-        "QToolButton:hover { color:@text@; border-color:@accent@; }");
+        "QToolButton { color:@muted@; font-size:11px; font-weight:600;"
+        " border:1px solid @line@; border-radius:7px; padding:4px 10px; }"
+        "QToolButton:hover { color:@text@; border-color:@accenthi@; background:@card@; }"
+        "QToolButton:pressed { background:@fieldhover@; border-color:@accent@; }");
     langBtn_->setStyleSheet(btn);
     settingsBtn_->setStyleSheet(btn);
     settingsBtn_->setIcon(ui::makeIcon("gear", ui::muted(), 16));  // 随主题重涂齿轮
+    // 手型光标：导航与 chrome 按钮都是可点击目标（产品化交互惯例）
+    nav_->viewport()->setCursor(Qt::PointingHandCursor);
+    langBtn_->setCursor(Qt::PointingHandCursor);
+    settingsBtn_->setCursor(Qt::PointingHandCursor);
 }
 
 void MainWindow::applyUiPrefs() {

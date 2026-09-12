@@ -141,7 +141,9 @@ inline QColor muted() { return theme().muted; }
 inline QColor selText() { return theme().selText; }
 
 inline QString mono() { return QString(theme().mono); }
-inline QString sans() { return QStringLiteral("Segoe UI, Microsoft YaHei UI"); }
+inline QString sans() {
+    return QStringLiteral("Segoe UI Variable Text, Segoe UI, Microsoft YaHei UI");
+}
 
 // 用量占比 → 颜色（预算临近渐变：<80% 强调色，<95% 警告，其余危险）
 inline QColor usageColor(double ratio) {

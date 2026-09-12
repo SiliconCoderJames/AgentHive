@@ -11,9 +11,22 @@ DashboardPanel::DashboardPanel(ah::Platform& platform, QWidget* parent)
     : PanelBase(platform, parent) {
     auto* root = new QVBoxLayout(this);
     root->setContentsMargins(16, 16, 16, 16);
-    root->setSpacing(12);
-    buildHeader(root, "总览", "Overview", "预算消耗 · Agent 状态 · 事件流与告警，一屏掌握蜂巢动态",
+    root->setSpacing(10);
+    buildHeader(root, "overview", "总览", "Overview", "预算消耗 · Agent 状态 · 事件流与告警，一屏掌握蜂巢动态",
                 "Budget, agent status, event stream and alerts at a glance");
+
+    // ---- 顶部 KPI 磁贴行：本周 Token / Agent / 今日消耗 / 未解决错误 ----
+    auto* kpiRow = new QHBoxLayout();
+    kpiRow->setSpacing(14);
+    kpiTokens_ = new ui::MetricTile("overview", this);
+    kpiAgents_ = new ui::MetricTile("plug", this);
+    kpiToday_ = new ui::MetricTile("audit", this);
+    kpiErrors_ = new ui::MetricTile("errors", this);
+    kpiRow->addWidget(kpiTokens_, 1);
+    kpiRow->addWidget(kpiAgents_, 1);
+    kpiRow->addWidget(kpiToday_, 1);
+    kpiRow->addWidget(kpiErrors_, 1);
+    root->addLayout(kpiRow);
 
     // ---- 第一行：Token 环形图 + 各 Agent 用量柱状图 ----
     auto* topRow = new QHBoxLayout();
@@ -22,7 +35,7 @@ DashboardPanel::DashboardPanel(ah::Platform& platform, QWidget* parent)
     budgetCard_ = new QGroupBox(i18n::trs("本周 Token 预算", "Weekly Token Budget"), this);
     budgetCard_->setObjectName("card");
     auto* bl = new QVBoxLayout(budgetCard_);
-    bl->setContentsMargins(10, 18, 10, 8);
+    bl->setContentsMargins(8, 16, 8, 6);
     ring_ = new ui::RingProgress(budgetCard_);
     bl->addWidget(ring_, 1);
     topRow->addWidget(budgetCard_, 2);
@@ -30,7 +43,7 @@ DashboardPanel::DashboardPanel(ah::Platform& platform, QWidget* parent)
     usageCard_ = new QGroupBox(i18n::trs("各 Agent 本周用量", "Per-Agent Usage This Week"), this);
     usageCard_->setObjectName("card");
     auto* ul = new QVBoxLayout(usageCard_);
-    ul->setContentsMargins(10, 18, 10, 8);
+    ul->setContentsMargins(8, 16, 8, 6);
     usageChart_ = new ui::HBarChart(usageCard_);
     ul->addWidget(usageChart_, 1);
     topRow->addWidget(usageCard_, 3);
@@ -40,13 +53,13 @@ DashboardPanel::DashboardPanel(ah::Platform& platform, QWidget* parent)
     agentsCard_ = new QGroupBox(i18n::trs("Agent 状态", "Agent Status"), this);
     agentsCard_->setObjectName("card");
     auto* al = new QVBoxLayout(agentsCard_);
-    al->setContentsMargins(10, 18, 10, 8);
+    al->setContentsMargins(8, 16, 8, 6);
     auto* gridHolder = new QWidget(agentsCard_);
     // 透明底色：否则全局 QSS 的 QWidget 背景会在卡片内再涂一层页面底色，形成"卡中卡"暗框
     gridHolder->setStyleSheet("background:transparent;");
     agentGrid_ = new QGridLayout(gridHolder);
     agentGrid_->setContentsMargins(0, 0, 0, 0);
-    agentGrid_->setSpacing(10);
+    agentGrid_->setSpacing(8);
     al->addWidget(gridHolder);
     al->addStretch(1);
     // Agent 状态按内容取高（不吸收多余空间）：Agent 少时不再撑出一大片空白
@@ -58,14 +71,14 @@ DashboardPanel::DashboardPanel(ah::Platform& platform, QWidget* parent)
     trendCard_ = new QGroupBox(i18n::trs("最近 14 天逐日消耗", "Daily Tokens (14 days)"), this);
     trendCard_->setObjectName("card");
     auto* trl = new QVBoxLayout(trendCard_);
-    trl->setContentsMargins(10, 18, 10, 8);
+    trl->setContentsMargins(8, 16, 8, 6);
     trendChart_ = new ui::VBarChart(trendCard_);
     trl->addWidget(trendChart_, 1);
     trendRow->addWidget(trendCard_, 3);
     modelCard_ = new QGroupBox(i18n::trs("模型用量累计", "Tokens by Model"), this);
     modelCard_->setObjectName("card");
     auto* ml = new QVBoxLayout(modelCard_);
-    ml->setContentsMargins(10, 18, 10, 8);
+    ml->setContentsMargins(8, 16, 8, 6);
     modelChart_ = new ui::HBarChart(modelCard_);
     ml->addWidget(modelChart_, 1);
     trendRow->addWidget(modelCard_, 2);
@@ -81,6 +94,8 @@ DashboardPanel::DashboardPanel(ah::Platform& platform, QWidget* parent)
     tl->setContentsMargins(10, 18, 10, 8);
     timeline_ = new QListWidget(tlCard_);
     timeline_->setAlternatingRowColors(true);
+    // 封顶：事件流是"最近动态"的窗口，不该无限吃掉首屏高度（完整审计在「操作日志」面板）
+    timeline_->setMaximumHeight(210);
     // 经 ui::th() 生成：等宽字体族与字号随主题/字号档位缩放（原先硬编码 11px 不随动）
     timeline_->setStyleSheet(ui::th(
         "QListWidget { font-family:@mono@,monospace; font-size:11px; }"
@@ -116,11 +131,37 @@ void DashboardPanel::refresh() {
         usageChart_->setEntries(bars);
 
         budgetAlertLevel_ = QString::fromStdString(sum.alert_level);
+
+        // KPI：本周 Token（数值紧凑记法，精确值进 tooltip；颜色随预算占比）
+        const double ratio = sum.budget > 0 ? double(sum.total_tokens) / double(sum.budget) : 0.0;
+        kpiTokens_->set(i18n::trs("本周 Token", "Weekly tokens"), ui::fmtCompact(sum.total_tokens),
+                        i18n::trs("预算 %1 · 剩余 %2", "budget %1 · left %2")
+                            .arg(ui::fmtCompact(sum.budget),
+                                 ui::fmtCompact(qMax<qint64>(0, sum.budget - sum.total_tokens))),
+                        ui::usageColor(ratio));
+        kpiTokens_->setToolTipAll(i18n::trs("本周已用 %1 / %2（%3%）", "used %1 of %2 (%3%)")
+                                      .arg(formatNum(sum.total_tokens))
+                                      .arg(formatNum(sum.budget))
+                                      .arg(ratio * 100, 0, 'f', 1));
+        // 预算占用率做成胶囊：数字旁边直接看到"用了多少比例"
+        kpiTokens_->setDelta(QString("%1%").arg(ratio * 100, 0, 'f', 0), ui::usageColor(ratio));
     }
 
     // Agent 状态卡片网格（列数随可用宽度自适应；卡片池复用避免闪烁）
     std::vector<ah::AgentInfo> agents;
     if (platform_.listAgents(agents, err)) {
+        // KPI：在线 / 总数（全在线时说明文字也变绿，一眼可判）
+        int online = 0;
+        for (const auto& a : agents)
+            if (a.status == "online") ++online;
+        const int total = static_cast<int>(agents.size());
+        const bool allOn = total > 0 && online == total;
+        const QColor c = online > 0 ? ui::ok() : ui::muted();
+        kpiAgents_->set(i18n::trs("Agent", "Agents"),
+                        QString("%1/%2").arg(online).arg(total),
+                        allOn ? i18n::trs("全部在线", "all online")
+                              : i18n::trs("在线 / 总数", "online / total"),
+                        c, c);
         size_t need = agents.size();
         while (agentCards_.size() < need)
             agentCards_.push_back(new ui::AgentCard(this));
@@ -153,6 +194,23 @@ void DashboardPanel::refresh() {
         if (es != lastDaily_) {
             lastDaily_ = es;
             trendChart_->setEntries(es);
+        }
+        // KPI：今日消耗 + 与昨日环比（商业仪表盘的"今天怎么样"一栏）
+        if (!es.isEmpty()) {
+            const qint64 today = es.back().second;
+            const qint64 prev = es.size() >= 2 ? es[es.size() - 2].second : 0;
+            kpiToday_->set(i18n::trs("今日消耗", "Today's tokens"), ui::fmtCompact(today),
+                           i18n::trs("较昨日", "vs yesterday"), ui::accent());
+            if (prev > 0) {
+                const double d = 100.0 * double(today - prev) / double(prev);
+                // 成本类指标：涨=不利（红）、跌=有利（绿）
+                kpiToday_->setDelta(QString("%1%2%").arg(d >= 0 ? "▲ " : "▼ ").arg(qAbs(d), 0, 'f', 0),
+                                    d >= 0 ? ui::danger() : ui::ok());
+            } else {
+                kpiToday_->setDelta(QString(), QColor());
+            }
+            kpiToday_->setToolTipAll(i18n::trs("今日已用 %1 tokens", "%1 tokens today")
+                                         .arg(formatNum(today)));
         }
     }
     std::vector<ah::UsageModelRow> modelRows;
@@ -187,7 +245,9 @@ void DashboardPanel::refresh() {
                                   "Token usage exceeded this week's budget!"),
             this));
     std::vector<ah::ErrorReport> openErrors;
-    platform_.errorList("open", "", 10, openErrors, err);
+    // 总览只放最近 4 条：告警是"抬头看一眼"的信息，完整清单在「错误报告」面板；
+    // 全量列出会把首屏推高到需要滚动（密度审计实测）
+    platform_.errorList("open", "", 4, openErrors, err);
     for (const auto& e : openErrors) {
         const QString when = relTime(QString::fromStdString(e.created_at));
         alertCards_.push_back(new ui::AlertCard(
@@ -198,8 +258,21 @@ void DashboardPanel::refresh() {
                 .arg(when),
             this));
     }
-    int at = alertsLay_->indexOf(emptyAlerts_);
-    for (auto* card : alertCards_) {
+    // KPI：未解决错误总数（告警列表只取 10 条，计数单独取全量）
+    {
+        std::vector<ah::ErrorReport> allOpen;
+        int openCount = static_cast<int>(openErrors.size());
+        if (platform_.errorList("open", "", 999, allOpen, err))
+            openCount = static_cast<int>(allOpen.size());
+        const QColor c = openCount == 0 ? ui::ok() : ui::danger();
+        kpiErrors_->set(i18n::trs("未解决错误", "Unresolved errors"), QString::number(openCount),
+                        openCount == 0 ? i18n::trs("一切正常", "all clear")
+                                       : i18n::trs("到「错误报告」处理", "resolve in Errors"),
+                        c, c);
+        kpiErrors_->setToolTipAll(
+            i18n::trs("当前有 %1 条未解决错误", "%1 unresolved error(s)").arg(openCount));
+    }
+    int at = alertsLay_->indexOf(emptyAlerts_);    for (auto* card : alertCards_) {
         int insertAt = at < 0 ? alertsLay_->count() : at;
         alertsLay_->insertWidget(insertAt, card);
         ++at;

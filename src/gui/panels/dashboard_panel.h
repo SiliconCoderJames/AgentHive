@@ -19,6 +19,10 @@ public:
     void refresh() override;
 
 private:
+    ui::MetricTile* kpiTokens_ = nullptr;    // 顶部 KPI 磁贴行：先给结论，再给图表
+    ui::MetricTile* kpiAgents_ = nullptr;
+    ui::MetricTile* kpiToday_ = nullptr;
+    ui::MetricTile* kpiErrors_ = nullptr;
     ui::RingProgress* ring_ = nullptr;
     ui::HBarChart* usageChart_ = nullptr;
     ui::VBarChart* trendChart_ = nullptr;    // 最近 14 天逐日消耗

@@ -53,7 +53,7 @@ MessagesPanel::MessagesPanel(ah::Platform& platform, QWidget* parent)
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(16, 16, 16, 16);
     layout->setSpacing(12);
-    buildHeader(layout, "Agent 交流", "Messaging",
+    buildHeader(layout, "messages", "Agent 交流", "Messaging",
                 "留言 / 提问 / 指派任务，异步流转，不要求同时在线",
                 "Notes, questions and tasks with async state machine");
 

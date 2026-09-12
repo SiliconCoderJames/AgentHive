@@ -8,6 +8,7 @@
 
 #include "../i18n.h"
 #include "../theme.h"
+#include "../widgets.h"   // ui::makeIcon：页头图标徽章与侧栏图标同源
 // 经 miderhive_core 的 PUBLIC include 路径（src/）解析
 #include "core/platform.h"
 
@@ -25,11 +26,18 @@ public:
     }
 
 protected:
-    // 页头：面板标题 + 一句话说明，统一各面板的视觉节奏（双语，可重译）
-    void buildHeader(QVBoxLayout* layout, const QString& zhTitle, const QString& enTitle,
-                     const QString& zhSub, const QString& enSub) {
+    // 页头：图标徽章 + 品牌饰条 + 面板标题/说明竖列，统一各面板的视觉节奏（双语，可重译）
+    void buildHeader(QVBoxLayout* layout, const QString& iconKind, const QString& zhTitle,
+                     const QString& enTitle, const QString& zhSub, const QString& enSub) {
         zhTitle_ = zhTitle; enTitle_ = enTitle;
         zhSub_ = zhSub; enSub_ = enSub;
+        // 图标徽章：圆角色块 + 与侧栏同源的矢量图标，给每个面板一个统一的视觉锚点
+        auto* chip = new QLabel(this);
+        chip->setFixedSize(38, 38);
+        chip->setAlignment(Qt::AlignCenter);
+        chip->setPixmap(ui::makeIcon(iconKind, ui::accent(), 20).pixmap(20, 20));
+        chip->setStyleSheet(ui::th("background:@selbg@; border:1px solid @line@;"
+                                   " border-radius:11px;"));
         headerTitle_ = new QLabel(i18n::trs(zhTitle, enTitle), this);
         headerTitle_->setStyleSheet(
             ui::th("font-size:20px; font-weight:700; color:@text@;"));
@@ -37,22 +45,28 @@ protected:
         // 标题与正文之间被撑出一大片空白（内容区反而没拿到空间）
         headerTitle_->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
         headerSub_ = new QLabel(i18n::trs(zhSub, enSub), this);
-        headerSub_->setStyleSheet(ui::th("font-size:12px; color:@muted@; margin-top:2px;"));
+        headerSub_->setStyleSheet(ui::th("font-size:12px; color:@muted@;"));
         headerSub_->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+        headerSub_->setWordWrap(true);
+        // 标题与说明收成一个竖列：与徽章同高对齐，页头更紧凑
+        auto* titleCol = new QVBoxLayout;
+        titleCol->setSpacing(3);
+        titleCol->setContentsMargins(0, 0, 0, 0);
+        titleCol->addWidget(headerTitle_);
+        titleCol->addWidget(headerSub_);
         // 标题蜜金→天蓝竖向渐变饰条：全面板统一的品牌签名
         auto* bar = new QFrame(this);
-        bar->setFixedSize(4, 26);
+        bar->setFixedSize(4, 28);
         bar->setStyleSheet(
             ui::th("background:qlineargradient(x1:0,y1:0,x2:0,y2:1,"
                    "stop:0 @brand@, stop:1 @accent@); border-radius:2px;"));
         auto* head = new QHBoxLayout;
-        head->setSpacing(10);
+        head->setSpacing(12);
+        head->addWidget(chip);
         head->addWidget(bar);
-        head->addWidget(headerTitle_);
-        head->addStretch(1);
+        head->addLayout(titleCol, 1);
         layout->addLayout(head);
-        layout->addWidget(headerSub_);
-        layout->addSpacing(10);
+        layout->addSpacing(12);
     }
 
     ah::Platform& platform_;

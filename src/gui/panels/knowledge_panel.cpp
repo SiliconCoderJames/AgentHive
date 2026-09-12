@@ -25,7 +25,7 @@ KnowledgePanel::KnowledgePanel(ah::Platform& platform, QWidget* parent)
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(16, 16, 16, 16);
     layout->setSpacing(12);
-    buildHeader(layout, "知识库", "Knowledge Base",
+    buildHeader(layout, "knowledge", "知识库", "Knowledge Base",
                 "经验 / 方案 / 踩坑统一沉淀，关键词与语义双模式检索，版本只追加不覆盖",
                 "Shared know-how with keyword & semantic search; append-only versions");
 
